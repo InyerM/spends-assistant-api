@@ -59,7 +59,9 @@ export async function saveExpense(expense, env) {
 
     console.log('[Sheets] Guardando fila:', values[0]);
 
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Todos!A:H:append?valueInputOption=USER_ENTERED`;
+    // Update range to A:I to include the new column
+    // Add insertDataOption=INSERT_ROWS to inherit formatting from the previous row
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Todos!A:I:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -198,26 +200,20 @@ export function formatDateForSheets(isoDate) {
 }
 
 /**
- * Converts 24h time (HH:mm) to 12h format (h:mm:ss a) or similar.
+ * Converts time to HH:mm:ss format.
+ * Sends 24h time to Sheets so it is recognized as a valid Time value.
+ * The Sheet's formatting (inherited via INSERT_ROWS) will handle the AM/PM display.
  * @param {string} time24 - Time in HH:mm or HH:mm:ss
- * @returns {string} - Time in 12h format
+ * @returns {string} - Time in HH:mm:ss
  */
 function formatTimeForSheets(time24) {
   if (!time24) return '';
   
-  // If it's already in 12h format (contains a/p/m), return as is
-  if (time24.match(/[ap]\.?\s*m\.?/i)) return time24;
+  // If it already has seconds, return as is
+  if (time24.split(':').length === 3) return time24;
 
-  const [hours, minutes, seconds] = time24.split(':');
-  let h = parseInt(hours, 10);
-  const m = minutes || '00';
-  const s = seconds || '00';
-  
-  const ampm = h >= 12 ? 'p. m.' : 'a. m.';
-  h = h % 12;
-  h = h ? h : 12; // the hour '0' should be '12'
-  
-  return `${h}:${m}:${s} ${ampm}`;
+  // Append seconds if missing
+  return `${time24}:00`;
 }
 
 /**
