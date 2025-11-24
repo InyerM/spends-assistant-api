@@ -1,0 +1,11 @@
+# Environment variables
+.env.local
+.dev.vars
+
+# Node modules
+node_modules
+
+# Wrangler
+.wrangler
+
+.DS_Store
