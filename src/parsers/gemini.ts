@@ -37,8 +37,12 @@ export async function parseExpense(
       temperature: 0.1,
       topP: 0.95,
       topK: 40,
-      maxOutputTokens: 2048,
-      responseMimeType: "application/json"
+      maxOutputTokens: 8192,
+      responseMimeType: "application/json",
+      // Disable thinking mode to avoid token consumption on reasoning
+      thinkingConfig: {
+        thinkingBudget: 0
+      }
     }
   };
 
