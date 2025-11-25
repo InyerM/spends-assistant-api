@@ -90,7 +90,7 @@ export async function handleTelegram(request: Request, env: Env): Promise<Respon
 
 🔗 [View Dashboard](${env.APP_URL || '#'})`;
       
-      await ctx.reply(confirmationMessage, { parse_mode: 'Markdown' });
+      await ctx.reply(confirmationMessage);
 
     } catch (error: unknown) {
       console.error("Processing error:", error);
