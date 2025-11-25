@@ -5,7 +5,6 @@ compatibility_date = "2024-11-23"
 
 [vars]
 ENVIRONMENT = "production"
-SUPABASE_URL = "http://localhost:54321"
 
 [observability]
 enabled = true

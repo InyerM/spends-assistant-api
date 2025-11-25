@@ -1,65 +1,181 @@
-# Smart Expense Assistant
+# Expense Assistant Microservice
 
-Telegram bot hosted on Cloudflare Workers that uses Gemini 2.0 Flash to parse expenses and save them to Google Sheets.
+## Overview
 
-## Features
-- 🧠 **AI Parsing**: Extracts data from natural language, emails, and SMS.
-- 📊 **Google Sheets**: Auto-saves to a structured spreadsheet.
-- ⚡ **Cloudflare Workers**: Serverless, fast, and cheap.
+Intelligent expense tracking system that automatically processes and categorizes transactions from multiple sources using AI, with cloud database storage and Redis caching.
 
-## Setup
+## Architecture
 
-### 1. Google Cloud Setup
-1. Go to [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project.
-3. Enable **Google Sheets API**.
-4. Create a **Service Account**:
-   - Go to IAM & Admin > Service Accounts.
-   - Create new service account.
-   - Create Key > JSON. Download the file.
-5. **Share your Google Sheet** with the service account email (client_email in the JSON).
+**Platform**: Cloudflare Workers (TypeScript)  
+**Database**: Supabase PostgreSQL  
+**AI**: Google Gemini 2.5 Flash  
+**Cache**: Redis (optional)  
+**Timezone**: America/Bogota
 
-### 2. Telegram Bot Setup
-1. Talk to [@BotFather](https://t.me/botfather).
-2. Create a new bot (`/newbot`).
-3. Get the **API Token**.
+## How It Works
 
-### 3. Gemini API
-1. Get an API key from [Google AI Studio](https://aistudio.google.com/).
+### 1. Input Sources
 
-### 4. Project Configuration
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Configure Secrets (in Cloudflare):
-   ```bash
-   npx wrangler secret put TELEGRAM_BOT_TOKEN
-   npx wrangler secret put GEMINI_API_KEY
-   npx wrangler secret put GOOGLE_SHEET_ID
-   # For GOOGLE_CREDENTIALS_JSON, encode your entire JSON file to base64 first:
-   # base64 -i credentials.json | pbcopy
-   npx wrangler secret put GOOGLE_CREDENTIALS_JSON
-   ```
+The microservice accepts expenses from three channels:
 
-### 5. Deploy
-```bash
-npx wrangler deploy
+- **Telegram Bot** (`/telegram`): Manual messages or forwarded bank SMS
+- **Email** (`/email`): Gmail forwarded Bancolombia notifications
+- **API** (`/transaction`): Direct transaction creation (iOS Shortcut, etc.)
+
+### 2. Processing Flow
+
+```
+1. Message arrives → Handler receives text
+2. Check Redis cache for duplicate message
+3. If not cached: Send to Gemini AI for parsing
+4. Gemini extracts: amount, description, category, bank, payment method
+5. Lookup account and category in database
+6. Apply automation rules (e.g., detect transfers)
+7. Save transaction to Supabase
+8. Cache parsed result (24h TTL)
+9. Send confirmation
 ```
 
-### 6. Set Webhook
-After deploying, set the Telegram webhook to your worker URL:
-```bash
-curl -F "url=https://your-worker-name.your-subdomain.workers.dev/telegram" https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook
+### 3. AI Parsing (Gemini)
+
+Handles multiple input formats:
+- **Bank SMS**: "Bancolombia: Compraste $11.000 en DLO*GOOGLE con tu T.Deb *7799, el 23/11/2024 a las 21:02"
+- **Manual**: "20k en almuerzo" or "bought 50k groceries"
+- **Nequi**: "Nequi: Pagaste $50.000 en UBER"
+
+Extracts:
+- Amount, description, category
+- Bank, payment type (debit/credit/cash), source
+- Original date/time (if present in SMS)
+- Card last 4 digits (for multi-card accounts)
+- Confidence score (0-100)
+
+### 4. Database Schema
+
+**Main Tables**:
+- `accounts`: Bank accounts (Bancolombia, Nequi, Cash)
+- `categories`: Expense/income categories
+- `transactions`: All financial transactions
+- `automation_rules`: Auto-categorization & transfer detection
+
+### 5. Smart Features
+
+**Automation Rules**:
+- Auto-detect transfers between accounts
+- Auto-categorize by keywords/patterns
+- Link related transactions
+
+**Redis Caching**:
+- Stores parsed Gemini responses (24h)
+- Prevents duplicate API calls for same message
+- SHA-256 hash of message text as key
+- Fail-open: works without Redis
+
+**Multi-Card Support**:
+- Matches transactions to specific card by last 4 digits
+- Falls back to default account if not found
+
+## Services Architecture
+
+```
+src/services/
+├── supabase/
+│   ├── accounts.service.ts      # Account lookups
+│   ├── categories.service.ts    # Category lookups
+│   ├── transactions.service.ts  # Transaction CRUD
+│   ├── automation-rules.service.ts  # Business logic
+│   └── index.ts                 # Factory pattern
+└── cache.service.ts             # Redis caching
 ```
 
-## Usage
-- Send a message: "20k lunch"
-- Forward an email from Bancolombia.
-- Forward an SMS from Nequi.
+## Key Flows
 
-## Structure
-- `src/index.js`: Entry point.
-- `src/handlers/telegram.js`: Bot logic.
-- `src/parsers/gemini.js`: AI extraction.
-- `src/services/sheets.js`: Google Sheets integration.
+### Telegram Flow
+```
+User sends "20k almuerzo"
+↓
+Telegram handler receives update
+↓
+CacheService checks if message processed before
+↓
+Gemini parses: {amount: 20000, category: "food", ...}
+↓
+AccountsService finds "cash" account
+↓
+CategoriesService finds "food" category
+↓
+AutomationRulesService applies rules
+↓
+TransactionsService saves to database
+↓
+CacheService stores result
+↓
+Bot sends confirmation message
+```
+
+### Email Flow
+```
+Gmail forwards Bancolombia email
+↓
+Apps Script extracts text → POST /email
+↓
+Email handler validates "Bancolombia" keyword
+↓
+Extract clean transaction text
+↓
+Same AI parsing + DB flow
+↓
+Return JSON response
+```
+
+## Environment Variables
+
+**Required**:
+- `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
+- `GEMINI_API_KEY`
+- `TELEGRAM_BOT_TOKEN`
+- `API_KEY`
+
+**Optional**:
+- `REDIS_URL`, `REDIS_PASSWORD`
+- `APP_URL`
+
+## Data Models
+
+**Transaction**:
+```typescript
+{
+  date: "2024-11-23",
+  time: "21:02:00",
+  amount: 11000,
+  description: "DLO*GOOGLE Google On",
+  category_id: "uuid",
+  account_id: "uuid",
+  type: "expense",
+  payment_method: "debit",
+  source: "bancolombia_email",
+  confidence: 100
+}
+```
+
+## Performance
+
+- **First request**: ~6s (Gemini API call)
+- **Cached request**: ~50ms (Redis hit)
+- **Database**: ~100ms (Supabase query)
+
+## Development
+
+```bash
+pnpm install
+pnpm dev              # Local development
+pnpm type-check       # TypeScript validation
+pnpm lint             # ESLint
+pnpm supabase:start   # Local DB (optional)
+```
+
+## Deployment
+
+**Platform**: Cloudflare Workers  
+**Database**: Supabase Cloud  
+**Cache**: Redis Cloud (Upstash, Railway, etc.)
