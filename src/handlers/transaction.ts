@@ -1,4 +1,5 @@
 import { createSupabaseServices } from '../services/supabase';
+import { CacheService } from '../services/cache.service';
 import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
 import { getCurrentColombiaTimes } from '../utils/date';
@@ -23,7 +24,8 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
     }
 
     const { parseExpense } = await import('../parsers/gemini');
-    const expense = await parseExpense(text, env.GEMINI_API_KEY);
+    const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
+    const expense = await parseExpense(text, env.GEMINI_API_KEY, cache);
     
     const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
     const colombiaTimes = getCurrentColombiaTimes();

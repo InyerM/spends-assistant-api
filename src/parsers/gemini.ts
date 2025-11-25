@@ -1,6 +1,11 @@
 import { ParsedExpense, GeminiResponse } from '../types/expense';
+import { CacheService } from '../services/cache.service';
 
-export async function parseExpense(text: string, apiKey: string): Promise<ParsedExpense> {
+export async function parseExpense(
+  text: string,
+  apiKey: string,
+  cache?: CacheService
+): Promise<ParsedExpense> {
   const model = "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -218,6 +223,16 @@ IMPORTANT:
 
   console.log('[Gemini] Processing:', text.substring(0, 50) + '...');
 
+  if (cache) {
+    const cacheKey = `gemini:${cache.hashKey(text)}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      console.log('[Gemini] Cache hit');
+      return JSON.parse(cached) as ParsedExpense;
+    }
+    console.log('[Gemini] Cache miss');
+  }
+
   let attempts = 0;
   const maxAttempts = 3;
 
@@ -270,6 +285,11 @@ IMPORTANT:
       }
       if (!expense.category) {
         throw new Error("Missing category");
+      }
+
+      if (cache) {
+        const cacheKey = `gemini:${cache.hashKey(text)}`;
+        await cache.set(cacheKey, JSON.stringify(expense), 86400);
       }
 
       return expense;

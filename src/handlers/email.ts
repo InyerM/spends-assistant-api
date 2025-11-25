@@ -1,5 +1,6 @@
 import { parseExpense } from '../parsers/gemini';
 import { createSupabaseServices } from '../services/supabase';
+import { CacheService } from '../services/cache.service';
 import { getCurrentColombiaTimes, convertDateFormat } from '../utils/date';
 import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
@@ -42,7 +43,8 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
       
       console.log('[Email] Clean text:', cleanText);
       
-      const expense = await parseExpense(cleanText, env.GEMINI_API_KEY);
+      const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
+      const expense = await parseExpense(cleanText, env.GEMINI_API_KEY, cache);
       const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
       
       const colombiaTimes = getCurrentColombiaTimes();

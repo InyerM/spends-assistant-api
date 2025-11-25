@@ -14,4 +14,6 @@ export interface Env {
   
   // Optional
   APP_URL?: string;
+  REDIS_URL?: string;
+  REDIS_PASSWORD?: string;
 }

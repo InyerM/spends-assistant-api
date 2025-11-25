@@ -2,6 +2,7 @@ import { Telegraf, Context } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { parseExpense } from '../parsers/gemini';
 import { createSupabaseServices } from '../services/supabase';
+import { CacheService } from '../services/cache.service';
 import { getCurrentColombiaTimes, convertDateFormat, formatDateForDisplay } from '../utils/date';
 import { formatCurrency } from '../utils/formatting';
 import { Env } from '../types/env';
@@ -10,6 +11,7 @@ import { CreateTransactionInput } from '../types/transaction';
 export async function handleTelegram(request: Request, env: Env): Promise<Response> {
   const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
   const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
+  const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
 
   bot.catch((err, ctx) => {
     console.error(`Telegraf error for ${ctx.updateType}`, err);
@@ -27,7 +29,7 @@ export async function handleTelegram(request: Request, env: Env): Promise<Respon
 
     try {
       ctx.sendChatAction('typing');
-      const expense = await parseExpense(text, env.GEMINI_API_KEY);
+      const expense = await parseExpense(text, env.GEMINI_API_KEY, cache);
 
       const colombiaTimes = getCurrentColombiaTimes();
       let date = colombiaTimes.date;
