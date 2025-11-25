@@ -57,7 +57,7 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
       }
 
       let accountId: string;
-      const account = await services.accounts.getAccount('bancolombia', expense.last_four);
+      const account = await services.accounts.getAccount('bancolombia', expense.last_four, expense.account_type);
       if (account) {
         accountId = account.id;
       } else {
@@ -86,7 +86,7 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
       };
 
       const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput);
-      await services.transactions.createTransaction(finalTransaction);
+      await services.transactions.createTransaction(finalTransaction, services.accounts, cache);
       
       console.log('[Email] Processed successfully');
       

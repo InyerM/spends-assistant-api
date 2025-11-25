@@ -115,7 +115,7 @@ async function processExpense(
     }
 
     let accountId: string;
-    const account = await services.accounts.getAccount(expense.bank, expense.last_four);
+    const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type);
     
     if (account) {
       accountId = account.id;
@@ -150,10 +150,13 @@ async function processExpense(
     };
 
     const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput);
-    const savedTransaction = await services.transactions.createTransaction(finalTransaction);
+    const savedTransaction = await services.transactions.createTransaction(finalTransaction, services.accounts, cache);
 
     const fechaFormateada = formatDateForDisplay(savedTransaction.date);
     const amountFormatted = formatCurrency(savedTransaction.amount);
+
+    const currentBalance = await services.accounts.getAccountBalance(accountId);
+    const balanceFormatted = formatCurrency(currentBalance);
 
     const confirmationMessage = `✅ Expense registered
 
@@ -162,6 +165,7 @@ async function processExpense(
 📅 ${fechaFormateada} ${savedTransaction.time}
 🏷️ ${expense.category}
 💳 ${expense.bank} - ${expense.payment_type}
+📊 Balance: ${balanceFormatted}
 
 🔗 [View Dashboard](${env.APP_URL || '#'})`;
     

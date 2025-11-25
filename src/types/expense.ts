@@ -9,6 +9,7 @@ export interface ParsedExpense {
   original_date?: string | null;
   original_time?: string | null;
   last_four?: string | null;
+  account_type?: 'checking' | 'savings' | 'credit_card' | null;
 }
 
 export interface GeminiResponse {

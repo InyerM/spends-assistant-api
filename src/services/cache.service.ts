@@ -68,6 +68,18 @@ export class CacheService {
     }
   }
 
+  async del(key: string): Promise<void> {
+    if (!this.redis || !this.isConnected) {
+      return;
+    }
+
+    try {
+      await this.redis.del(key);
+    } catch (error) {
+      console.error('[Cache] Delete error:', error);
+    }
+  }
+
   hashKey(input: string): string {
     const normalized = input.trim().toLowerCase();
     return createHash('sha256').update(normalized).digest('hex');

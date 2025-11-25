@@ -31,7 +31,7 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
     const colombiaTimes = getCurrentColombiaTimes();
     
     let accountId: string;
-    const account = await services.accounts.getAccount(expense.bank, expense.last_four);
+    const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type);
     if (account) {
       accountId = account.id;
     } else {
@@ -62,7 +62,7 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
     };
 
     const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput);
-    const savedTransaction = await services.transactions.createTransaction(finalTransaction);
+    const savedTransaction = await services.transactions.createTransaction(finalTransaction, services.accounts, cache);
 
     return new Response(JSON.stringify({
       status: 'success',

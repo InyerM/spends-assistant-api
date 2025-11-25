@@ -65,7 +65,7 @@ async function importCSV(csvPath: string) {
           raw_text: JSON.stringify(record)
         };
 
-        await services.transactions.createTransaction(transaction);
+        await services.transactions.createTransaction(transaction, services.accounts);
         successCount++;
         
         if (successCount % 50 === 0) {

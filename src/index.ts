@@ -1,6 +1,7 @@
 import { handleTelegram } from './handlers/telegram';
 import { handleEmail } from './handlers/email';
 import { handleTransaction } from './handlers/transaction';
+import { handleBalance } from './handlers/balance';
 import { Env } from './types/env';
 
 export default {
@@ -30,6 +31,11 @@ export default {
       }), {
         headers: { 'Content-Type': 'application/json' }
       });
+    }
+
+    // Balance endpoint
+    if (url.pathname.startsWith('/balance/') && request.method === 'GET') {
+      return handleBalance(request, env);
     }
 
     // Telegram webhook

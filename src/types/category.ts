@@ -3,7 +3,8 @@ export type CategoryType = 'expense' | 'income' | 'transfer';
 export interface Category {
   id: string;
   name: string;
-  type: CategoryType;
+  slug: string;
+  type: 'expense' | 'income' | 'transfer';
   parent_id: string | null;
   icon: string | null;
   color: string | null;
