@@ -1,10 +1,10 @@
 import { BaseService } from './base.service';
-import type { AutomationRule, CreateTransactionInput } from '../../types';
+import type { AutomationRule, CreateTransactionInput, AppliedRule } from '../../types';
 
 export class AutomationRulesService extends BaseService {
   async getAutomationRules(): Promise<AutomationRule[]> {
     return await this.fetch<AutomationRule[]>(
-      '/rest/v1/automation_rules?is_active=eq.true&order=priority.desc&select=*'
+      '/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&order=priority.desc&select=*'
     );
   }
 
@@ -13,7 +13,7 @@ export class AutomationRulesService extends BaseService {
    */
   async getActivePrompts(): Promise<string[]> {
     const rules = await this.fetch<AutomationRule[]>(
-      '/rest/v1/automation_rules?is_active=eq.true&prompt_text=not.is.null&order=priority.desc&select=prompt_text'
+      '/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&prompt_text=not.is.null&order=priority.desc&select=prompt_text'
     );
     return rules
       .filter(r => r.prompt_text)
@@ -28,7 +28,7 @@ export class AutomationRulesService extends BaseService {
     const normalizedPhone = phoneNumber.replace(/^\*/, '');
     
     const rules = await this.fetch<AutomationRule[]>(
-      `/rest/v1/automation_rules?is_active=eq.true&match_phone=eq.${normalizedPhone}&select=*`
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=eq.${normalizedPhone}&select=*`
     );
     
     return rules.length > 0 ? rules[0] : null;
@@ -39,7 +39,7 @@ export class AutomationRulesService extends BaseService {
    */
   async getTransferRules(): Promise<AutomationRule[]> {
     return await this.fetch<AutomationRule[]>(
-      '/rest/v1/automation_rules?is_active=eq.true&match_phone=not.is.null&order=priority.desc&select=*'
+      '/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=not.is.null&order=priority.desc&select=*'
     );
   }
 
@@ -47,12 +47,26 @@ export class AutomationRulesService extends BaseService {
     transaction: CreateTransactionInput
   ): Promise<CreateTransactionInput> {
     const rules = await this.getAutomationRules();
+    const appliedRules: AppliedRule[] = [];
 
     for (const rule of rules) {
       if (this.matchesConditions(transaction, rule.conditions)) {
-        transaction = this.applyActions(transaction, rule.actions);
+        const actions = { ...rule.actions };
+        if (rule.transfer_to_account_id && !actions.link_to_account) {
+          actions.link_to_account = rule.transfer_to_account_id;
+        }
+        transaction = this.applyActions(transaction, actions);
+        appliedRules.push({
+          rule_id: rule.id,
+          rule_name: rule.name,
+          actions: rule.actions as unknown as Record<string, unknown>,
+        });
         console.log(`[Rule Applied] ${rule.name}`);
       }
+    }
+
+    if (appliedRules.length > 0) {
+      transaction.applied_rules = appliedRules;
     }
 
     return transaction;

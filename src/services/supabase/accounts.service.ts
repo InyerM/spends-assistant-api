@@ -16,6 +16,7 @@ export class AccountsService extends BaseService {
         last_four: `eq.${lastFour}`,
         type: `eq.${accountType}`,
         is_active: 'eq.true',
+        deleted_at: 'is.null',
         select: '*'
       });
 
@@ -35,6 +36,7 @@ export class AccountsService extends BaseService {
         institution: `eq.${institution}`,
         last_four: `eq.${lastFour}`,
         is_active: 'eq.true',
+        deleted_at: 'is.null',
         select: '*'
       });
 
@@ -54,6 +56,7 @@ export class AccountsService extends BaseService {
         institution: `eq.${institution}`,
         type: `eq.${accountType}`,
         is_active: 'eq.true',
+        deleted_at: 'is.null',
         select: '*'
       });
 
@@ -71,6 +74,7 @@ export class AccountsService extends BaseService {
     const params = new URLSearchParams({
       institution: `eq.${institution}`,
       is_active: 'eq.true',
+      deleted_at: 'is.null',
       select: '*'
     });
 
@@ -87,7 +91,7 @@ export class AccountsService extends BaseService {
 
   async getAccountBalance(accountId: string): Promise<number> {
     const account = await this.fetch<Account[]>(
-      `/rest/v1/accounts?id=eq.${accountId}&select=balance`
+      `/rest/v1/accounts?id=eq.${accountId}&deleted_at=is.null&select=balance`
     );
 
     return account[0]?.balance || 0;

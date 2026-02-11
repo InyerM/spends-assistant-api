@@ -200,3 +200,48 @@ export function buildTransferPromptSection(rules: AutomationRule[]): string {
 
   return `TRANSFERS: Messages with "Transferiste"/"Enviaste" are transfers. Known phones: ${ruleLines}. Unknown phones→category:"missing".`;
 }
+
+/**
+ * Build dynamic prompt section from automation rules' conditions/actions.
+ * This allows Gemini to proactively apply known rules during parsing.
+ */
+export function buildAutomationRulesPromptSection(rules: AutomationRule[]): string {
+  const actionRules = rules.filter(
+    r => r.conditions && r.actions &&
+    (r.actions.set_type || r.actions.set_category || r.actions.link_to_account) &&
+    !r.match_phone
+  );
+
+  if (actionRules.length === 0) return '';
+
+  const lines = actionRules.map(r => {
+    const condParts: string[] = [];
+    if (r.conditions.description_contains?.length) {
+      condParts.push(`description contains [${r.conditions.description_contains.join(', ')}]`);
+    }
+    if (r.conditions.description_regex) {
+      condParts.push(`description matches /${r.conditions.description_regex}/`);
+    }
+    if (r.conditions.amount_between) {
+      condParts.push(`amount between ${r.conditions.amount_between[0]}-${r.conditions.amount_between[1]}`);
+    }
+    if (r.conditions.source?.length) {
+      condParts.push(`source is [${r.conditions.source.join(', ')}]`);
+    }
+
+    const actParts: string[] = [];
+    if (r.actions.set_type) actParts.push(`type→"${r.actions.set_type}"`);
+    if (r.actions.set_category) actParts.push(`category→"${r.actions.set_category}"`);
+
+    if (condParts.length === 0 || actParts.length === 0) return '';
+    return `- RULE "${r.name}": IF ${condParts.join(' AND ')} THEN ${actParts.join(', ')}`;
+  }).filter(Boolean);
+
+  if (lines.length === 0) return '';
+
+  console.log('[Transfer] Automation rules prompt section built:', JSON.stringify(lines, null, 2));
+
+  return `AUTOMATION RULES (apply these when conditions match, they override default categorization):
+${lines.join('\n')}
+If a rule matches, use the specified values. These rules are deterministic overrides from the user.`;
+}

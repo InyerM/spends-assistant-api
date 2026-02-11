@@ -54,6 +54,7 @@ export class TransactionsService extends BaseService {
       `amount=eq.${amount}&` +
       `account_id=eq.${accountId}&` +
       `description=ilike.%${encodeURIComponent(descriptionQuery)}%&` +
+      `deleted_at=is.null&` +
       `select=*`
     );
 

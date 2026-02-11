@@ -221,6 +221,12 @@ Output: {
   "account_type": null
 }
 
+AUTOMATION RULES:
+- You may receive dynamic AUTOMATION RULES injected after this prompt.
+- If a rule's conditions match the input, use the specified values (type, category) in your output.
+- Automation rules are deterministic overrides from the user and take priority over default categorization.
+- Still parse all other fields normally (amount, bank, date, etc.).
+
 CRITICAL:
 - ALWAYS respond with ONLY valid JSON
 - DO NOT add markdown (\`\`\`json)

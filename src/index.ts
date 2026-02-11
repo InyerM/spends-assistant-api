@@ -1,6 +1,7 @@
 import { handleTelegram } from './handlers/telegram';
 import { handleEmail } from './handlers/email';
 import { handleTransaction } from './handlers/transaction';
+import { handleParse } from './handlers/parse';
 import { handleBalance } from './handlers/balance';
 import { Env } from './types/env';
 
@@ -46,6 +47,11 @@ export default {
     // Email endpoint
     if (url.pathname === '/email' && request.method === 'POST') {
       return handleEmail(request, env);
+    }
+
+    // Parse API (parse only, no save)
+    if (url.pathname === '/parse' && request.method === 'POST') {
+      return handleParse(request, env);
     }
 
     // Transaction API

@@ -4,7 +4,7 @@ import { CacheService } from '../services/cache.service';
 import { getCurrentColombiaTimes, convertDateFormat } from '../utils/date';
 import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
-import { isTransferMessage, processTransfer, buildTransferPromptSection } from '../services/transfer-processor';
+import { isTransferMessage, processTransfer, buildTransferPromptSection, buildAutomationRulesPromptSection } from '../services/transfer-processor';
 
 interface AppsScriptPayload {
   body?: string;
@@ -47,16 +47,18 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
       const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
       const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
       
-      // Fetch dynamic prompts and transfer rules for Gemini
-      const [activePrompts, transferRules] = await Promise.all([
+      // Fetch dynamic prompts, transfer rules, and all rules for Gemini
+      const [activePrompts, transferRules, allRules] = await Promise.all([
         services.automationRules.getActivePrompts(),
         services.automationRules.getTransferRules(),
+        services.automationRules.getAutomationRules(),
       ]);
-      
-      // Build dynamic prompts including transfer rules
+
+      // Build dynamic prompts including transfer rules and automation rules
       const dynamicPrompts = [
         ...activePrompts,
         buildTransferPromptSection(transferRules),
+        buildAutomationRulesPromptSection(allRules),
       ].filter(Boolean);
       
       const expense = await parseExpense(cleanText, env.GEMINI_API_KEY, cache, { dynamicPrompts });

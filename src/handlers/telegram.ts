@@ -7,7 +7,7 @@ import { getCurrentColombiaTimes, convertDateFormat, formatDateForDisplay } from
 import { formatCurrency } from '../utils/formatting';
 import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
-import { isTransferMessage, processTransfer, buildTransferPromptSection } from '../services/transfer-processor';
+import { isTransferMessage, processTransfer, buildTransferPromptSection, buildAutomationRulesPromptSection } from '../services/transfer-processor';
 
 export async function handleTelegram(request: Request, env: Env): Promise<Response> {
   const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
@@ -105,16 +105,18 @@ async function processExpense(
   try {
     ctx.sendChatAction('typing');
     
-    // Fetch dynamic prompts and transfer rules for Gemini
-    const [activePrompts, transferRules] = await Promise.all([
+    // Fetch dynamic prompts, transfer rules, and all rules for Gemini
+    const [activePrompts, transferRules, allRules] = await Promise.all([
       services.automationRules.getActivePrompts(),
       services.automationRules.getTransferRules(),
+      services.automationRules.getAutomationRules(),
     ]);
-    
-    // Build dynamic prompts including transfer rules
+
+    // Build dynamic prompts including transfer rules and automation rules
     const dynamicPrompts = [
       ...activePrompts,
       buildTransferPromptSection(transferRules),
+      buildAutomationRulesPromptSection(allRules),
     ].filter(Boolean);
     
     const expense = await parseExpense(text, env.GEMINI_API_KEY, cache, { dynamicPrompts });
