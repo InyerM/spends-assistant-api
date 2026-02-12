@@ -3,6 +3,7 @@ import { TransactionType } from './transaction';
 export interface AutomationRuleConditions {
   description_contains?: string[];
   description_regex?: string;
+  raw_text_contains?: string[];
   amount_between?: [number, number];
   amount_equals?: number;
   from_account?: string;
@@ -14,6 +15,7 @@ export interface AutomationRuleConditions {
 export interface AutomationRuleActions {
   set_type?: TransactionType;
   set_category?: string | null;
+  set_account?: string;
   link_to_account?: string;
   auto_reconcile?: boolean;
   add_note?: string;

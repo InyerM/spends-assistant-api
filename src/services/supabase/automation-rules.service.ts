@@ -89,6 +89,14 @@ export class AutomationRulesService extends BaseService {
       if (!regex.test(transaction.description)) return false;
     }
 
+    if (conditions.raw_text_contains) {
+      const rawText = (transaction.raw_text ?? '').toLowerCase();
+      const matches = conditions.raw_text_contains.some((keyword: string) =>
+        rawText.includes(keyword.toLowerCase())
+      );
+      if (!matches) return false;
+    }
+
     if (conditions.amount_between) {
       const [min, max] = conditions.amount_between;
       if (transaction.amount < min || transaction.amount > max) {
@@ -127,6 +135,10 @@ export class AutomationRulesService extends BaseService {
 
     if (actions.set_category !== undefined) {
       transaction.category_id = actions.set_category || undefined;
+    }
+
+    if (actions.set_account) {
+      transaction.account_id = actions.set_account;
     }
 
     if (actions.link_to_account) {
