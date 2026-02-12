@@ -40,22 +40,35 @@ export class TransactionsService extends BaseService {
     return transaction;
   }
 
-  async findSimilarTransaction(
+  async findExactDuplicate(
+    rawText: string,
+    source: string
+  ): Promise<Transaction | null> {
+    const transactions = await this.fetch<Transaction[]>(
+      `/rest/v1/transactions?` +
+      `raw_text=eq.${encodeURIComponent(rawText)}&` +
+      `source=eq.${encodeURIComponent(source)}&` +
+      `deleted_at=is.null&` +
+      `select=*&` +
+      `limit=1`
+    );
+
+    return transactions.length > 0 ? transactions[0] : null;
+  }
+
+  async findNearDuplicate(
     date: string,
     amount: number,
-    description: string,
     accountId: string
   ): Promise<Transaction | null> {
-    const descriptionQuery = description.substring(0, 20);
-
     const transactions = await this.fetch<Transaction[]>(
       `/rest/v1/transactions?` +
       `date=eq.${date}&` +
       `amount=eq.${amount}&` +
       `account_id=eq.${accountId}&` +
-      `description=ilike.%${encodeURIComponent(descriptionQuery)}%&` +
       `deleted_at=is.null&` +
-      `select=*`
+      `select=*&` +
+      `limit=1`
     );
 
     return transactions.length > 0 ? transactions[0] : null;

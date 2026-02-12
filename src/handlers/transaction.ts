@@ -2,7 +2,7 @@ import { createSupabaseServices } from '../services/supabase';
 import { CacheService } from '../services/cache.service';
 import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
-import { getCurrentColombiaTimes } from '../utils/date';
+import { getCurrentColombiaTimes, convertDateFormat } from '../utils/date';
 import { isTransferMessage, processTransfer, buildTransferPromptSection, buildAutomationRulesPromptSection } from '../services/transfer-processor';
 
 interface TransactionRequest {
@@ -44,7 +44,15 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
     
     const expense = await parseExpense(text, env.GEMINI_API_KEY, cache, { dynamicPrompts });
     const colombiaTimes = getCurrentColombiaTimes();
-    
+
+    let date = colombiaTimes.date;
+    let time = colombiaTimes.time;
+
+    if (expense.original_date && expense.original_time) {
+      date = convertDateFormat(expense.original_date);
+      time = expense.original_time;
+    }
+
     let accountId: string;
     const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type);
     if (account) {
@@ -62,8 +70,8 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
     }
 
     const transactionInput: CreateTransactionInput = {
-      date: colombiaTimes.date,
-      time: colombiaTimes.time,
+      date,
+      time,
       amount: expense.amount,
       description: expense.description,
       category_id: categoryId,
@@ -76,10 +84,28 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
       parsed_data: expense as unknown as Record<string, unknown>
     };
 
+    // Check for duplicate transactions
+    const existingExact = text
+      ? await services.transactions.findExactDuplicate(text, source)
+      : null;
+    const existingNear = existingExact
+      ? null
+      : await services.transactions.findNearDuplicate(
+          date,
+          expense.amount,
+          accountId
+        );
+    const duplicateMatch = existingExact ?? existingNear;
+
+    if (duplicateMatch) {
+      transactionInput.duplicate_status = 'pending_review';
+      transactionInput.duplicate_of = duplicateMatch.id;
+    }
+
     // Check if it's a transfer message
     let savedTransaction;
     let transferInfo;
-    
+
     if (isTransferMessage(text) || expense.category === 'transfer') {
       // Process as transfer - may create dual transactions
       const missingCategory = await services.categories.getCategory('missing');
@@ -89,9 +115,9 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
         services,
         missingCategory?.id
       );
-      
+
       transferInfo = result.transferInfo;
-      
+
       // Create all transactions (1 or 2)
       for (const tx of result.transactions) {
         const finalTx = await services.automationRules.applyAutomationRules(tx);
