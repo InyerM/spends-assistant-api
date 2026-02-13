@@ -10,6 +10,9 @@
     "supabase:status": "supabase status",
     "supabase:migration:new": "supabase migration new",
     "supabase:db:reset": "supabase db reset",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "type-check": "tsc --noEmit",
     "lint": "eslint 'src/**/*.{ts,tsx}'",
     "format": "prettier --write 'src/**/*.{ts,tsx}'"
@@ -25,12 +28,14 @@
     "@types/dotenv": "^8.2.3",
     "@types/ioredis": "^5.0.0",
     "@types/node": "^20.10.0",
+    "@vitest/coverage-v8": "^4.0.18",
     "dotenv": "^17.2.3",
     "eslint": "^9.0.0",
     "globals": "^15.0.0",
     "prettier": "^3.1.0",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.0.0",
+    "vitest": "^4.0.18",
     "wrangler": "^3.78.12"
   }
 }
