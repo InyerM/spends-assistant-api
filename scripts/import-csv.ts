@@ -62,6 +62,7 @@ async function importCSV(csvPath: string) {
           payment_method: 'cash',
           source: 'import_csv',
           confidence: 100,
+          user_id: '00000000-0000-0000-0000-000000000000',
           raw_text: JSON.stringify(record)
         };
 
