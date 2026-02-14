@@ -13,6 +13,7 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
 
     // Resolve user from API key
     const authHeader = request.headers.get('Authorization');
+    console.log('Auth header:', authHeader);
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response('Unauthorized', { status: 401 });
     }
@@ -23,6 +24,24 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
     // Fall back to legacy static API_KEY
     if (!userId && token === env.API_KEY) {
       userId = env.DEFAULT_USER_ID;
+    }
+
+    // Fall back to Supabase JWT verification
+    if (!userId) {
+      try {
+        const userRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            apikey: env.SUPABASE_SERVICE_KEY,
+          },
+        });
+        if (userRes.ok) {
+          const user = (await userRes.json()) as { id: string };
+          userId = user.id;
+        }
+      } catch {
+        // JWT verification failed, userId remains null
+      }
     }
 
     if (!userId) {
@@ -37,6 +56,20 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    // Check AI parse usage limit
+    const usageCheck = await services.usage.incrementAiParses(userId);
+    if (!usageCheck.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: 'Parse limit reached',
+          code: 'PARSE_LIMIT_REACHED',
+          used: usageCheck.used,
+          limit: usageCheck.limit,
+        }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } },
+      );
     }
 
     const { parseExpense } = await import('../parsers/gemini');

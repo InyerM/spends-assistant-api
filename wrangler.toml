@@ -8,3 +8,7 @@ ENVIRONMENT = "production"
 
 [observability]
 enabled = true
+
+# Monthly cleanup of old usage records (1st of each month at 3am UTC)
+[triggers]
+crons = ["0 3 1 * *"]

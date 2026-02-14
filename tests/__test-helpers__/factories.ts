@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { Transaction, CreateTransactionInput, Account, Category, AutomationRule } from '../../src/types';
+import type { Transaction, CreateTransactionInput, Account, Category, AutomationRule, UsageTracking } from '../../src/types';
 
 export function createMockTransaction(overrides: Partial<Transaction> = {}): Transaction {
   return {
@@ -111,6 +111,21 @@ export function createMockEnv() {
     DEFAULT_USER_ID: 'test-user-id',
     REDIS_URL: 'redis://localhost:6379',
     REDIS_PASSWORD: 'test-password',
+  };
+}
+
+export function createMockUsage(overrides: Partial<UsageTracking> = {}): UsageTracking {
+  return {
+    id: 'usage-1',
+    user_id: 'test-user-id',
+    month: new Date().toISOString().slice(0, 7),
+    ai_parses_used: 5,
+    ai_parses_limit: 15,
+    transactions_count: 10,
+    transactions_limit: 50,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    ...overrides,
   };
 }
 

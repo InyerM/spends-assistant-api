@@ -86,10 +86,24 @@ describe('handleParse', () => {
     const { parseExpense } = await import('../../src/parsers/gemini');
     vi.mocked(parseExpense).mockResolvedValue(parsedExpense);
 
-    // Mock supabase fetch for api_keys + rules + accounts + categories
+    // Mock supabase fetch for api_keys + usage + rules + accounts + categories
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url.includes('user_api_keys')) {
         return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('usage_tracking')) {
+        return new Response(JSON.stringify([{
+          id: 'usage-1',
+          user_id: env.DEFAULT_USER_ID,
+          month: new Date().toISOString().slice(0, 7),
+          ai_parses_used: 5,
+          ai_parses_limit: 15,
+          transactions_count: 0,
+          transactions_limit: 50,
+        }]), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
@@ -135,16 +149,77 @@ describe('handleParse', () => {
     expect(body.resolved.category_id).toBe(category.id);
   });
 
+  it('returns 429 when parse limit reached', async () => {
+    // Mock: usage check returns not allowed
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('user_api_keys')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('usage_tracking')) {
+        // Return usage at limit
+        return new Response(JSON.stringify([{
+          id: 'usage-1',
+          user_id: env.DEFAULT_USER_ID,
+          month: new Date().toISOString().slice(0, 7),
+          ai_parses_used: 15,
+          ai_parses_limit: 15,
+          transactions_count: 0,
+          transactions_limit: 50,
+        }]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }));
+
+    const request = new Request('http://localhost/parse', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.API_KEY}`,
+      },
+      body: JSON.stringify({ text: 'Compraste $50,000' }),
+    });
+
+    const response = await handleParse(request, env);
+    expect(response.status).toBe(429);
+    const body = await response.json();
+    expect(body.code).toBe('PARSE_LIMIT_REACHED');
+    expect(body.used).toBe(15);
+    expect(body.limit).toBe(15);
+  });
+
   it('returns 500 on error', async () => {
     const { parseExpense } = await import('../../src/parsers/gemini');
     vi.mocked(parseExpense).mockRejectedValue(new Error('Gemini API Error'));
 
-    vi.stubGlobal('fetch', vi.fn(async () =>
-      new Response(JSON.stringify([]), {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('usage_tracking')) {
+        return new Response(JSON.stringify([{
+          id: 'usage-1',
+          user_id: env.DEFAULT_USER_ID,
+          month: new Date().toISOString().slice(0, 7),
+          ai_parses_used: 0,
+          ai_parses_limit: 15,
+          transactions_count: 0,
+          transactions_limit: 50,
+        }]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify([]), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
-      }),
-    ));
+      });
+    }));
 
     const request = new Request('http://localhost/parse', {
       method: 'POST',

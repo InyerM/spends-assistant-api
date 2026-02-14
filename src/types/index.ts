@@ -4,3 +4,4 @@ export * from './expense';
 export * from './transaction';
 export * from './rule';
 export * from './env';
+export * from './usage';

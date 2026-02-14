@@ -3,6 +3,7 @@ import { handleEmail } from './handlers/email';
 import { handleTransaction } from './handlers/transaction';
 import { handleParse } from './handlers/parse';
 import { handleBalance } from './handlers/balance';
+import { createSupabaseServices } from './services/supabase';
 import { Env } from './types/env';
 
 export default {
@@ -62,7 +63,8 @@ export default {
     return new Response('Not Found', { status: 404 });
   },
 
-  async scheduled(_event: ScheduledEvent, _env: Env, _ctx: ExecutionContext): Promise<void> {
-    // Cron jobs here
+  async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
+    const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
+    await services.usage.cleanupOldRecords();
   }
 };

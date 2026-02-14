@@ -3,6 +3,7 @@ import { CategoriesService } from './categories.service';
 import { TransactionsService } from './transactions.service';
 import { AutomationRulesService } from './automation-rules.service';
 import { ApiKeysService } from './api-keys.service';
+import { UsageService } from './usage.service';
 
 export interface SupabaseServices {
   accounts: AccountsService;
@@ -10,6 +11,7 @@ export interface SupabaseServices {
   transactions: TransactionsService;
   automationRules: AutomationRulesService;
   apiKeys: ApiKeysService;
+  usage: UsageService;
 }
 
 export function createSupabaseServices(
@@ -21,7 +23,8 @@ export function createSupabaseServices(
     categories: new CategoriesService(url, serviceKey),
     transactions: new TransactionsService(url, serviceKey),
     automationRules: new AutomationRulesService(url, serviceKey),
-    apiKeys: new ApiKeysService(url, serviceKey)
+    apiKeys: new ApiKeysService(url, serviceKey),
+    usage: new UsageService(url, serviceKey),
   };
 }
 
@@ -30,3 +33,4 @@ export { CategoriesService } from './categories.service';
 export { TransactionsService } from './transactions.service';
 export { AutomationRulesService } from './automation-rules.service';
 export { ApiKeysService } from './api-keys.service';
+export { UsageService } from './usage.service';
