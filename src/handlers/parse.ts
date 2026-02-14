@@ -9,8 +9,23 @@ interface ParseRequest {
 
 export async function handleParse(request: Request, env: Env): Promise<Response> {
   try {
+    const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
+
+    // Resolve user from API key
     const authHeader = request.headers.get('Authorization');
-    if (!authHeader || authHeader !== `Bearer ${env.API_KEY}`) {
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+
+    const token = authHeader.slice(7);
+    let userId = await services.apiKeys.resolveUser(token);
+
+    // Fall back to legacy static API_KEY
+    if (!userId && token === env.API_KEY) {
+      userId = env.DEFAULT_USER_ID;
+    }
+
+    if (!userId) {
       return new Response('Unauthorized', { status: 401 });
     }
 
@@ -26,12 +41,11 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
 
     const { parseExpense } = await import('../parsers/gemini');
     const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
-    const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
 
     const [activePrompts, transferRules, allRules] = await Promise.all([
-      services.automationRules.getActivePrompts(),
-      services.automationRules.getTransferRules(),
-      services.automationRules.getAutomationRules(),
+      services.automationRules.getActivePrompts(userId),
+      services.automationRules.getTransferRules(userId),
+      services.automationRules.getAutomationRules(userId),
     ]);
 
     const dynamicPrompts = [
@@ -42,25 +56,26 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
 
     const expense = await parseExpense(text, env.GEMINI_API_KEY, cache, { dynamicPrompts });
 
-    // Resolve account
+    // Resolve account (scoped to user)
     let accountId: string | undefined;
     const account = await services.accounts.getAccount(
       expense.bank,
       expense.last_four,
       expense.account_type,
+      userId,
     );
     if (account) {
       accountId = account.id;
     } else {
       const fallback =
-        (await services.accounts.getAccount('cash')) ||
-        (await services.accounts.getAccount('bancolombia'));
+        (await services.accounts.getAccount('cash', null, null, userId)) ||
+        (await services.accounts.getAccount('bancolombia', null, null, userId));
       if (fallback) accountId = fallback.id;
     }
 
-    // Resolve category
+    // Resolve category (scoped to user)
     let categoryId: string | undefined;
-    const category = await services.categories.getCategory(expense.category);
+    const category = await services.categories.getCategory(expense.category, userId);
     if (category) {
       categoryId = category.id;
     }

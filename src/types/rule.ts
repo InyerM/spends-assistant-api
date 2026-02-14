@@ -23,6 +23,7 @@ export interface AutomationRuleActions {
 
 export interface AutomationRule {
   id: string;
+  user_id: string;
   name: string;
   is_active: boolean;
   priority: number;

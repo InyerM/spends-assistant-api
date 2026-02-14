@@ -5,10 +5,13 @@ export class AccountsService extends BaseService {
   async getAccount(
     institution: string,
     lastFour?: string | null,
-    accountType?: 'checking' | 'savings' | 'credit_card' | 'credit' | null
+    accountType?: 'checking' | 'savings' | 'credit_card' | 'credit' | null,
+    userId?: string
   ): Promise<Account | null> {
-    console.log("Querying accounts for:", { institution, lastFour, accountType });
-    
+    console.log("Querying accounts for:", { institution, lastFour, accountType, userId });
+
+    const userFilter = userId ? `&user_id=eq.${userId}` : '';
+
     // Try with all params if provided
     if (lastFour && accountType) {
       const params = new URLSearchParams({
@@ -21,7 +24,7 @@ export class AccountsService extends BaseService {
       });
 
       const accounts = await this.fetch<Account[]>(
-        `/rest/v1/accounts?${params}`
+        `/rest/v1/accounts?${params}${userFilter}`
       );
 
       if (accounts[0]) {
@@ -41,7 +44,7 @@ export class AccountsService extends BaseService {
       });
 
       const accounts = await this.fetch<Account[]>(
-        `/rest/v1/accounts?${params}`
+        `/rest/v1/accounts?${params}${userFilter}`
       );
 
       if (accounts[0]) {
@@ -61,7 +64,7 @@ export class AccountsService extends BaseService {
       });
 
       const accounts = await this.fetch<Account[]>(
-        `/rest/v1/accounts?${params}`
+        `/rest/v1/accounts?${params}${userFilter}`
       );
 
       if (accounts[0]) {
@@ -79,7 +82,7 @@ export class AccountsService extends BaseService {
     });
 
     const accounts = await this.fetch<Account[]>(
-      `/rest/v1/accounts?${params}`
+      `/rest/v1/accounts?${params}${userFilter}`
     );
 
     if (accounts[0]) {
@@ -103,8 +106,8 @@ export class AccountsService extends BaseService {
     operation: 'add' | 'subtract'
   ): Promise<void> {
     const currentBalance = await this.getAccountBalance(accountId);
-    const newBalance = operation === 'subtract' 
-      ? currentBalance - amount 
+    const newBalance = operation === 'subtract'
+      ? currentBalance - amount
       : currentBalance + amount;
 
     await this.fetch(

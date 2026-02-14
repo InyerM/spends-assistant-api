@@ -10,10 +10,28 @@ interface TransactionRequest {
   source?: string;
 }
 
+async function resolveUserId(request: Request, env: Env, services: ReturnType<typeof createSupabaseServices>): Promise<string | null> {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+
+  const token = authHeader.slice(7);
+
+  // Try per-user API key first
+  const userId = await services.apiKeys.resolveUser(token);
+  if (userId) return userId;
+
+  // Fall back to legacy static API_KEY
+  if (token === env.API_KEY) return env.DEFAULT_USER_ID;
+
+  return null;
+}
+
 export async function handleTransaction(request: Request, env: Env): Promise<Response> {
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader || authHeader !== `Bearer ${env.API_KEY}`) {
+    const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
+
+    const userId = await resolveUserId(request, env, services);
+    if (!userId) {
       return new Response('Unauthorized', { status: 401 });
     }
 
@@ -26,13 +44,12 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
 
     const { parseExpense } = await import('../parsers/gemini');
     const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
-    const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
-    
-    // Fetch dynamic prompts, transfer rules, and all rules for Gemini
+
+    // Fetch dynamic prompts, transfer rules, and all rules for Gemini (scoped to user)
     const [activePrompts, transferRules, allRules] = await Promise.all([
-      services.automationRules.getActivePrompts(),
-      services.automationRules.getTransferRules(),
-      services.automationRules.getAutomationRules(),
+      services.automationRules.getActivePrompts(userId),
+      services.automationRules.getTransferRules(userId),
+      services.automationRules.getAutomationRules(userId),
     ]);
 
     // Build dynamic prompts including transfer rules and automation rules
@@ -41,7 +58,7 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
       buildTransferPromptSection(transferRules),
       buildAutomationRulesPromptSection(allRules),
     ].filter(Boolean);
-    
+
     const expense = await parseExpense(text, env.GEMINI_API_KEY, cache, { dynamicPrompts });
     const colombiaTimes = getCurrentColombiaTimes();
 
@@ -54,22 +71,23 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
     }
 
     let accountId: string;
-    const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type);
+    const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type, userId);
     if (account) {
       accountId = account.id;
     } else {
-       const fallback = await services.accounts.getAccount('cash') || await services.accounts.getAccount('bancolombia');
+       const fallback = await services.accounts.getAccount('cash', null, null, userId) || await services.accounts.getAccount('bancolombia', null, null, userId);
        if (!fallback) throw new Error("No default account found");
        accountId = fallback.id;
     }
 
     let categoryId: string | undefined;
-    const category = await services.categories.getCategory(expense.category);
+    const category = await services.categories.getCategory(expense.category, userId);
     if (category) {
       categoryId = category.id;
     }
 
     const transactionInput: CreateTransactionInput = {
+      user_id: userId,
       date,
       time,
       amount: expense.amount,
@@ -86,14 +104,15 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
 
     // Check for duplicate transactions
     const existingExact = text
-      ? await services.transactions.findExactDuplicate(text, source)
+      ? await services.transactions.findExactDuplicate(text, source, userId)
       : null;
     const existingNear = existingExact
       ? null
       : await services.transactions.findNearDuplicate(
           date,
           expense.amount,
-          accountId
+          accountId,
+          userId
         );
     const duplicateMatch = existingExact ?? existingNear;
 
@@ -108,24 +127,25 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
 
     if (isTransferMessage(text) || expense.category === 'transfer') {
       // Process as transfer - may create dual transactions
-      const missingCategory = await services.categories.getCategory('missing');
+      const missingCategory = await services.categories.getCategory('missing', userId);
       const result = await processTransfer(
         transactionInput,
         text,
         services,
-        missingCategory?.id
+        missingCategory?.id,
+        userId
       );
 
       transferInfo = result.transferInfo;
 
       // Create all transactions (1 or 2)
       for (const tx of result.transactions) {
-        const finalTx = await services.automationRules.applyAutomationRules(tx);
+        const finalTx = await services.automationRules.applyAutomationRules(tx, userId);
         savedTransaction = await services.transactions.createTransaction(finalTx, services.accounts, cache);
       }
     } else {
       // Normal flow
-      const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput);
+      const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput, userId);
       savedTransaction = await services.transactions.createTransaction(finalTransaction, services.accounts, cache);
     }
 

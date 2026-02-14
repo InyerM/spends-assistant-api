@@ -31,9 +31,9 @@ export class TransactionsService extends BaseService {
 
     // Invalidate cache
     if (cache) {
-      await cache.del(`balance:${data.account_id}`);
+      await cache.del(`balance:${data.user_id}:${data.account_id}`);
       if (data.transfer_to_account_id) {
-        await cache.del(`balance:${data.transfer_to_account_id}`);
+        await cache.del(`balance:${data.user_id}:${data.transfer_to_account_id}`);
       }
     }
 
@@ -42,12 +42,14 @@ export class TransactionsService extends BaseService {
 
   async findExactDuplicate(
     rawText: string,
-    source: string
+    source: string,
+    userId: string
   ): Promise<Transaction | null> {
     const transactions = await this.fetch<Transaction[]>(
       `/rest/v1/transactions?` +
       `raw_text=eq.${encodeURIComponent(rawText)}&` +
       `source=eq.${encodeURIComponent(source)}&` +
+      `user_id=eq.${userId}&` +
       `deleted_at=is.null&` +
       `select=*&` +
       `limit=1`
@@ -59,13 +61,15 @@ export class TransactionsService extends BaseService {
   async findNearDuplicate(
     date: string,
     amount: number,
-    accountId: string
+    accountId: string,
+    userId: string
   ): Promise<Transaction | null> {
     const transactions = await this.fetch<Transaction[]>(
       `/rest/v1/transactions?` +
       `date=eq.${date}&` +
       `amount=eq.${amount}&` +
       `account_id=eq.${accountId}&` +
+      `user_id=eq.${userId}&` +
       `deleted_at=is.null&` +
       `select=*&` +
       `limit=1`

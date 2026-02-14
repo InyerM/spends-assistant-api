@@ -4,6 +4,7 @@ import type { Transaction, CreateTransactionInput, Account, Category, Automation
 export function createMockTransaction(overrides: Partial<Transaction> = {}): Transaction {
   return {
     id: 'tx-1',
+    user_id: 'test-user-id',
     date: '2024-01-15',
     time: '14:30',
     amount: 50000,
@@ -35,6 +36,7 @@ export function createMockTransactionInput(
   overrides: Partial<CreateTransactionInput> = {},
 ): CreateTransactionInput {
   return {
+    user_id: 'test-user-id',
     date: '2024-01-15',
     time: '14:30',
     amount: 50000,
@@ -49,6 +51,7 @@ export function createMockTransactionInput(
 export function createMockAccount(overrides: Partial<Account> = {}): Account {
   return {
     id: 'acc-1',
+    user_id: 'test-user-id',
     name: 'Bancolombia Savings',
     type: 'savings',
     institution: 'bancolombia',
@@ -67,6 +70,7 @@ export function createMockAccount(overrides: Partial<Account> = {}): Account {
 export function createMockCategory(overrides: Partial<Category> = {}): Category {
   return {
     id: 'cat-1',
+    user_id: 'test-user-id',
     name: 'Food',
     slug: 'food',
     type: 'expense',
@@ -82,6 +86,7 @@ export function createMockCategory(overrides: Partial<Category> = {}): Category 
 export function createMockAutomationRule(overrides: Partial<AutomationRule> = {}): AutomationRule {
   return {
     id: 'rule-1',
+    user_id: 'test-user-id',
     name: 'Test Rule',
     is_active: true,
     priority: 1,
@@ -103,6 +108,7 @@ export function createMockEnv() {
     GEMINI_API_KEY: 'test-gemini-key',
     TELEGRAM_BOT_TOKEN: 'test-telegram-token',
     API_KEY: 'test-api-key',
+    DEFAULT_USER_ID: 'test-user-id',
     REDIS_URL: 'redis://localhost:6379',
     REDIS_PASSWORD: 'test-password',
   };

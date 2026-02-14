@@ -8,6 +8,7 @@ export interface AppliedRule {
 
 export interface Transaction {
   id: string;
+  user_id: string;
   date: string;
   time: string;
   amount: number;
@@ -34,6 +35,7 @@ export interface Transaction {
 }
 
 export interface CreateTransactionInput {
+  user_id: string;
   date: string;
   time: string;
   amount: number;

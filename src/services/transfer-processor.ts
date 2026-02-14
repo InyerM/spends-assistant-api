@@ -88,7 +88,8 @@ export async function processTransfer(
   transaction: CreateTransactionInput,
   rawText: string,
   services: ReturnType<typeof createSupabaseServices>,
-  categoryId?: string
+  categoryId?: string,
+  userId?: string
 ): Promise<TransferProcessResult> {
   // 1. Extract phone from message
   const phone = extractPhoneNumber(rawText);
@@ -117,7 +118,7 @@ export async function processTransfer(
   }
 
   // 3. Check automation rules for matching phone
-  const rule = await services.automationRules.findTransferRule(phone);
+  const rule = await services.automationRules.findTransferRule(phone, userId);
 
   if (!rule) {
     // No rule match → category: missing (or keep original)
@@ -148,7 +149,7 @@ export async function processTransfer(
   const transferId = crypto.randomUUID();
 
   // Get transfer category
-  const transferCategory = await services.categories.getCategory('transfer');
+  const transferCategory = await services.categories.getCategory('transfer', userId);
   const transferCategoryId = transferCategory?.id || categoryId;
 
   // Outgoing transaction (from source account)

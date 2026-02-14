@@ -12,6 +12,9 @@ export interface Env {
   // API Authentication
   API_KEY: string;
   
+  // Default user for Telegram/Email (until per-user mapping is implemented)
+  DEFAULT_USER_ID: string;
+
   // Optional
   APP_URL?: string;
   REDIS_URL?: string;

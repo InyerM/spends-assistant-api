@@ -2,18 +2,20 @@ import { BaseService } from './base.service';
 import type { AutomationRule, CreateTransactionInput, AppliedRule } from '../../types';
 
 export class AutomationRulesService extends BaseService {
-  async getAutomationRules(): Promise<AutomationRule[]> {
+  async getAutomationRules(userId?: string): Promise<AutomationRule[]> {
+    const userFilter = userId ? `&user_id=eq.${userId}` : '';
     return await this.fetch<AutomationRule[]>(
-      '/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&order=priority.desc&select=*'
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&order=priority.desc&select=*${userFilter}`
     );
   }
 
   /**
    * Get all active prompt texts for dynamic injection into Gemini
    */
-  async getActivePrompts(): Promise<string[]> {
+  async getActivePrompts(userId?: string): Promise<string[]> {
+    const userFilter = userId ? `&user_id=eq.${userId}` : '';
     const rules = await this.fetch<AutomationRule[]>(
-      '/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&prompt_text=not.is.null&order=priority.desc&select=prompt_text'
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&prompt_text=not.is.null&order=priority.desc&select=prompt_text${userFilter}`
     );
     return rules
       .filter(r => r.prompt_text)
@@ -23,30 +25,33 @@ export class AutomationRulesService extends BaseService {
   /**
    * Find a transfer rule by matching phone number
    */
-  async findTransferRule(phoneNumber: string): Promise<AutomationRule | null> {
+  async findTransferRule(phoneNumber: string, userId?: string): Promise<AutomationRule | null> {
     // Normalize phone number (remove leading * if present)
     const normalizedPhone = phoneNumber.replace(/^\*/, '');
-    
+    const userFilter = userId ? `&user_id=eq.${userId}` : '';
+
     const rules = await this.fetch<AutomationRule[]>(
-      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=eq.${normalizedPhone}&select=*`
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=eq.${normalizedPhone}&select=*${userFilter}`
     );
-    
+
     return rules.length > 0 ? rules[0] : null;
   }
 
   /**
    * Get all transfer rules with phone matching
    */
-  async getTransferRules(): Promise<AutomationRule[]> {
+  async getTransferRules(userId?: string): Promise<AutomationRule[]> {
+    const userFilter = userId ? `&user_id=eq.${userId}` : '';
     return await this.fetch<AutomationRule[]>(
-      '/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=not.is.null&order=priority.desc&select=*'
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=not.is.null&order=priority.desc&select=*${userFilter}`
     );
   }
 
   async applyAutomationRules(
-    transaction: CreateTransactionInput
+    transaction: CreateTransactionInput,
+    userId?: string
   ): Promise<CreateTransactionInput> {
-    const rules = await this.getAutomationRules();
+    const rules = await this.getAutomationRules(userId);
     const appliedRules: AppliedRule[] = [];
 
     for (const rule of rules) {

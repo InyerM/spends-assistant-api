@@ -2,6 +2,7 @@ export type CategoryType = 'expense' | 'income' | 'transfer';
 
 export interface Category {
   id: string;
+  user_id: string;
   name: string;
   slug: string;
   type: 'expense' | 'income' | 'transfer';

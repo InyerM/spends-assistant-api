@@ -56,7 +56,7 @@ describe('isTransferMessage', () => {
   });
 
   it('detects "transferencia"', () => {
-    expect(isTransferMessage('Se realizó transferencia')).toBe(true);
+    expect(isTransferMessage('Se realizo transferencia')).toBe(true);
   });
 
   it('returns false for purchase message', () => {
@@ -89,7 +89,7 @@ describe('processTransfer', () => {
     const tx = createMockTransactionInput({ description: 'Compra almacen' });
     const services = createMockServices();
 
-    const result = await processTransfer(tx, 'Compraste en almacen', services, 'cat-missing');
+    const result = await processTransfer(tx, 'Compraste en almacen', services, 'cat-missing', 'test-user-id');
     expect(result.transactions).toHaveLength(1);
     expect(result.transactions[0].type).toBe('expense');
     expect(result.transactions[0].category_id).toBe('cat-missing');
@@ -105,6 +105,7 @@ describe('processTransfer', () => {
       'Transferiste a *3104633357 desde tu cuenta 2651',
       services,
       'cat-missing',
+      'test-user-id',
     );
     expect(result.transactions).toHaveLength(1);
     expect(result.transactions[0].type).toBe('expense');
@@ -135,6 +136,8 @@ describe('processTransfer', () => {
       tx,
       'Transferiste a *3104633357 desde tu cuenta 2651',
       services,
+      undefined,
+      'test-user-id',
     );
 
     expect(result.transactions).toHaveLength(2);
@@ -169,6 +172,8 @@ describe('processTransfer', () => {
       tx,
       'Transferiste a *3104633357 desde tu cuenta 2651',
       services,
+      undefined,
+      'test-user-id',
     );
 
     expect(result.transactions[1].notes).toContain('2651');
@@ -183,6 +188,7 @@ describe('processTransfer', () => {
       'Compraste en almacen sin telefono',
       services,
       'cat-missing',
+      'test-user-id',
     );
 
     expect(result.transactions[0].notes).toContain('existing note');

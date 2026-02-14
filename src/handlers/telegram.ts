@@ -13,6 +13,7 @@ export async function handleTelegram(request: Request, env: Env): Promise<Respon
   const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
   const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
   const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
+  const userId = env.DEFAULT_USER_ID;
 
   bot.catch((err, ctx) => {
     console.error(`Telegraf error for ${ctx.updateType}`, err);
@@ -68,20 +69,20 @@ Questions? Contact your admin.`;
       return;
     }
 
-    await processExpense(ctx, args, env, services, cache);
+    await processExpense(ctx, args, env, services, cache, userId);
   });
 
   bot.on(message('text'), async (ctx: Context) => {
     // @ts-expect-error - Telegraf types might be slightly off for worker env
     const text = ctx.message?.text;
     if (!text) return;
-    
+
     // @ts-expect-error - Telegraf types might be slightly off for worker env
     if (text.includes("Nequi") && !text.includes("85954") && !ctx.message?.forward_from) {
       // Optional stricter validation for Nequi SMS forwarding
     }
 
-    await processExpense(ctx, text, env, services, cache);
+    await processExpense(ctx, text, env, services, cache, userId);
   });
 
   try {
@@ -100,16 +101,17 @@ async function processExpense(
   text: string,
   env: Env,
   services: ReturnType<typeof createSupabaseServices>,
-  cache: CacheService
+  cache: CacheService,
+  userId: string
 ) {
   try {
     ctx.sendChatAction('typing');
-    
-    // Fetch dynamic prompts, transfer rules, and all rules for Gemini
+
+    // Fetch dynamic prompts, transfer rules, and all rules for Gemini (scoped to user)
     const [activePrompts, transferRules, allRules] = await Promise.all([
-      services.automationRules.getActivePrompts(),
-      services.automationRules.getTransferRules(),
-      services.automationRules.getAutomationRules(),
+      services.automationRules.getActivePrompts(userId),
+      services.automationRules.getTransferRules(userId),
+      services.automationRules.getAutomationRules(userId),
     ]);
 
     // Build dynamic prompts including transfer rules and automation rules
@@ -131,12 +133,12 @@ async function processExpense(
     }
 
     let accountId: string;
-    const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type);
-    
+    const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type, userId);
+
     if (account) {
       accountId = account.id;
     } else {
-      const cashAccount = await services.accounts.getAccount('cash');
+      const cashAccount = await services.accounts.getAccount('cash', null, null, userId);
       if (cashAccount) {
         accountId = cashAccount.id;
       } else {
@@ -145,12 +147,13 @@ async function processExpense(
     }
 
     let categoryId: string | undefined;
-    const category = await services.categories.getCategory(expense.category);
+    const category = await services.categories.getCategory(expense.category, userId);
     if (category) {
       categoryId = category.id;
     }
 
     const transactionInput: CreateTransactionInput = {
+      user_id: userId,
       date,
       time,
       amount: expense.amount,
@@ -171,28 +174,29 @@ async function processExpense(
     
     if (isTransferMessage(text) || expense.category === 'transfer') {
       // Process as transfer - may create dual transactions
-      const missingCategory = await services.categories.getCategory('missing');
+      const missingCategory = await services.categories.getCategory('missing', userId);
       const result = await processTransfer(
         transactionInput,
         text,
         services,
-        missingCategory?.id
+        missingCategory?.id,
+        userId
       );
-      
+
       transferInfo = result.transferInfo;
-      
+
       // Create all transactions (1 or 2)
       for (const tx of result.transactions) {
-        const finalTx = await services.automationRules.applyAutomationRules(tx);
+        const finalTx = await services.automationRules.applyAutomationRules(tx, userId);
         savedTransaction = await services.transactions.createTransaction(finalTx, services.accounts, cache);
       }
-      
+
       if (transferInfo.isInternalTransfer) {
         console.log(`[Transfer] Internal transfer created: ${transferInfo.ruleName}`);
       }
     } else {
       // Normal flow
-      const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput);
+      const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput, userId);
       savedTransaction = await services.transactions.createTransaction(finalTransaction, services.accounts, cache);
     }
     

@@ -19,7 +19,7 @@ describe('AccountsService', () => {
       const mockFn = createMockFetch({ accounts: { data: [account] } });
       vi.stubGlobal('fetch', mockFn);
 
-      const result = await service.getAccount('bancolombia', '2651', 'savings');
+      const result = await service.getAccount('bancolombia', '2651', 'savings', 'test-user-id');
       expect(result).toEqual(account);
     });
 
@@ -36,7 +36,7 @@ describe('AccountsService', () => {
         });
       }));
 
-      const result = await service.getAccount('bancolombia', '2651', 'checking');
+      const result = await service.getAccount('bancolombia', '2651', 'checking', 'test-user-id');
       expect(result).toEqual(account);
     });
 
@@ -44,7 +44,7 @@ describe('AccountsService', () => {
       const account = createMockAccount();
       vi.stubGlobal('fetch', createMockFetch({ accounts: { data: [account] } }));
 
-      const result = await service.getAccount('bancolombia', null, 'savings');
+      const result = await service.getAccount('bancolombia', null, 'savings', 'test-user-id');
       expect(result).toEqual(account);
     });
 
@@ -57,14 +57,14 @@ describe('AccountsService', () => {
         });
       }));
 
-      const result = await service.getAccount('bancolombia');
+      const result = await service.getAccount('bancolombia', undefined, undefined, 'test-user-id');
       expect(result).toEqual(account);
     });
 
     it('returns null when no account found', async () => {
       vi.stubGlobal('fetch', createMockFetch({ accounts: { data: [] } }));
 
-      const result = await service.getAccount('nonexistent');
+      const result = await service.getAccount('nonexistent', undefined, undefined, 'test-user-id');
       expect(result).toBeNull();
     });
   });

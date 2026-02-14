@@ -142,7 +142,7 @@ describe('TransactionsService', () => {
       const cache = { del: vi.fn() } as unknown as CacheService;
       const input = createMockTransactionInput({ type: 'expense' });
       await service.createTransaction(input, accountsService, cache);
-      expect(cache.del).toHaveBeenCalledWith('balance:acc-1');
+      expect(cache.del).toHaveBeenCalledWith('balance:test-user-id:acc-1');
     });
   });
 
@@ -156,7 +156,7 @@ describe('TransactionsService', () => {
         });
       }));
 
-      const result = await service.findExactDuplicate('Compraste $50,000', 'api');
+      const result = await service.findExactDuplicate('Compraste $50,000', 'api', 'test-user-id');
       expect(result).toEqual(tx);
     });
 
@@ -168,8 +168,22 @@ describe('TransactionsService', () => {
         });
       }));
 
-      const result = await service.findExactDuplicate('unique text', 'api');
+      const result = await service.findExactDuplicate('unique text', 'api', 'test-user-id');
       expect(result).toBeNull();
+    });
+
+    it('includes user_id in query parameters', async () => {
+      const mockFn = vi.fn(async () => {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      });
+      vi.stubGlobal('fetch', mockFn);
+
+      await service.findExactDuplicate('some text', 'api', 'test-user-id');
+      const calledUrl = mockFn.mock.calls[0][0] as string;
+      expect(calledUrl).toContain('user_id=eq.test-user-id');
     });
   });
 
@@ -183,7 +197,7 @@ describe('TransactionsService', () => {
         });
       }));
 
-      const result = await service.findNearDuplicate('2024-01-15', 50000, 'acc-1');
+      const result = await service.findNearDuplicate('2024-01-15', 50000, 'acc-1', 'test-user-id');
       expect(result).toEqual(tx);
     });
 
@@ -195,8 +209,22 @@ describe('TransactionsService', () => {
         });
       }));
 
-      const result = await service.findNearDuplicate('2024-01-15', 99999, 'acc-1');
+      const result = await service.findNearDuplicate('2024-01-15', 99999, 'acc-1', 'test-user-id');
       expect(result).toBeNull();
+    });
+
+    it('includes user_id in query parameters', async () => {
+      const mockFn = vi.fn(async () => {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      });
+      vi.stubGlobal('fetch', mockFn);
+
+      await service.findNearDuplicate('2024-01-15', 50000, 'acc-1', 'test-user-id');
+      const calledUrl = mockFn.mock.calls[0][0] as string;
+      expect(calledUrl).toContain('user_id=eq.test-user-id');
     });
   });
 });

@@ -322,6 +322,7 @@ describe('handleEmail', () => {
     const parsed = JSON.parse(postedBody!);
     expect(parsed.date).toBe('2024-01-15');
     expect(parsed.time).toBe('14:30');
+    expect(parsed.user_id).toBe('test-user-id');
   });
 
   it('returns 500 on service error', async () => {

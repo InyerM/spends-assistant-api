@@ -22,7 +22,7 @@ describe('AutomationRulesService', () => {
       const rules = [createMockAutomationRule()];
       vi.stubGlobal('fetch', createMockFetch({ automation_rules: { data: rules } }));
 
-      const result = await service.getAutomationRules();
+      const result = await service.getAutomationRules('test-user-id');
       expect(result).toEqual(rules);
     });
   });
@@ -32,7 +32,7 @@ describe('AutomationRulesService', () => {
       const rule = createMockAutomationRule({ match_phone: '3104633357' });
       vi.stubGlobal('fetch', createMockFetch({ automation_rules: { data: [rule] } }));
 
-      const result = await service.findTransferRule('3104633357');
+      const result = await service.findTransferRule('3104633357', 'test-user-id');
       expect(result).toEqual(rule);
     });
 
@@ -41,7 +41,7 @@ describe('AutomationRulesService', () => {
       const mockFn = createMockFetch({ automation_rules: { data: [rule] } });
       vi.stubGlobal('fetch', mockFn);
 
-      await service.findTransferRule('*3104633357');
+      await service.findTransferRule('*3104633357', 'test-user-id');
       const calledUrl = (mockFn.mock.calls[0][0] as string);
       expect(calledUrl).toContain('match_phone=eq.3104633357');
     });
@@ -49,7 +49,7 @@ describe('AutomationRulesService', () => {
     it('returns null when no match', async () => {
       vi.stubGlobal('fetch', createMockFetch({ automation_rules: { data: [] } }));
 
-      const result = await service.findTransferRule('0000000000');
+      const result = await service.findTransferRule('0000000000', 'test-user-id');
       expect(result).toBeNull();
     });
   });
@@ -57,7 +57,7 @@ describe('AutomationRulesService', () => {
   describe('matchesConditions (via applyAutomationRules)', () => {
     function setupRulesAndApply(rule: ReturnType<typeof createMockAutomationRule>, tx: ReturnType<typeof createMockTransactionInput>) {
       vi.stubGlobal('fetch', createMockFetch({ automation_rules: { data: [rule] } }));
-      return service.applyAutomationRules(tx);
+      return service.applyAutomationRules(tx, 'test-user-id');
     }
 
     it('matches description_contains', async () => {
@@ -210,7 +210,7 @@ describe('AutomationRulesService', () => {
       vi.stubGlobal('fetch', createMockFetch({ automation_rules: { data: [rule] } }));
 
       const tx = createMockTransactionInput();
-      const result = await service.applyAutomationRules(tx);
+      const result = await service.applyAutomationRules(tx, 'test-user-id');
       expect(result.type).toBe('income');
     });
 
@@ -221,7 +221,7 @@ describe('AutomationRulesService', () => {
       });
       vi.stubGlobal('fetch', createMockFetch({ automation_rules: { data: [rule] } }));
 
-      const result = await service.applyAutomationRules(createMockTransactionInput());
+      const result = await service.applyAutomationRules(createMockTransactionInput(), 'test-user-id');
       expect(result.category_id).toBe('food');
     });
 
@@ -232,7 +232,7 @@ describe('AutomationRulesService', () => {
       });
       vi.stubGlobal('fetch', createMockFetch({ automation_rules: { data: [rule] } }));
 
-      const result = await service.applyAutomationRules(createMockTransactionInput());
+      const result = await service.applyAutomationRules(createMockTransactionInput(), 'test-user-id');
       expect(result.transfer_to_account_id).toBe('acc-dest');
       expect(result.transfer_id).toBeDefined();
     });
@@ -244,7 +244,7 @@ describe('AutomationRulesService', () => {
       });
       vi.stubGlobal('fetch', createMockFetch({ automation_rules: { data: [rule] } }));
 
-      const result = await service.applyAutomationRules(createMockTransactionInput());
+      const result = await service.applyAutomationRules(createMockTransactionInput(), 'test-user-id');
       expect(result.account_id).toBe('acc-new');
     });
 
@@ -256,7 +256,7 @@ describe('AutomationRulesService', () => {
       });
       vi.stubGlobal('fetch', createMockFetch({ automation_rules: { data: [rule] } }));
 
-      const result = await service.applyAutomationRules(createMockTransactionInput());
+      const result = await service.applyAutomationRules(createMockTransactionInput(), 'test-user-id');
       expect(result.transfer_to_account_id).toBe('acc-transfer-dest');
     });
 
@@ -267,7 +267,7 @@ describe('AutomationRulesService', () => {
       });
       vi.stubGlobal('fetch', createMockFetch({ automation_rules: { data: [rule] } }));
 
-      const result = await service.applyAutomationRules(createMockTransactionInput());
+      const result = await service.applyAutomationRules(createMockTransactionInput(), 'test-user-id');
       expect(result.notes).toBe('automated');
     });
 
@@ -280,6 +280,7 @@ describe('AutomationRulesService', () => {
 
       const result = await service.applyAutomationRules(
         createMockTransactionInput({ notes: 'existing' }),
+        'test-user-id',
       );
       expect(result.notes).toBe('existing\nautomated');
     });
@@ -293,7 +294,7 @@ describe('AutomationRulesService', () => {
       });
       vi.stubGlobal('fetch', createMockFetch({ automation_rules: { data: [rule] } }));
 
-      const result = await service.applyAutomationRules(createMockTransactionInput());
+      const result = await service.applyAutomationRules(createMockTransactionInput(), 'test-user-id');
       expect(result.applied_rules).toHaveLength(1);
       expect(result.applied_rules![0].rule_id).toBe('rule-1');
       expect(result.applied_rules![0].rule_name).toBe('Test Rule');

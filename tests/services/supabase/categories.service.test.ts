@@ -18,14 +18,14 @@ describe('CategoriesService', () => {
       const category = createMockCategory({ slug: 'food' });
       vi.stubGlobal('fetch', createMockFetch({ categories: { data: [category] } }));
 
-      const result = await service.getCategory('food');
+      const result = await service.getCategory('food', 'test-user-id');
       expect(result).toEqual(category);
     });
 
     it('returns null when not found', async () => {
       vi.stubGlobal('fetch', createMockFetch({ categories: { data: [] } }));
 
-      const result = await service.getCategory('nonexistent');
+      const result = await service.getCategory('nonexistent', 'test-user-id');
       expect(result).toBeNull();
     });
 
@@ -33,10 +33,11 @@ describe('CategoriesService', () => {
       const mockFn = createMockFetch({ categories: { data: [] } });
       vi.stubGlobal('fetch', mockFn);
 
-      await service.getCategory('food');
+      await service.getCategory('food', 'test-user-id');
       const calledUrl = mockFn.mock.calls[0][0] as string;
       expect(calledUrl).toContain('slug=eq.food');
       expect(calledUrl).toContain('is_active=eq.true');
+      expect(calledUrl).toContain('user_id=eq.test-user-id');
     });
   });
 });

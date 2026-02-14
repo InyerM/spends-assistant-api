@@ -15,15 +15,16 @@ interface AppsScriptPayload {
 export async function handleEmail(request: Request, env: Env): Promise<Response> {
   try {
     const contentType = request.headers.get('content-type') || '';
-    
+    const userId = env.DEFAULT_USER_ID;
+
     let emailData: AppsScriptPayload;
-    
+
     if (contentType.includes('application/json')) {
       emailData = await request.json() as AppsScriptPayload;
       console.log('[Email] Received from Apps Script:', emailData);
-      
+
       const emailText = emailData.body || emailData.text || emailData.subject || '';
-      
+
       if (!emailText.toLowerCase().includes('bancolombia')) {
         console.log('[Email] Not Bancolombia, ignoring');
         return new Response(JSON.stringify({ status: 'ignored', reason: 'not_bancolombia' }), {
@@ -31,9 +32,9 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
           headers: { 'Content-Type': 'application/json' }
         });
       }
-      
+
       const cleanText = extractBancolombiaText(emailText);
-      
+
       if (!cleanText) {
         console.log('[Email] Could not extract valid text');
         return new Response(JSON.stringify({ status: 'error', reason: 'no_text_extracted' }), {
@@ -41,17 +42,17 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
           headers: { 'Content-Type': 'application/json' }
         });
       }
-      
+
       console.log('[Email] Clean text:', cleanText);
-      
+
       const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
       const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
-      
-      // Fetch dynamic prompts, transfer rules, and all rules for Gemini
+
+      // Fetch dynamic prompts, transfer rules, and all rules for Gemini (scoped to user)
       const [activePrompts, transferRules, allRules] = await Promise.all([
-        services.automationRules.getActivePrompts(),
-        services.automationRules.getTransferRules(),
-        services.automationRules.getAutomationRules(),
+        services.automationRules.getActivePrompts(userId),
+        services.automationRules.getTransferRules(userId),
+        services.automationRules.getAutomationRules(userId),
       ]);
 
       // Build dynamic prompts including transfer rules and automation rules
@@ -60,9 +61,9 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
         buildTransferPromptSection(transferRules),
         buildAutomationRulesPromptSection(allRules),
       ].filter(Boolean);
-      
+
       const expense = await parseExpense(cleanText, env.GEMINI_API_KEY, cache, { dynamicPrompts });
-      
+
       const colombiaTimes = getCurrentColombiaTimes();
       let date = colombiaTimes.date;
       let time = colombiaTimes.time;
@@ -73,7 +74,7 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
       }
 
       let accountId: string;
-      const account = await services.accounts.getAccount('bancolombia', expense.last_four, expense.account_type);
+      const account = await services.accounts.getAccount('bancolombia', expense.last_four, expense.account_type, userId);
       if (account) {
         accountId = account.id;
       } else {
@@ -81,12 +82,13 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
       }
 
       let categoryId: string | undefined;
-      const category = await services.categories.getCategory(expense.category);
+      const category = await services.categories.getCategory(expense.category, userId);
       if (category) {
         categoryId = category.id;
       }
 
       const transactionInput: CreateTransactionInput = {
+        user_id: userId,
         date,
         time,
         amount: expense.amount,
@@ -103,38 +105,39 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
 
       // Check if it's a transfer message
       let isInternalTransfer = false;
-      
+
       if (isTransferMessage(cleanText) || expense.category === 'transfer') {
         // Process as transfer - may create dual transactions
-        const missingCategory = await services.categories.getCategory('missing');
+        const missingCategory = await services.categories.getCategory('missing', userId);
         const result = await processTransfer(
           transactionInput,
           cleanText,
           services,
-          missingCategory?.id
+          missingCategory?.id,
+          userId
         );
-        
+
         isInternalTransfer = result.transferInfo.isInternalTransfer;
-        
+
         // Create all transactions (1 or 2)
         for (const tx of result.transactions) {
-          const finalTx = await services.automationRules.applyAutomationRules(tx);
+          const finalTx = await services.automationRules.applyAutomationRules(tx, userId);
           await services.transactions.createTransaction(finalTx, services.accounts, cache);
         }
-        
+
         if (isInternalTransfer) {
           console.log(`[Email] Internal transfer created: ${result.transferInfo.ruleName}`);
         }
       } else {
         // Normal flow
-        const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput);
+        const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput, userId);
         await services.transactions.createTransaction(finalTransaction, services.accounts, cache);
       }
-      
+
       console.log('[Email] Processed successfully');
-      
-      return new Response(JSON.stringify({ 
-        status: 'success', 
+
+      return new Response(JSON.stringify({
+        status: 'success',
         expense: {
           amount: expense.amount,
           description: expense.description,
@@ -145,18 +148,18 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
         headers: { 'Content-Type': 'application/json' }
       });
     }
-    
+
     return new Response(JSON.stringify({ status: 'error', reason: 'invalid_format' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }
     });
-    
+
   } catch (error: unknown) {
     console.error('[Email] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ 
-      status: 'error', 
-      message: errorMessage 
+    return new Response(JSON.stringify({
+      status: 'error',
+      message: errorMessage
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
@@ -171,7 +174,7 @@ function extractBancolombiaText(emailBody: string): string | null {
     /Retiraste.*?(?:\$|COP)?[\d,.]+.*?en/i,
     /Pagaste.*?(?:\$|COP)?[\d,.]+.*?en/i
   ];
-  
+
   for (const pattern of patterns) {
     const match = emailBody.match(pattern);
     if (match) {
@@ -181,13 +184,13 @@ function extractBancolombiaText(emailBody: string): string | null {
       return extended.split('\n')[0];
     }
   }
-  
+
   const lines = emailBody.split('\n');
   for (const line of lines) {
     if (line.toLowerCase().includes('bancolombia') && /[\d,.]+/.test(line)) {
       return line.trim();
     }
   }
-  
+
   return null;
 }

@@ -11,6 +11,20 @@ vi.mock('../../src/parsers/gemini', () => ({
   parseExpense: vi.fn(),
 }));
 
+/** Stub fetch so that user_api_keys lookups (resolveUser) return empty and
+ *  all other Supabase calls get a sensible default. */
+function stubFetchDefault(): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ),
+  );
+}
+
 describe('handleTransaction', () => {
   const env = createMockEnv();
 
@@ -28,7 +42,24 @@ describe('handleTransaction', () => {
     expect(response.status).toBe(401);
   });
 
+  it('returns 401 with wrong API key', async () => {
+    stubFetchDefault();
+
+    const request = new Request('http://localhost/transaction', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer wrong-key',
+      },
+      body: JSON.stringify({ text: 'test' }),
+    });
+    const response = await handleTransaction(request, env);
+    expect(response.status).toBe(401);
+  });
+
   it('returns 400 when text is missing', async () => {
+    stubFetchDefault();
+
     const request = new Request('http://localhost/transaction', {
       method: 'POST',
       headers: {
@@ -58,6 +89,12 @@ describe('handleTransaction', () => {
     });
 
     vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.includes('user_api_keys')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       if (url.includes('automation_rules')) {
         return new Response(JSON.stringify([]), {
           status: 200,
@@ -135,6 +172,12 @@ describe('handleTransaction', () => {
 
     let postBody: string | undefined;
     vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.includes('user_api_keys')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       if (url.includes('automation_rules')) {
         return new Response(JSON.stringify([]), {
           status: 200,
@@ -200,6 +243,7 @@ describe('handleTransaction', () => {
     const parsed = JSON.parse(postBody!);
     expect(parsed.duplicate_status).toBe('pending_review');
     expect(parsed.duplicate_of).toBe(existingTx.id);
+    expect(parsed.user_id).toBe('test-user-id');
   });
 
   it('processes transfer message', async () => {
@@ -219,6 +263,12 @@ describe('handleTransaction', () => {
     });
 
     vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.includes('user_api_keys')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       if (url.includes('automation_rules')) {
         return new Response(JSON.stringify([]), {
           status: 200,
@@ -299,6 +349,12 @@ describe('handleTransaction', () => {
 
     let postedBody: string | undefined;
     vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.includes('user_api_keys')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       if (url.includes('automation_rules')) {
         return new Response(JSON.stringify([]), {
           status: 200,
@@ -356,6 +412,7 @@ describe('handleTransaction', () => {
     const parsed = JSON.parse(postedBody!);
     expect(parsed.date).toBe('2024-01-15');
     expect(parsed.time).toBe('14:30');
+    expect(parsed.user_id).toBe('test-user-id');
   });
 
   it('falls back to default account when bank not found', async () => {
@@ -376,6 +433,12 @@ describe('handleTransaction', () => {
 
     let callCount = 0;
     vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.includes('user_api_keys')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       if (url.includes('automation_rules')) {
         return new Response(JSON.stringify([]), {
           status: 200,
@@ -390,7 +453,7 @@ describe('handleTransaction', () => {
           });
         }
         callCount++;
-        // First call: unknown bank → empty, second: cash → found
+        // First call: unknown bank -> empty, second: cash -> found
         if (callCount === 1) {
           return new Response(JSON.stringify([]), {
             status: 200,

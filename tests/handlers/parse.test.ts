@@ -6,6 +6,20 @@ vi.mock('../../src/parsers/gemini', () => ({
   parseExpense: vi.fn(),
 }));
 
+/** Stub fetch so that user_api_keys lookups (resolveUser) return empty and
+ *  all other Supabase calls get a sensible default. */
+function stubFetchDefault(): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ),
+  );
+}
+
 describe('handleParse', () => {
   const env = createMockEnv();
 
@@ -24,6 +38,8 @@ describe('handleParse', () => {
   });
 
   it('returns 401 with wrong API key', async () => {
+    stubFetchDefault();
+
     const request = new Request('http://localhost/parse', {
       method: 'POST',
       headers: {
@@ -37,6 +53,8 @@ describe('handleParse', () => {
   });
 
   it('returns 400 when text is missing', async () => {
+    stubFetchDefault();
+
     const request = new Request('http://localhost/parse', {
       method: 'POST',
       headers: {
@@ -68,8 +86,14 @@ describe('handleParse', () => {
     const { parseExpense } = await import('../../src/parsers/gemini');
     vi.mocked(parseExpense).mockResolvedValue(parsedExpense);
 
-    // Mock supabase fetch for rules + accounts + categories
+    // Mock supabase fetch for api_keys + rules + accounts + categories
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('user_api_keys')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       if (url.includes('automation_rules')) {
         return new Response(JSON.stringify([]), {
           status: 200,

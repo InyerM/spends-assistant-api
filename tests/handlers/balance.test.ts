@@ -34,6 +34,31 @@ describe('handleBalance', () => {
     expect(body.formatted).toBeDefined();
   });
 
+  it('returns balance with auth resolving user via legacy API key', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('user_api_keys')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify([{ balance: 750000 }]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }));
+
+    const request = new Request('http://localhost/balance/acc-1', {
+      headers: {
+        Authorization: `Bearer ${env.API_KEY}`,
+      },
+    });
+    const response = await handleBalance(request, env);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.balance).toBe(750000);
+  });
+
   it('returns 500 on service error', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response('Internal error', { status: 500, statusText: 'Internal Server Error' }),
