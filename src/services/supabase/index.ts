@@ -4,6 +4,7 @@ import { TransactionsService } from './transactions.service';
 import { AutomationRulesService } from './automation-rules.service';
 import { ApiKeysService } from './api-keys.service';
 import { UsageService } from './usage.service';
+import { SkippedMessagesService } from './skipped-messages.service';
 
 export interface SupabaseServices {
   accounts: AccountsService;
@@ -12,6 +13,7 @@ export interface SupabaseServices {
   automationRules: AutomationRulesService;
   apiKeys: ApiKeysService;
   usage: UsageService;
+  skippedMessages: SkippedMessagesService;
 }
 
 export function createSupabaseServices(
@@ -25,6 +27,7 @@ export function createSupabaseServices(
     automationRules: new AutomationRulesService(url, serviceKey),
     apiKeys: new ApiKeysService(url, serviceKey),
     usage: new UsageService(url, serviceKey),
+    skippedMessages: new SkippedMessagesService(url, serviceKey),
   };
 }
 
@@ -34,3 +37,4 @@ export { TransactionsService } from './transactions.service';
 export { AutomationRulesService } from './automation-rules.service';
 export { ApiKeysService } from './api-keys.service';
 export { UsageService } from './usage.service';
+export { SkippedMessagesService } from './skipped-messages.service';

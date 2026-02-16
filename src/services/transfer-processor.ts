@@ -235,7 +235,10 @@ export function buildAutomationRulesPromptSection(rules: AutomationRule[]): stri
     if (r.actions.set_category) actParts.push(`category→"${r.actions.set_category}"`);
 
     if (condParts.length === 0 || actParts.length === 0) return '';
-    return `- RULE "${r.name}": IF ${condParts.join(' AND ')} THEN ${actParts.join(', ')}`;
+
+    const logic = r.condition_logic ?? 'or';
+    const logicLabel = logic === 'and' ? ' AND ' : ' OR ';
+    return `- RULE "${r.name}" (${logic.toUpperCase()}): IF ${condParts.join(logicLabel)} THEN ${actParts.join(', ')}`;
   }).filter(Boolean);
 
   if (lines.length === 0) return '';

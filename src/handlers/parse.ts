@@ -1,6 +1,8 @@
 import { CacheService } from '../services/cache.service';
 import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
+import { CreateTransactionInput } from '../types/transaction';
+import { validateAndFixDate, validateAndFixTime } from '../utils/date';
 import { buildTransferPromptSection, buildAutomationRulesPromptSection } from '../services/transfer-processor';
 
 interface ParseRequest {
@@ -75,19 +77,62 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
     const { parseExpense } = await import('../parsers/gemini');
     const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
 
-    const [activePrompts, transferRules, allRules] = await Promise.all([
+    const [activePrompts, transferRules, allRules, accountDetectionRules] = await Promise.all([
       services.automationRules.getActivePrompts(userId),
       services.automationRules.getTransferRules(userId),
       services.automationRules.getAutomationRules(userId),
+      services.automationRules.getAccountDetectionRules(userId),
     ]);
 
+    // Pre-parse account detection: check raw text against account_detection rules
+    const generalRules = allRules.filter(r => r.rule_type !== 'account_detection');
+    const preMatchedAccount = accountDetectionRules.find(rule =>
+      services.automationRules.matchesConditions(
+        { raw_text: text } as Partial<CreateTransactionInput>,
+        rule.conditions,
+        rule.condition_logic ?? 'or'
+      )
+    );
+
+    const accountHint = preMatchedAccount?.actions.set_account
+      ? `ACCOUNT CONTEXT: This message is from account "${preMatchedAccount.name}" (id: ${preMatchedAccount.actions.set_account}).`
+      : '';
+
     const dynamicPrompts = [
+      accountHint,
       ...activePrompts,
       buildTransferPromptSection(transferRules),
-      buildAutomationRulesPromptSection(allRules),
+      buildAutomationRulesPromptSection(generalRules),
     ].filter(Boolean);
 
     const expense = await parseExpense(text, env.GEMINI_API_KEY, cache, { dynamicPrompts });
+
+    // Handle non-transactional messages
+    if (expense.is_transaction === false) {
+      await services.skippedMessages.create({
+        user_id: userId,
+        raw_text: text,
+        source: 'api',
+        reason: expense.skip_reason ?? 'not_transaction',
+        parsed_data: expense as unknown as Record<string, unknown>,
+      });
+      return new Response(
+        JSON.stringify({
+          status: 'skipped',
+          reason: expense.skip_reason ?? 'not_transaction',
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
+    }
+
+    // Validate and fix AI-parsed dates/times
+    const validatedDate = validateAndFixDate(expense.original_date);
+    const validatedTime = validateAndFixTime(expense.original_time);
+    if (validatedDate) expense.original_date = validatedDate;
+    if (validatedTime) expense.original_time = validatedTime;
 
     // Resolve account (scoped to user)
     let accountId: string | undefined;

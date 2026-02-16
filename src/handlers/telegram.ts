@@ -3,7 +3,7 @@ import { message } from 'telegraf/filters';
 import { parseExpense } from '../parsers/gemini';
 import { createSupabaseServices } from '../services/supabase';
 import { CacheService } from '../services/cache.service';
-import { getCurrentColombiaTimes, convertDateFormat, formatDateForDisplay } from '../utils/date';
+import { getCurrentColombiaTimes, convertDateFormat, formatDateForDisplay, validateAndFixDate, validateAndFixTime } from '../utils/date';
 import { formatCurrency } from '../utils/formatting';
 import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
@@ -108,28 +108,63 @@ async function processExpense(
     ctx.sendChatAction('typing');
 
     // Fetch dynamic prompts, transfer rules, and all rules for Gemini (scoped to user)
-    const [activePrompts, transferRules, allRules] = await Promise.all([
+    const [activePrompts, transferRules, allRules, accountDetectionRules] = await Promise.all([
       services.automationRules.getActivePrompts(userId),
       services.automationRules.getTransferRules(userId),
       services.automationRules.getAutomationRules(userId),
+      services.automationRules.getAccountDetectionRules(userId),
     ]);
+
+    // Pre-parse account detection: check raw text against account_detection rules
+    const generalRules = allRules.filter(r => r.rule_type !== 'account_detection');
+    const preMatchedAccount = accountDetectionRules.find(rule =>
+      services.automationRules.matchesConditions(
+        { raw_text: text } as Partial<CreateTransactionInput>,
+        rule.conditions,
+        rule.condition_logic ?? 'or'
+      )
+    );
+
+    const accountHint = preMatchedAccount?.actions.set_account
+      ? `ACCOUNT CONTEXT: This message is from account "${preMatchedAccount.name}" (id: ${preMatchedAccount.actions.set_account}).`
+      : '';
 
     // Build dynamic prompts including transfer rules and automation rules
     const dynamicPrompts = [
+      accountHint,
       ...activePrompts,
       buildTransferPromptSection(transferRules),
-      buildAutomationRulesPromptSection(allRules),
+      buildAutomationRulesPromptSection(generalRules),
     ].filter(Boolean);
-    
+
     const expense = await parseExpense(text, env.GEMINI_API_KEY, cache, { dynamicPrompts });
+
+    // Handle non-transactional messages
+    if (expense.is_transaction === false) {
+      await services.skippedMessages.create({
+        user_id: userId,
+        raw_text: text,
+        source: 'telegram',
+        reason: expense.skip_reason ?? 'not_transaction',
+        parsed_data: expense as unknown as Record<string, unknown>,
+      });
+      await ctx.reply('ℹ️ Mensaje informativo detectado, no se creo transaccion.');
+      return;
+    }
 
     const colombiaTimes = getCurrentColombiaTimes();
     let date = colombiaTimes.date;
     let time = colombiaTimes.time;
 
-    if (expense.original_date && expense.original_time) {
-      date = convertDateFormat(expense.original_date);
-      time = expense.original_time;
+    // Validate and fix AI-parsed dates/times
+    const validatedDate = validateAndFixDate(expense.original_date);
+    const validatedTime = validateAndFixTime(expense.original_time);
+
+    if (validatedDate && validatedTime) {
+      date = convertDateFormat(validatedDate);
+      time = validatedTime;
+    } else if (validatedDate) {
+      date = convertDateFormat(validatedDate);
     }
 
     let accountId: string;

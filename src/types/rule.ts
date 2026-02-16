@@ -21,6 +21,9 @@ export interface AutomationRuleActions {
   add_note?: string;
 }
 
+export type RuleType = 'general' | 'account_detection' | 'transfer';
+export type ConditionLogic = 'and' | 'or';
+
 export interface AutomationRule {
   id: string;
   user_id: string;
@@ -30,6 +33,8 @@ export interface AutomationRule {
   prompt_text?: string | null;
   match_phone?: string | null;
   transfer_to_account_id?: string | null;
+  rule_type: RuleType;
+  condition_logic: ConditionLogic;
   conditions: AutomationRuleConditions;
   actions: AutomationRuleActions;
   created_at: string;

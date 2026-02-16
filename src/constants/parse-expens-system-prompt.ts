@@ -6,8 +6,30 @@ POSSIBLE INPUTS:
 2. Nequi SMS (number 85954): "Nequi: Pagaste $X en Y. Saldo: $Z"
 3. Manual message: "20k in rappi", "50mil for lunch", "bought 100mil groceries" (spanish or english)
 
+CRITICAL: Before parsing, determine if this is an actual financial transaction or an informational/non-transactional message.
+If the message is NOT a real transaction, set is_transaction=false and provide a skip_reason.
+
+Non-transactional messages include:
+- Spending summaries: "tus gastos entre diciembre y enero cambiaron en $1.615.035"
+- Balance inquiries: "Consulta de saldo", "Tu saldo disponible es..."
+- Promotional messages: "Activa tu tarjeta de credito", "Solicita tu credito"
+- OTP codes: "Tu clave dinamica es 123456", "Codigo de verificacion"
+- Account alerts without a specific purchase/payment: "Tu cuenta ha sido bloqueada", "Actualizamos tus datos"
+- Informational notifications: "Recuerda que tu cuota es...", "Tu extracto esta disponible"
+
+Examples of NON-transactions:
+- "Bancolombia: tus gastos entre diciembre y enero cambiaron en $1.615.035" → is_transaction=false, skip_reason="spending_summary"
+- "Consulta de saldo en cajero" → is_transaction=false, skip_reason="balance_inquiry"
+- "Tu clave dinamica es 123456" → is_transaction=false, skip_reason="otp_code"
+- "Activa tu tarjeta de credito Bancolombia" → is_transaction=false, skip_reason="promotional"
+- "Recuerda pagar tu factura antes del 15" → is_transaction=false, skip_reason="informational"
+
+If it IS a real transaction (purchase, payment, withdrawal, transfer), set is_transaction=true and skip_reason=null.
+
 OUTPUT (strict JSON without markdown):
 {
+  "is_transaction": boolean,
+  "skip_reason": string | null,
   "amount": number,
   "description": string,
   "category": "slug-from-list-below",
@@ -20,6 +42,8 @@ OUTPUT (strict JSON without markdown):
   "last_four": string | null,
   "account_type": "checking|savings|credit_card|credit" | null
 }
+
+NOTE: When is_transaction=false, amount/description/category can be 0/""/missing since they won't be used.
 
 CATEGORY SLUGS - Choose the MOST SPECIFIC category that matches:
 
@@ -171,13 +195,29 @@ Last four digits:
 - Store as string: "7799"
 
 Dates/Times:
-- Bank SMS: extract if present ("23/11/2024", "19:47")
-- Manual: always null
+- Bank SMS: extract exact date/time (e.g., "23/11/2024 19:47")
+- Natural language dates: ALWAYS convert to DD/MM/YYYY format:
+  - "7 de febrero" → "07/02/YYYY" (use current year if not specified)
+  - "ayer" → yesterday's date in DD/MM/YYYY
+  - "el lunes" → last Monday's date in DD/MM/YYYY
+  - "hoy" → today's date in DD/MM/YYYY
+  - "anteayer" → day before yesterday in DD/MM/YYYY
+  - "el 15" → 15th of current month in DD/MM/YYYY
+- Natural language times: ALWAYS convert to HH:MM (24-hour format):
+  - "10:30pm" → "22:30"
+  - "3 de la tarde" → "15:00"
+  - "8 de la manana" → "08:00"
+  - "mediodia" → "12:00"
+  - "medianoche" → "00:00"
+- Manual with no date/time reference: null (system uses current Colombia time)
+- NEVER output natural language for dates or times — always structured format
 
 EXAMPLES:
 
 Input: "20000 en almuerzo"
 Output: {
+  "is_transaction": true,
+  "skip_reason": null,
   "amount": 20000,
   "description": "almuerzo",
   "category": "restaurant",
@@ -193,6 +233,8 @@ Output: {
 
 Input: "Bancolombia: Compraste $119.000,00 en CODASHOP con tu T.Deb *7799, el 23/11/2024 a las 19:47"
 Output: {
+  "is_transaction": true,
+  "skip_reason": null,
   "amount": 119000,
   "description": "CODASHOP",
   "category": "software",
@@ -208,6 +250,8 @@ Output: {
 
 Input: "50k en rappi"
 Output: {
+  "is_transaction": true,
+  "skip_reason": null,
   "amount": 50000,
   "description": "rappi",
   "category": "restaurant",
@@ -215,6 +259,23 @@ Output: {
   "payment_type": "cash",
   "source": "manual",
   "confidence": 90,
+  "original_date": null,
+  "original_time": null,
+  "last_four": null,
+  "account_type": null
+}
+
+Input: "Bancolombia: tus gastos entre diciembre y enero cambiaron en $1.615.035"
+Output: {
+  "is_transaction": false,
+  "skip_reason": "spending_summary",
+  "amount": 0,
+  "description": "",
+  "category": "missing",
+  "bank": "bancolombia",
+  "payment_type": "debit",
+  "source": "bancolombia_email",
+  "confidence": 95,
   "original_date": null,
   "original_time": null,
   "last_four": null,

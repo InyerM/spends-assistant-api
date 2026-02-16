@@ -112,6 +112,15 @@ export async function parseExpense(
 
       console.log('[Gemini] Response:', JSON.stringify(expense));
 
+      // If Gemini detected a non-transactional message, return early with flag
+      if (expense.is_transaction === false) {
+        console.log(`[Gemini] Non-transactional message detected: ${expense.skip_reason}`);
+        return expense;
+      }
+
+      // Default is_transaction to true for backward compatibility
+      expense.is_transaction = true;
+
       if (!expense.amount || expense.amount <= 0) {
         throw new Error("Invalid amount");
       }

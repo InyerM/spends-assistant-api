@@ -10,6 +10,8 @@ export interface ParsedExpense {
   original_time?: string | null;
   last_four?: string | null;
   account_type?: 'checking' | 'savings' | 'credit_card' | 'credit' | null;
+  is_transaction?: boolean;
+  skip_reason?: string | null;
 }
 
 export interface GeminiResponse {
