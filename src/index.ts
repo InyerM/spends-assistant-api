@@ -3,6 +3,7 @@ import { handleEmail } from './handlers/email';
 import { handleTransaction } from './handlers/transaction';
 import { handleParse } from './handlers/parse';
 import { handleBalance } from './handlers/balance';
+import { handleAutomationGenerate } from './handlers/automation-generate';
 import { createSupabaseServices } from './services/supabase';
 import { Env } from './types/env';
 
@@ -58,6 +59,11 @@ export default {
     // Transaction API
     if (url.pathname === '/transaction' && request.method === 'POST') {
       return handleTransaction(request, env);
+    }
+
+    // Automation rule generation (AI preview, no save)
+    if (url.pathname === '/automation/generate' && request.method === 'POST') {
+      return handleAutomationGenerate(request, env);
     }
 
     return new Response('Not Found', { status: 404 });

@@ -199,6 +199,22 @@ export class AutomationRulesService extends BaseService {
   }
 
   /**
+   * Create a single rule, optionally including the AI prompt that generated it.
+   */
+  async createRuleWithPrompt(
+    rule: CreateRuleInput & { ai_prompt?: string }
+  ): Promise<AutomationRule> {
+    const results = await this.fetch<AutomationRule[]>(
+      '/rest/v1/automation_rules',
+      {
+        method: 'POST',
+        body: JSON.stringify(rule),
+      }
+    );
+    return results[0];
+  }
+
+  /**
    * Bulk create automation rules.
    */
   async bulkCreateRules(rules: CreateRuleInput[]): Promise<AutomationRule[]> {

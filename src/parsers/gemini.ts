@@ -1,6 +1,7 @@
 import { ParsedExpense, GeminiResponse } from '../types/expense';
 import { CacheService } from '../services/cache.service';
-import { systemPrompt } from '../constants/parse-expens-system-prompt';
+import { buildSystemPrompt } from '../constants/parse-expens-system-prompt';
+import { getCurrentColombiaTimes } from '../utils/date';
 
 export interface ParseExpenseOptions {
   dynamicPrompts?: string[];
@@ -15,11 +16,13 @@ export async function parseExpense(
   const model = "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-  // Build final prompt with dynamic injections
-  let finalPrompt = systemPrompt;
+  // Build final prompt with current Colombia date/time and dynamic injections
+  const { date: currentDate, time: currentTime } = getCurrentColombiaTimes();
+  const basePrompt = buildSystemPrompt(currentDate, currentTime);
+  let finalPrompt = basePrompt;
   if (options?.dynamicPrompts && options.dynamicPrompts.length > 0) {
     const dynamicSection = options.dynamicPrompts.join('\n\n');
-    finalPrompt = `${systemPrompt}\n\n${dynamicSection}`;
+    finalPrompt = `${basePrompt}\n\n${dynamicSection}`;
     console.log('[Gemini] Dynamic prompts injected:', options.dynamicPrompts.length);
   }
 

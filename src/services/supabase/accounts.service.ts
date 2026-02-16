@@ -2,6 +2,12 @@ import { BaseService } from './base.service';
 import type { Account } from '../../types';
 
 export class AccountsService extends BaseService {
+  async getAccounts(userId: string): Promise<Account[]> {
+    return await this.fetch<Account[]>(
+      `/rest/v1/accounts?user_id=eq.${userId}&is_active=eq.true&deleted_at=is.null&order=name.asc&select=*`
+    );
+  }
+
   async getAccount(
     institution: string,
     lastFour?: string | null,

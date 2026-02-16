@@ -37,6 +37,7 @@ export interface AutomationRule {
   condition_logic: ConditionLogic;
   conditions: AutomationRuleConditions;
   actions: AutomationRuleActions;
+  ai_prompt?: string | null;
   created_at: string;
   updated_at: string;
 }
