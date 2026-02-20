@@ -1,6 +1,7 @@
 import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
 import { formatCurrency } from '../utils/formatting';
+import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 
 export async function handleBalance(request: Request, env: Env): Promise<Response> {
   try {
@@ -17,20 +18,17 @@ export async function handleBalance(request: Request, env: Env): Promise<Respons
 
     const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
 
-    // Resolve user from API key
-    const authHeader = request.headers.get('Authorization');
-    let userId: string | null = null;
+    const userId = await resolveUserId(request, env, services.apiKeys);
+    if (!userId) return unauthorizedResponse();
 
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
-      userId = await services.apiKeys.resolveUser(token);
-      if (!userId && token === env.API_KEY) {
-        userId = env.DEFAULT_USER_ID;
-      }
+    const balance = await services.accounts.getAccountBalance(accountId, userId);
+
+    if (balance === null) {
+      return new Response(JSON.stringify({ error: 'Account not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
-
-    // Balance endpoint: allow without auth for backward compat, but scoped if auth present
-    const balance = await services.accounts.getAccountBalance(accountId);
 
     return new Response(JSON.stringify({
       account_id: accountId,

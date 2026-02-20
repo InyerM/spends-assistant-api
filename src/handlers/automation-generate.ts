@@ -2,6 +2,7 @@ import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
 import { GeminiResponse } from '../types/expense';
 import { automationGenerateSystemPrompt } from '../constants/automation-generate-system-prompt';
+import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 import type {
   AutomationRule,
   AutomationRuleConditions,
@@ -31,41 +32,8 @@ export async function handleAutomationGenerate(
   try {
     const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
 
-    // Resolve user from API key
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response('Unauthorized', { status: 401 });
-    }
-
-    const token = authHeader.slice(7);
-    let userId = await services.apiKeys.resolveUser(token);
-
-    // Fall back to legacy static API_KEY
-    if (!userId && token === env.API_KEY) {
-      userId = env.DEFAULT_USER_ID;
-    }
-
-    // Fall back to Supabase JWT verification
-    if (!userId) {
-      try {
-        const userRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            apikey: env.SUPABASE_SERVICE_KEY,
-          },
-        });
-        if (userRes.ok) {
-          const user = (await userRes.json()) as { id: string };
-          userId = user.id;
-        }
-      } catch {
-        // JWT verification failed, userId remains null
-      }
-    }
-
-    if (!userId) {
-      return new Response('Unauthorized', { status: 401 });
-    }
+    const userId = await resolveUserId(request, env, services.apiKeys);
+    if (!userId) return unauthorizedResponse();
 
     const body = (await request.json()) as AutomationGenerateRequest;
     const { prompt } = body;

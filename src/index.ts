@@ -5,6 +5,7 @@ import { handleParse } from './handlers/parse';
 import { handleBalance } from './handlers/balance';
 import { handleAutomationGenerate } from './handlers/automation-generate';
 import { createSupabaseServices } from './services/supabase';
+import { resolveUserId, unauthorizedResponse } from './utils/auth';
 import { Env } from './types/env';
 
 export default {
@@ -22,15 +23,22 @@ export default {
       });
     }
 
-    // Setup webhook helper
-    if (url.pathname === '/setup-webhook' && request.method === 'GET') {
+    // Setup webhook helper (protected — does not expose bot token)
+    if (url.pathname === '/setup-webhook' && request.method === 'POST') {
+      const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
+      const userId = await resolveUserId(request, env, services.apiKeys);
+      if (!userId) return unauthorizedResponse();
+
       const webhookUrl = `${url.origin}/telegram`;
       const telegramApiUrl = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}`;
-      
+
+      const res = await fetch(telegramApiUrl);
+      const result = await res.json();
+
       return new Response(JSON.stringify({
-        message: 'To setup Telegram webhook, visit this URL in your browser:',
-        url: telegramApiUrl,
-        webhook: webhookUrl
+        status: 'ok',
+        webhook: webhookUrl,
+        telegram_response: result,
       }), {
         headers: { 'Content-Type': 'application/json' }
       });

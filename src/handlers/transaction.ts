@@ -4,36 +4,19 @@ import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
 import { getCurrentColombiaTimes, convertDateFormat, validateAndFixDate, validateAndFixTime } from '../utils/date';
 import { isTransferMessage, processTransfer, buildTransferPromptSection, buildAutomationRulesPromptSection } from '../services/transfer-processor';
+import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 
 interface TransactionRequest {
   text: string;
   source?: string;
 }
 
-async function resolveUserId(request: Request, env: Env, services: ReturnType<typeof createSupabaseServices>): Promise<string | null> {
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) return null;
-
-  const token = authHeader.slice(7);
-
-  // Try per-user API key first
-  const userId = await services.apiKeys.resolveUser(token);
-  if (userId) return userId;
-
-  // Fall back to legacy static API_KEY
-  if (token === env.API_KEY) return env.DEFAULT_USER_ID;
-
-  return null;
-}
-
 export async function handleTransaction(request: Request, env: Env): Promise<Response> {
   try {
     const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
 
-    const userId = await resolveUserId(request, env, services);
-    if (!userId) {
-      return new Response('Unauthorized', { status: 401 });
-    }
+    const userId = await resolveUserId(request, env, services.apiKeys);
+    if (!userId) return unauthorizedResponse();
 
     const body = await request.json() as TransactionRequest;
     const { text, source = 'api' } = body;

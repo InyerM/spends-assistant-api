@@ -4,6 +4,7 @@ import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
 import { validateAndFixDate, validateAndFixTime } from '../utils/date';
 import { buildTransferPromptSection, buildAutomationRulesPromptSection } from '../services/transfer-processor';
+import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 
 interface ParseRequest {
   text: string;
@@ -13,42 +14,8 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
   try {
     const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
 
-    // Resolve user from API key
-    const authHeader = request.headers.get('Authorization');
-    console.log('Auth header:', authHeader);
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response('Unauthorized', { status: 401 });
-    }
-
-    const token = authHeader.slice(7);
-    let userId = await services.apiKeys.resolveUser(token);
-
-    // Fall back to legacy static API_KEY
-    if (!userId && token === env.API_KEY) {
-      userId = env.DEFAULT_USER_ID;
-    }
-
-    // Fall back to Supabase JWT verification
-    if (!userId) {
-      try {
-        const userRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            apikey: env.SUPABASE_SERVICE_KEY,
-          },
-        });
-        if (userRes.ok) {
-          const user = (await userRes.json()) as { id: string };
-          userId = user.id;
-        }
-      } catch {
-        // JWT verification failed, userId remains null
-      }
-    }
-
-    if (!userId) {
-      return new Response('Unauthorized', { status: 401 });
-    }
+    const userId = await resolveUserId(request, env, services.apiKeys);
+    if (!userId) return unauthorizedResponse();
 
     const body = (await request.json()) as ParseRequest;
     const { text } = body;

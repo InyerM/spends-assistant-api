@@ -5,6 +5,7 @@ import { getCurrentColombiaTimes, convertDateFormat, validateAndFixDate, validat
 import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
 import { isTransferMessage, processTransfer, buildTransferPromptSection, buildAutomationRulesPromptSection } from '../services/transfer-processor';
+import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 
 interface AppsScriptPayload {
   body?: string;
@@ -14,8 +15,12 @@ interface AppsScriptPayload {
 
 export async function handleEmail(request: Request, env: Env): Promise<Response> {
   try {
+    const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
+
+    const userId = await resolveUserId(request, env, services.apiKeys);
+    if (!userId) return unauthorizedResponse();
+
     const contentType = request.headers.get('content-type') || '';
-    const userId = env.DEFAULT_USER_ID;
 
     let emailData: AppsScriptPayload;
 
@@ -46,7 +51,6 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
       console.log('[Email] Clean text:', cleanText);
 
       const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
-      const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
 
       // Fetch dynamic prompts, transfer rules, and all rules for Gemini (scoped to user)
       const [activePrompts, transferRules, allRules, accountDetectionRules] = await Promise.all([

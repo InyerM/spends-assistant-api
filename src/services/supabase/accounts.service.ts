@@ -98,12 +98,14 @@ export class AccountsService extends BaseService {
     return accounts[0] || null;
   }
 
-  async getAccountBalance(accountId: string): Promise<number> {
+  async getAccountBalance(accountId: string, userId?: string): Promise<number | null> {
+    const userFilter = userId ? `&user_id=eq.${userId}` : '';
     const account = await this.fetch<Account[]>(
-      `/rest/v1/accounts?id=eq.${accountId}&deleted_at=is.null&select=balance`
+      `/rest/v1/accounts?id=eq.${accountId}&deleted_at=is.null&select=balance${userFilter}`
     );
 
-    return account[0]?.balance || 0;
+    if (account.length === 0) return null;
+    return account[0].balance || 0;
   }
 
   async updateBalance(
@@ -111,7 +113,7 @@ export class AccountsService extends BaseService {
     amount: number,
     operation: 'add' | 'subtract'
   ): Promise<void> {
-    const currentBalance = await this.getAccountBalance(accountId);
+    const currentBalance = await this.getAccountBalance(accountId) ?? 0;
     const newBalance = operation === 'subtract'
       ? currentBalance - amount
       : currentBalance + amount;

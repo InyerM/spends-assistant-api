@@ -242,7 +242,7 @@ async function processExpense(
     const fechaFormateada = formatDateForDisplay(savedTransaction.date);
     const amountFormatted = formatCurrency(savedTransaction.amount);
 
-    const currentBalance = await services.accounts.getAccountBalance(accountId);
+    const currentBalance = await services.accounts.getAccountBalance(accountId) ?? 0;
     const balanceFormatted = formatCurrency(currentBalance);
 
     let confirmationMessage = `✅ Expense registered
