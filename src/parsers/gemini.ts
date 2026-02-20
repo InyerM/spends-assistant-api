@@ -51,8 +51,12 @@ export async function parseExpense(
 
   console.log('[Gemini] Processing:', text.substring(0, 50) + '...');
 
+  const cacheInput = options?.dynamicPrompts?.length
+    ? text + JSON.stringify(options.dynamicPrompts)
+    : text;
+
   if (cache) {
-    const cacheKey = `gemini:${cache.hashKey(text)}`;
+    const cacheKey = `gemini:${cache.hashKey(cacheInput)}`;
     const cached = await cache.get(cacheKey);
     if (cached) {
       console.log('[Gemini] Cache hit');
@@ -135,7 +139,7 @@ export async function parseExpense(
       }
 
       if (cache) {
-        const cacheKey = `gemini:${cache.hashKey(text)}`;
+        const cacheKey = `gemini:${cache.hashKey(cacheInput)}`;
         await cache.set(cacheKey, JSON.stringify(expense), 86400);
       }
 
