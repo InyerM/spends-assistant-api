@@ -168,16 +168,21 @@ async function processExpense(
     }
 
     let accountId: string;
-    const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type, userId);
-
-    if (account) {
-      accountId = account.id;
+    if (preMatchedAccount?.actions.set_account) {
+      // Account detection rule matched — use the rule's account directly
+      accountId = preMatchedAccount.actions.set_account;
+      console.log(`[Account] Using account_detection rule: ${preMatchedAccount.name}`);
     } else {
-      const cashAccount = await services.accounts.getAccount('cash', null, null, userId);
-      if (cashAccount) {
-        accountId = cashAccount.id;
+      const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type, userId);
+      if (account) {
+        accountId = account.id;
       } else {
-        throw new Error("Could not determine account - no cash fallback found");
+        const cashAccount = await services.accounts.getAccount('cash', null, null, userId);
+        if (cashAccount) {
+          accountId = cashAccount.id;
+        } else {
+          throw new Error("Could not determine account - no cash fallback found");
+        }
       }
     }
 

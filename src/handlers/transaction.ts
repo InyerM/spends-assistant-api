@@ -95,13 +95,19 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
     }
 
     let accountId: string;
-    const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type, userId);
-    if (account) {
-      accountId = account.id;
+    if (preMatchedAccount?.actions.set_account) {
+      // Account detection rule matched — use the rule's account directly
+      accountId = preMatchedAccount.actions.set_account;
+      console.log(`[Account] Using account_detection rule: ${preMatchedAccount.name}`);
     } else {
-       const fallback = await services.accounts.getAccount('cash', null, null, userId) || await services.accounts.getAccount('bancolombia', null, null, userId);
-       if (!fallback) throw new Error("No default account found");
-       accountId = fallback.id;
+      const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type, userId);
+      if (account) {
+        accountId = account.id;
+      } else {
+        const fallback = await services.accounts.getAccount('cash', null, null, userId) || await services.accounts.getAccount('bancolombia', null, null, userId);
+        if (!fallback) throw new Error("No default account found");
+        accountId = fallback.id;
+      }
     }
 
     let categoryId: string | undefined;
