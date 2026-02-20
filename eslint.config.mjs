@@ -4,7 +4,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['node_modules/', 'dist/', '.wrangler/', '.git/', 'scripts/send-spend.js'],
+    ignores: ['node_modules/', 'dist/', '.wrangler/', '.git/', 'scripts/*.js'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
