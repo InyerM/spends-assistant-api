@@ -2,10 +2,6 @@
 
 ## CRITICAL PROJECT RULES
 
-### NEVER create middleware.ts in the frontend
-
-**When working on the frontend (`spends-assistant-web/`), NEVER create `middleware.ts` or `middleware.js`.** The project uses `proxy.ts` for auth/session logic and it must NOT be wired up as Next.js middleware. See `spends-assistant-web/CLAUDE.md` for full frontend rules.
-
 ### API Route Performance
 
 - Use `Promise.all()` for independent async operations — never sequential awaits

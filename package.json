@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "prepare": "husky",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
@@ -15,7 +16,17 @@
     "test:coverage": "vitest run --coverage",
     "type-check": "tsc --noEmit",
     "lint": "eslint 'src/**/*.{ts,tsx}'",
-    "format": "prettier --write 'src/**/*.{ts,tsx}'"
+    "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
+    "format": "prettier --check 'src/**/*.{ts,tsx}'",
+    "format:fix": "prettier --write 'src/**/*.{ts,tsx}'"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix"
+    ],
+    "*.{ts,tsx,js,jsx,css,md,json}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "csv-parse": "^5.6.0",
@@ -32,6 +43,8 @@
     "dotenv": "^17.2.3",
     "eslint": "^9.0.0",
     "globals": "^15.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.1.0",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.0.0",
