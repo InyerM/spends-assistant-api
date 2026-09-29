@@ -168,6 +168,7 @@ export async function extractImageObservations(input: ExtractionInput): Promise<
             schema: extractionSchema
           }
         },
+        usage: { include: true },
         temperature: 0,
         max_tokens: 2048,
         provider: {

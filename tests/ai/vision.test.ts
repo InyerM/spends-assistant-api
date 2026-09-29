@@ -57,6 +57,7 @@ describe('extractImageObservations', () => {
     const body = JSON.parse(init.body);
     expect(body.model).toBe('qwen/qwen3-vl-30b-a3b-instruct');
     expect(body.provider).toMatchObject({ zdr: true, data_collection: 'deny' });
+    expect(body.usage).toEqual({ include: true });
     expect(body.response_format.type).toBe('json_schema');
     expect(body.messages[1].content).toContainEqual({
       type: 'image_url',
