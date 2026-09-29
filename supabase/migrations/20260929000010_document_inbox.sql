@@ -8,11 +8,13 @@ CREATE TABLE public.documents (
   sha256 TEXT NOT NULL CHECK (sha256 ~ '^[a-f0-9]{64}$'),
   document_type TEXT CHECK (document_type IN ('receipt', 'bank_screenshot', 'sms_screenshot', 'statement', 'other')),
   status TEXT NOT NULL DEFAULT 'uploaded' CHECK (status IN ('uploaded', 'processing', 'extracted', 'failed')),
+  processing_token UUID,
   model TEXT,
   error_code TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT documents_file_path_owner CHECK (split_part(file_path, '/', 1) = user_id::text),
+  CONSTRAINT documents_processing_token_state CHECK ((status = 'processing') = (processing_token IS NOT NULL)),
   CONSTRAINT documents_user_file_path_unique UNIQUE (user_id, file_path),
   CONSTRAINT documents_id_user_unique UNIQUE (id, user_id)
 );
@@ -70,23 +72,23 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.document_observations TO authenti
 -- A failed or abandoned extraction may be retried. The claim is a single row
 -- update so simultaneous requests cannot both start the vision call.
 CREATE FUNCTION public.claim_document_extraction(p_document_id UUID)
-RETURNS BOOLEAN
+RETURNS UUID
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_claimed INTEGER;
+  v_token UUID;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Authentication required' USING ERRCODE = '28000';
   END IF;
 
   UPDATE public.documents
-  SET status = 'processing', error_code = NULL
+  SET status = 'processing', processing_token = gen_random_uuid(), error_code = NULL
   WHERE id = p_document_id AND user_id = auth.uid()
     AND (status IN ('uploaded', 'failed')
-      OR (status = 'processing' AND updated_at < now() - INTERVAL '5 minutes'));
-  GET DIAGNOSTICS v_claimed = ROW_COUNT;
-  RETURN v_claimed = 1;
+      OR (status = 'processing' AND updated_at < now() - INTERVAL '5 minutes'))
+  RETURNING processing_token INTO v_token;
+  RETURN v_token;
 END;
 $$;
 
@@ -95,6 +97,7 @@ $$;
 -- from the authenticated session and the database.
 CREATE FUNCTION public.complete_document_extraction(
   p_document_id UUID,
+  p_claim_token UUID,
   p_document_type TEXT,
   p_model TEXT,
   p_observations JSONB
@@ -120,6 +123,7 @@ BEGIN
 
   PERFORM 1 FROM public.documents
   WHERE id = p_document_id AND user_id = v_user AND status = 'processing'
+    AND processing_token = p_claim_token
   FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Document is not claimed by caller' USING ERRCODE = '23514';
@@ -149,16 +153,17 @@ BEGIN
   GET DIAGNOSTICS v_count = ROW_COUNT;
 
   UPDATE public.documents
-  SET status = 'extracted', document_type = p_document_type, model = p_model, error_code = NULL
-  WHERE id = p_document_id AND user_id = v_user;
+  SET status = 'extracted', processing_token = NULL, document_type = p_document_type,
+    model = p_model, error_code = NULL
+  WHERE id = p_document_id AND user_id = v_user AND processing_token = p_claim_token;
   RETURN v_count;
 END;
 $$;
 
 REVOKE ALL ON FUNCTION public.claim_document_extraction(UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.complete_document_extraction(UUID, TEXT, TEXT, JSONB) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.complete_document_extraction(UUID, UUID, TEXT, TEXT, JSONB) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.claim_document_extraction(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.complete_document_extraction(UUID, TEXT, TEXT, JSONB) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.complete_document_extraction(UUID, UUID, TEXT, TEXT, JSONB) TO authenticated;
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES ('documents', 'documents', false, 5242880, ARRAY['image/png', 'image/jpeg', 'image/webp'])
