@@ -14,6 +14,14 @@ describe('AccountsService', () => {
   });
 
   describe('getAccount', () => {
+    it('does not log account identifiers during lookup', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.stubGlobal('fetch', createMockFetch({ accounts: { data: [] } }));
+      await service.getAccount('private-bank', '9876', 'savings', 'private-user');
+      expect(JSON.stringify(log.mock.calls)).not.toContain('9876');
+      expect(JSON.stringify(log.mock.calls)).not.toContain('private-user');
+    });
+
     it('finds account with all params (institution + lastFour + type)', async () => {
       const account = createMockAccount();
       const mockFn = createMockFetch({ accounts: { data: [account] } });
@@ -80,11 +88,11 @@ describe('AccountsService', () => {
       expect(result).toBe(500000);
     });
 
-    it('returns 0 when account not found', async () => {
+    it('returns null when account not found', async () => {
       vi.stubGlobal('fetch', createMockFetch({ accounts: { data: [] } }));
 
       const result = await service.getAccountBalance('nonexistent');
-      expect(result).toBe(0);
+      expect(result).toBeNull();
     });
   });
 

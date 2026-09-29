@@ -14,7 +14,6 @@ export class AccountsService extends BaseService {
     accountType?: 'checking' | 'savings' | 'credit_card' | 'credit' | null,
     userId?: string
   ): Promise<Account | null> {
-    console.log("Querying accounts for:", { institution, lastFour, accountType, userId });
 
     const userFilter = userId ? `&user_id=eq.${userId}` : '';
 
@@ -34,7 +33,6 @@ export class AccountsService extends BaseService {
       );
 
       if (accounts[0]) {
-        console.log(`Found account with institution+last_four+type`);
         return accounts[0];
       }
     }
@@ -54,7 +52,6 @@ export class AccountsService extends BaseService {
       );
 
       if (accounts[0]) {
-        console.log(`Found account with institution+last_four`);
         return accounts[0];
       }
     }
@@ -74,7 +71,6 @@ export class AccountsService extends BaseService {
       );
 
       if (accounts[0]) {
-        console.log(`Found account with institution+type`);
         return accounts[0];
       }
     }
@@ -90,10 +86,6 @@ export class AccountsService extends BaseService {
     const accounts = await this.fetch<Account[]>(
       `/rest/v1/accounts?${params}${userFilter}`
     );
-
-    if (accounts[0]) {
-      console.log(`Found account by institution only: ${institution}`);
-    }
 
     return accounts[0] || null;
   }

@@ -11,6 +11,12 @@ vi.mock('../../src/parsers/expense', () => ({
   parseExpense: vi.fn()
 }));
 
+function authenticatedEmailRequest(init: RequestInit): Request {
+  const headers = new Headers(init.headers);
+  headers.set('Authorization', `Bearer ${createMockEnv().API_KEY}`);
+  return new Request('http://localhost/email', { ...init, headers });
+}
+
 describe('handleEmail', () => {
   const env = createMockEnv();
 
@@ -18,8 +24,21 @@ describe('handleEmail', () => {
     vi.restoreAllMocks();
   });
 
+  it('does not log the raw financial email body', async () => {
+    const secret = 'Bancolombia private-account-98765';
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('[]', { status: 200 })));
+    const request = authenticatedEmailRequest({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.API_KEY}` },
+      body: JSON.stringify({ body: secret })
+    });
+    await handleEmail(request, env);
+    expect(JSON.stringify(log.mock.calls)).not.toContain(secret);
+  });
+
   it('ignores non-Bancolombia emails', async () => {
-    const request = new Request('http://localhost/email', {
+    const request = authenticatedEmailRequest({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body: 'Some other email content' })
@@ -88,7 +107,7 @@ describe('handleEmail', () => {
       })
     );
 
-    const request = new Request('http://localhost/email', {
+    const request = authenticatedEmailRequest({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -104,7 +123,7 @@ describe('handleEmail', () => {
   });
 
   it('returns error when text extraction fails', async () => {
-    const request = new Request('http://localhost/email', {
+    const request = authenticatedEmailRequest({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body: 'Bancolombia aviso general sin montos' })
@@ -118,7 +137,7 @@ describe('handleEmail', () => {
   });
 
   it('returns 400 for non-JSON content type', async () => {
-    const request = new Request('http://localhost/email', {
+    const request = authenticatedEmailRequest({
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: 'plain text'
@@ -184,7 +203,7 @@ describe('handleEmail', () => {
       })
     );
 
-    const request = new Request('http://localhost/email', {
+    const request = authenticatedEmailRequest({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -199,7 +218,7 @@ describe('handleEmail', () => {
   });
 
   it('uses subject or text fallback when body is missing', async () => {
-    const request = new Request('http://localhost/email', {
+    const request = authenticatedEmailRequest({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subject: 'Alert from Bancolombia: Compraste $10,000 en tienda' })
@@ -321,7 +340,7 @@ describe('handleEmail', () => {
       })
     );
 
-    const request = new Request('http://localhost/email', {
+    const request = authenticatedEmailRequest({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -352,7 +371,7 @@ describe('handleEmail', () => {
       )
     );
 
-    const request = new Request('http://localhost/email', {
+    const request = authenticatedEmailRequest({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

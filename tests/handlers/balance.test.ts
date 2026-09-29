@@ -25,7 +25,9 @@ describe('handleBalance', () => {
       }),
     ));
 
-    const request = new Request('http://localhost/balance/acc-1');
+    const request = new Request('http://localhost/balance/acc-1', {
+      headers: { Authorization: `Bearer ${env.API_KEY}` },
+    });
     const response = await handleBalance(request, env);
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -60,11 +62,15 @@ describe('handleBalance', () => {
   });
 
   it('returns 500 on service error', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () =>
-      new Response('Internal error', { status: 500, statusText: 'Internal Server Error' }),
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      url.includes('user_api_keys')
+        ? new Response('[]', { status: 200 })
+        : new Response('Internal error', { status: 500, statusText: 'Internal Server Error' }),
     ));
 
-    const request = new Request('http://localhost/balance/acc-1');
+    const request = new Request('http://localhost/balance/acc-1', {
+      headers: { Authorization: `Bearer ${env.API_KEY}` },
+    });
     const response = await handleBalance(request, env);
     expect(response.status).toBe(500);
   });

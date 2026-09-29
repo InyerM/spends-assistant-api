@@ -36,7 +36,6 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
 
     if (contentType.includes('application/json')) {
       emailData = (await request.json()) as AppsScriptPayload;
-      console.log('[Email] Received from Apps Script:', emailData);
 
       const emailText = emailData.body || emailData.text || emailData.subject || '';
 
@@ -58,7 +57,6 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
         });
       }
 
-      console.log('[Email] Clean text:', cleanText);
 
       const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
 

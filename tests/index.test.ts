@@ -56,13 +56,12 @@ describe('Worker routing', () => {
     expect(body.status).toBe('ok');
   });
 
-  it('returns webhook setup info on /setup-webhook', async () => {
+  it('requires POST and authentication for webhook setup', async () => {
     const request = new Request('http://localhost/setup-webhook', { method: 'GET' });
     const response = await worker.fetch(request, env, ctx);
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.message).toContain('webhook');
-    expect(body.url).toContain('api.telegram.org');
+    expect(response.status).toBe(404);
+    const post = new Request('http://localhost/setup-webhook', { method: 'POST' });
+    expect((await worker.fetch(post, env, ctx)).status).toBe(401);
   });
 
   it('routes /telegram POST to handleTelegram', async () => {
