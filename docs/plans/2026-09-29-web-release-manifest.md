@@ -21,6 +21,7 @@ Apply the new database migrations in filename order: `20260929000000`, `00010`, 
 - PGlite tests cover owner isolation, replay, direct-role denial, reviewed-document erasure, Shortcut duplicate rechecks, balance/quota updates, and request reservations. These are synthetic local database tests; they do not prove multi-connection PostgreSQL locking or the current remote grants.
 - The read-only audit of the confirmed **1,516-transaction** profile and private 72-signal proposal file are documented in `docs/audits/2026-09-28-transaction-quality-audit.md`. No historical transaction was edited.
 - The five-page invented PDF passed local rendering but failed model quality: Qwen 30B whole-page and Qwen 235B escalation missed the dense page; two tiled Qwen 30B runs recovered the dense page but scored only **19/21** exact rows end to end. See `docs/evaluations/2026-09-29-pdf-synthetic-tiles-live.md`.
+- An eight-case invented BGE-M3 benchmark improved the held-out correct first suggestion from **1/4 to 3/4**, but the no-match case still received a false suggestion. No real document embeddings or pgvector schema were created. See `docs/evaluations/2026-09-29-document-vector-synthetic.md`.
 
 ## Approval and release sequence
 
