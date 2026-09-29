@@ -36,7 +36,7 @@ DECLARE
   v_limit integer;
   v_used integer;
   v_plan text;
-  v_month text := to_char(now() AT TIME ZONE 'America/Bogota', 'YYYY-MM');
+  v_month text := to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM');
 BEGIN
   IF v_user IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE = '28000'; END IF;
   IF p_request_id IS NULL OR jsonb_typeof(p_payload) IS DISTINCT FROM 'object' THEN
