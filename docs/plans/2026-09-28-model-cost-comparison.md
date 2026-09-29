@@ -6,6 +6,7 @@ Date: 2026-09-28. These are planning estimates, not invoices or a measured OCR b
 
 - **1,000 single-image receipts or statement pages:** assume 2,000 billed input tokens per image, including its visual representation and prompt, plus 300 output tokens for extracted structured data. This totals 2 million input and 0.3 million output tokens. Actual image tokenization depends on resolution, cropping, provider, and model. A multi-page document counts as multiple pages.
 - **1,000 text consultations:** assume 800 input and 250 output tokens each. This totals 0.8 million input and 0.25 million output tokens. Longer context, reasoning, retries, and multiple model passes increase cost.
+- **1,000 dense statement pages:** as a sensitivity check, assume 10,000 input and 1,000 output tokens per page. This totals 10 million input and 1 million output tokens. A native PDF path may use different billing rules, so measure it separately.
 - Estimates use the displayed standard OpenRouter rate, with no cache discount, batch discount, provider surcharge, taxes, storage, embeddings, or application hosting. USD amounts are rounded to cents. The calculation is `input_millions × input_rate + output_millions × output_rate`.
 
 | Model                                                                                         | Input / output per million tokens | 1,000 images/pages | 1,000 text consultations | Intended role                                    |
@@ -17,6 +18,8 @@ Date: 2026-09-28. These are planning estimates, not invoices or a measured OCR b
 | [GPT-5.4 Mini](https://openrouter.ai/openai/gpt-5.4-mini)                                     |                     $0.75 / $4.50 |             ~$2.85 |                   ~$1.73 | Stronger proprietary comparison candidate        |
 | [Claude Haiku 4.5](https://openrouter.ai/anthropic/claude-haiku-4.5/api)                      |                     $1.00 / $5.00 |             ~$3.50 |                   ~$2.05 | Proprietary comparison candidate                 |
 | [Claude Sonnet 4.6](https://openrouter.ai/anthropic/claude-sonnet-4.6/pricing)                |                    $3.00 / $15.00 |            ~$10.50 |                   ~$6.15 | Expensive escalation or benchmark only           |
+
+For **1,000 dense statement pages** under the stated token assumption, the same rates yield approximately $1.82 with Qwen3 VL 30B or DeepSeek V4.1 Flash, $2.88 with Qwen3 VL 235B, $4.50 with GPT-5 Mini, $12 with GPT-5.4 Mini, $15 with Claude Haiku 4.5, and $45 with Claude Sonnet 4.6.
 
 Dedicated OCR is a separate option: [Mistral OCR 4.1](https://docs.mistral.ai/models/ocr-4-1) lists **$4 per 1,000 pages** or **$5 per 1,000 annotated pages**. [Mistral OCR 3](https://docs.mistral.ai/models/ocr-3-25-12) lists **$2 per 1,000 pages**. A second model pass to turn OCR text into transactions adds its own cost. These services need a separate API and privacy review.
 
