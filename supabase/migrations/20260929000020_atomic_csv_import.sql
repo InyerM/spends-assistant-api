@@ -146,7 +146,8 @@ BEGIN
     VALUES(v_user, v_month) ON CONFLICT(user_id, month) DO NOTHING;
   SELECT transactions_count INTO v_used FROM public.usage_tracking
     WHERE user_id = v_user AND month = v_month FOR UPDATE;
-  SELECT plan INTO v_plan FROM public.subscriptions WHERE user_id = v_user;
+  SELECT plan INTO v_plan FROM public.subscriptions
+    WHERE user_id = v_user AND status = 'active';
   IF coalesce(v_plan, 'free') = 'free' THEN
     SELECT coalesce((SELECT value::integer FROM public.app_settings
       WHERE key = 'free_transactions_limit'), 50) INTO v_limit;
