@@ -42,7 +42,7 @@ const extracted = {
 describe('extractImageObservations', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('uses Qwen3 VL 30B with private routing and returns multiple draft observations', async () => {
+  it('uses Qwen3 VL 30B without training or non-transient collection', async () => {
     const fetchMock = vi.fn(async () => response(extracted));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -56,7 +56,8 @@ describe('extractImageObservations', () => {
     expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
     const body = JSON.parse(init.body);
     expect(body.model).toBe('qwen/qwen3-vl-30b-a3b-instruct');
-    expect(body.provider).toMatchObject({ zdr: true, data_collection: 'deny' });
+    expect(body.provider).toMatchObject({ data_collection: 'deny' });
+    expect(body.provider).not.toHaveProperty('zdr');
     expect(body.usage).toEqual({ include: true });
     expect(body.response_format.type).toBe('json_schema');
     expect(body.messages[1].content).toContainEqual({

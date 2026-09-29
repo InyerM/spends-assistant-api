@@ -33,7 +33,7 @@ export function buildRequestBody(fixture: Fixture, model: ModelCandidate): Recor
     max_tokens: 2048,
     usage: { include: true },
     provider: {
-      zdr: true,
+      ...(model.id.startsWith('qwen/') ? {} : { zdr: true }),
       data_collection: 'deny',
       max_price: { prompt: model.price.input, completion: model.price.output }
     }

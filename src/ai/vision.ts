@@ -172,7 +172,6 @@ export async function extractImageObservations(input: ExtractionInput): Promise<
         temperature: 0,
         max_tokens: 2048,
         provider: {
-          zdr: true,
           data_collection: 'deny',
           max_price: { prompt: 0.4, completion: 1 }
         }

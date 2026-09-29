@@ -50,6 +50,12 @@ describe('buildRequestBody', () => {
       max_price: { prompt: 0.13, completion: 0.52 }
     });
   });
+
+  it('evaluates Qwen with data collection denied and without a ZDR requirement', () => {
+    const body = buildRequestBody(fixture, MODELS[1]) as { provider: Record<string, unknown> };
+    expect(body.provider.data_collection).toBe('deny');
+    expect(body.provider).not.toHaveProperty('zdr');
+  });
 });
 
 describe('createLiveResponder', () => {
