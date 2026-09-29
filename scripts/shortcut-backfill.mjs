@@ -194,6 +194,12 @@ function argument(name) {
   return process.argv.find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1);
 }
 
+function argumentsFor(name) {
+  return process.argv
+    .filter((part) => part.startsWith(`${name}=`))
+    .map((part) => part.slice(name.length + 1));
+}
+
 async function readJson(path) {
   const bytes = await readFile(path);
   const text =
@@ -208,24 +214,27 @@ async function readJson(path) {
 }
 
 async function main() {
-  const inputPath = argument('--input');
+  const inputPaths = argumentsFor('--input');
   const outDir = argument('--out-dir');
   const sourceArg = argument('--source');
   const exportPath = argument('--inbox-export');
   const year = Number(argument('--year') ?? 2026);
-  if (!inputPath || !outDir) {
+  if (!inputPaths.length || !outDir) {
     throw new Error(
-      'Usage: node scripts/shortcut-backfill.mjs --input=messages.json --out-dir=private-dir [--source=sms-manual-backfill] [--inbox-export=shortcut-inbox.json] [--year=2026]'
+      'Usage: node scripts/shortcut-backfill.mjs --input=messages.json [--input=another-month.json] --out-dir=private-dir [--source=sms-manual-backfill] [--inbox-export=shortcut-inbox.json] [--year=2026]'
     );
   }
-  const parsed = await readJson(inputPath);
-  const rawInput = Array.isArray(parsed) ? parsed : (parsed?.items ?? parsed?.messages);
-  const input = Array.isArray(parsed?.emails)
-    ? emailMessagesToItems(parsed.emails)
-    : legacyMessagesToItems(rawInput);
-  const source = sourceArg ?? parsed?.source;
-  if (sourceArg && parsed?.source && sourceArg !== parsed.source)
-    throw new Error('Input source differs from --source');
+  const documents = await Promise.all(inputPaths.map(readJson));
+  const source = sourceArg ?? documents[0]?.source;
+  const input = [];
+  for (const parsed of documents) {
+    if (parsed?.source && parsed.source !== source)
+      throw new Error('Input source differs from --source or another input');
+    const rawInput = Array.isArray(parsed) ? parsed : (parsed?.items ?? parsed?.messages);
+    input.push(...(Array.isArray(parsed?.emails)
+      ? emailMessagesToItems(parsed.emails)
+      : legacyMessagesToItems(rawInput)));
+  }
   const inboxExport = exportPath ? await readJson(exportPath) : { version: 1, items: [] };
   const { batches, counts } = buildBackfillBatches(input, source, inboxExport, year);
   await mkdir(outDir, { mode: 0o700 });

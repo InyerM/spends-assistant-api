@@ -33,12 +33,38 @@ export function auditNotices(messages) {
     by_kind[kind] = (by_kind[kind] ?? 0) + 1;
   }
   const distinct_bodies = new Set(bodies).size;
-  return {
+  const report = {
     total: bodies.length,
     distinct_bodies,
     repeated_bodies: bodies.length - distinct_bodies,
     by_kind,
   };
+  const dated = messages
+    .filter((message) => message && typeof message === 'object' && typeof message.received_at === 'string')
+    .map((message) => ({ received_at: message.received_at, instant: Date.parse(message.received_at) }));
+  if (dated.some((item) => !Number.isFinite(item.instant)))
+    throw new Error('Input contains an invalid receipt timestamp');
+  if (dated.length) {
+    dated.sort((a, b) => a.instant - b.instant);
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      year: 'numeric', month: '2-digit', timeZone: 'America/Bogota',
+    });
+    const months = new Map();
+    for (const item of dated) {
+      const parts = formatter.formatToParts(item.instant);
+      const year = parts.find((part) => part.type === 'year').value;
+      const month = parts.find((part) => part.type === 'month').value;
+      const key = `${year}-${month}`;
+      months.set(key, (months.get(key) ?? 0) + 1);
+    }
+    report.coverage = {
+      with_received_at: dated.length,
+      first_received_at: dated[0].received_at,
+      last_received_at: dated.at(-1).received_at,
+      by_month: Object.fromEntries([...months].sort(([a], [b]) => a.localeCompare(b))),
+    };
+  }
+  return report;
 }
 
 async function main() {

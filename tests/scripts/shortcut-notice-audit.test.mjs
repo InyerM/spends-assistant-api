@@ -34,6 +34,19 @@ test('audit counts exact repeated bodies but preserves every message for later r
   });
 });
 
+test('audit exposes month coverage for timestamped exports without printing bodies', () => {
+  const report = auditNotices([
+    { received_at: '2026-05-28T11:56:40-05:00', raw_text: 'Synthetic purchase' },
+    { received_at: '2026-01-01T12:03:17-05:00', raw_text: 'Synthetic transfer' },
+  ]);
+  assert.deepEqual(report.coverage, {
+    with_received_at: 2,
+    first_received_at: '2026-01-01T12:03:17-05:00',
+    last_received_at: '2026-05-28T11:56:40-05:00',
+    by_month: { '2026-01': 1, '2026-05': 1 },
+  });
+});
+
 test('CLI reads UTF-16LE Shortcut JSON without printing private message text', () => {
   const root = mkdtempSync(join(tmpdir(), 'spends-notice-audit-'));
   try {

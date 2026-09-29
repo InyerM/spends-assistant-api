@@ -117,6 +117,40 @@ test('CLI writes private JSON and refuses to reuse an output directory', () => {
   }
 });
 
+test('CLI merges overlapping monthly exports before preparing review batches', () => {
+  const root = mkdtempSync(join(tmpdir(), 'spends-monthly-backfill-test-'));
+  try {
+    const firstPath = join(root, 'may.json');
+    const secondPath = join(root, 'june.json');
+    const outputPath = join(root, 'prepared');
+    const overlap = item('2026-05-31T23:59:30-05:00', 'Synthetic overlap');
+    writeFileSync(firstPath, JSON.stringify({
+      source: 'sms-manual-backfill',
+      messages: [item('2026-05-28T12:00:00-05:00', 'Synthetic May'), overlap]
+    }));
+    writeFileSync(secondPath, JSON.stringify({
+      source: 'sms-manual-backfill',
+      messages: [overlap, item('2026-06-01T12:00:00-05:00', 'Synthetic June')]
+    }));
+    const result = spawnSync(process.execPath, [
+      'scripts/shortcut-backfill.mjs',
+      `--input=${firstPath}`,
+      `--input=${secondPath}`,
+      `--out-dir=${outputPath}`
+    ], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout).counts, {
+      input: 4,
+      outside_year: 0,
+      already_in_export: 0,
+      repeated_in_input: 1,
+      ready_for_review: 3
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('CLI reads a UTF-16LE Shortcut export without changing message content', () => {
   const root = mkdtempSync(join(tmpdir(), 'spends-utf16-test-'));
   try {

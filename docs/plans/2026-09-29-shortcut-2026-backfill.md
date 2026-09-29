@@ -30,12 +30,13 @@ Use original receipt timestamps with a timezone. The script accepts an array of 
 ```sh
 node scripts/shortcut-backfill.mjs \
   --input=/private/path/messages-2026.json \
+  --input=/private/path/another-period.json \
   --inbox-export=/private/path/shortcut-inbox.json \
   --out-dir=/private/path/prepared-2026 \
   --year=2026
 ```
 
-`--inbox-export` is optional but should be supplied to omit messages the inbox already has. The source must remain stable across runs; a different source changes the idempotency identity. If the input is an array, supply `--source=sms-manual-backfill`. The output directory must not exist. The script creates it with mode `0700` and writes numbered batch files and an aggregate manifest with mode `0600`. Each batch has at most 25 messages and 128 KiB of JSON. It prints only aggregate counts and never prints the message text. It rejects missing or guessed receipt timestamps and conflicting stable IDs.
+The second `--input` is optional; repeat it for each period or bank export under the same source. The converter removes identical message-and-receipt-instant overlaps across those files before preparing batches. `--inbox-export` is also optional but should be supplied to omit messages the inbox already has. The source must remain stable across runs; a different source changes the idempotency identity. If the input is an array, supply `--source=sms-manual-backfill`. The output directory must not exist. The script creates it with mode `0700` and writes numbered batch files and an aggregate manifest with mode `0600`. Each batch has at most 25 messages and 128 KiB of JSON. It prints only aggregate counts and never prints the message text. It rejects missing or guessed receipt timestamps and conflicting stable IDs.
 
 The script also accepts the old Scriptable `messages` array of strings. A string beginning with `[Recibido: DD/MM/YYYY HH:mm]` is converted to `received_at` using the original Colombia local time, while the full text stays unchanged to preserve comparison with earlier `sms-bulk` rows. The older Bancolombia string path passed the body without a receipt prefix. Even if that body mentions a purchase date, it does not establish the **SMS receipt timestamp**. Export those messages with explicit `received_at` metadata or add the same verified receipt prefix for every bank. A plain string without this evidence is rejected before any batch is written. Do not replace it with the script run time.
 
@@ -101,3 +102,14 @@ The local aggregate audit of those exports produced the following **heuristic me
 | Nequi       |    131 |                    46 |            105 |                            14 |                           0 |                  0 |        0 |         8 |       4 |
 
 The 105 Nequi insufficient-funds notices are especially likely to be mistaken for purchases if a classifier only looks for the verb “pay.” Incoming Bancolombia transfers, internal transfers, card repayments, failed notices, security codes, and marketing need distinct treatment. Before any financial creation, a read-only AI suggestion should classify each inbox item as an actual posted event, incoming money, own-account transfer, card repayment, failed attempt, marketing/security notice, or uncertain; extract evidence with confidence and cite the message text. The owner must compare it with existing rows and bank-statement balances, then explicitly match, mark non-transaction, or create one reviewed row. Unknown and low-confidence items remain pending. No heuristic or model suggestion should mutate a balance.
+
+## Owner's timestamped September 29 exports
+
+`Bancolombia-01.txt` and `Nequi-01.txt` are private UTF-16LE JSON exports with complete ISO 8601 receipt instants and nonempty message bodies. A converter dry run accepted all 500 Bancolombia and 132 Nequi objects individually. Combined under their shared `sms-manual-backfill` source, the 632 input objects contain five identical message-and-receipt-instant overlaps across the two files, leaving **627 unique inbox items** in 26 bounded batches. These counts do not compare with existing financial rows, and no API or database write was made.
+
+| Export      | Receipt range, Colombia time         | Monthly counts                                | Heuristic failed-payment notices |
+| ----------- | ------------------------------------ | --------------------------------------------- | -------------------------------: |
+| Bancolombia | 2026-01-01 12:03 to 2026-05-28 11:56 | Jan 87; Feb 76; Mar 114; Apr 124; May 99      |                                1 |
+| Nequi       | 2026-02-03 18:05 to 2026-09-28 22:15 | Feb 6; May 17; Jun 28; Jul 34; Aug 37; Sep 10 |                              106 |
+
+The Bancolombia query is sorted oldest first and returned exactly 500 messages, stopping in May although the search upper bound was September 29. That strongly suggests incomplete coverage, but does **not** prove a documented 500-result cap in Messages. [Apple recommends narrower Find filters for broad queries](https://support.apple.com/en-ae/guide/shortcuts/apdbdab3433f/ios). Re-run the same timestamp-preserving Shortcut for Bancolombia in three date windows: January–March, April–June, and July–September 29. Keep the bank-body filter and remove the Read filter. Export each window to a separate private file. If a window again returns 500, split it by month. Overlap at a boundary is safe because the converter deduplicates identical body plus receipt instant. Compare the monthly counts and earliest/latest dates with `scripts/shortcut-notice-audit.mjs`; it now reports those aggregates without printing bodies. Do not post the current partial set as if it covered the year.
