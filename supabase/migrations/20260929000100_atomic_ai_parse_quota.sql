@@ -86,3 +86,8 @@ GRANT UPDATE (transactions_count, updated_at) ON public.usage_tracking TO authen
 -- The active pro plan bypasses the count limit, so clients may read their
 -- subscription but only trusted billing/server code may change its plan.
 REVOKE INSERT, UPDATE, DELETE ON public.subscriptions FROM PUBLIC, anon, authenticated;
+
+-- TRUNCATE and REFERENCES are outside RLS. Remove any legacy broad grants;
+-- clients also have no reason to attach triggers to either counter source.
+REVOKE TRUNCATE, REFERENCES, TRIGGER ON public.usage_tracking, public.subscriptions
+  FROM PUBLIC, anon, authenticated;

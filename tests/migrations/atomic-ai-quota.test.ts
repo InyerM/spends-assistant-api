@@ -33,7 +33,7 @@ describe('atomic AI parse quota migration', () => {
         plan text NOT NULL,
         status text NOT NULL
       );
-      GRANT SELECT, INSERT, UPDATE, DELETE ON public.subscriptions TO authenticated;
+      GRANT ALL ON public.subscriptions TO authenticated;
       GRANT SELECT, INSERT, UPDATE, DELETE ON public.subscriptions TO service_role;
       CREATE TABLE public.app_settings (key text PRIMARY KEY, value jsonb NOT NULL);
       CREATE TABLE public.usage_tracking (
@@ -47,7 +47,7 @@ describe('atomic AI parse quota migration', () => {
         updated_at timestamptz DEFAULT now(),
         UNIQUE (user_id, month)
       );
-      GRANT SELECT, INSERT, UPDATE, DELETE ON public.usage_tracking TO authenticated;
+      GRANT ALL ON public.usage_tracking TO authenticated;
       INSERT INTO auth.users (id) VALUES ('${user1}'), ('${user2}');
       INSERT INTO public.app_settings (key, value) VALUES
         ('free_ai_parses_limit', '2'),
@@ -168,5 +168,23 @@ describe('atomic AI parse quota migration', () => {
       `INSERT INTO public.subscriptions (user_id, plan, status) VALUES ($1, 'free', 'active')`,
       [user2]
     );
+  });
+
+  it('removes table-wide and DDL grants that bypass row security', async () => {
+    await db.exec('SET ROLE authenticated');
+    for (const table of ['usage_tracking', 'subscriptions']) {
+      const result = await db.query<{ truncate: boolean; references: boolean; trigger: boolean }>(
+        `SELECT has_table_privilege('public.${table}', 'TRUNCATE') AS truncate,
+                has_table_privilege('public.${table}', 'REFERENCES') AS references,
+                has_table_privilege('public.${table}', 'TRIGGER') AS trigger`
+      );
+      expect(result.rows).toEqual([{ truncate: false, references: false, trigger: false }]);
+      await expect(db.exec(`TRUNCATE public.${table}`)).rejects.toThrow(/permission denied/);
+      await db.exec(`GRANT TRUNCATE ON public.${table} TO anon`);
+      const delegated = await db.query<{ can_truncate: boolean }>(
+        `SELECT has_table_privilege('anon', 'public.${table}', 'TRUNCATE') AS can_truncate`
+      );
+      expect(delegated.rows).toEqual([{ can_truncate: false }]);
+    }
   });
 });
