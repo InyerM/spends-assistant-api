@@ -18,7 +18,8 @@
     "lint": "eslint 'src/**/*.{ts,tsx}'",
     "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
     "format": "prettier --check 'src/**/*.{ts,tsx}'",
-    "format:fix": "prettier --write 'src/**/*.{ts,tsx}'"
+    "format:fix": "prettier --write 'src/**/*.{ts,tsx}'",
+    "eval:pdf-synthetic": "node --experimental-strip-types --import ./scripts/eval/text-models/register.mjs scripts/eval/pdf-statements/run.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
