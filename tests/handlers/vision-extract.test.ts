@@ -4,12 +4,17 @@ import { extractImageObservations } from '../../src/ai/vision';
 import { createMockEnv } from '../__test-helpers__/factories';
 
 const trackUsage = vi.hoisted(() => vi.fn());
+const incrementAiParses = vi.hoisted(() => vi.fn());
 vi.mock('../../src/ai/vision', () => ({
   DEFAULT_VISION_MODEL: 'qwen/qwen3-vl-30b-a3b-instruct',
   extractImageObservations: vi.fn()
 }));
 vi.mock('../../src/services/supabase', () => ({
-  createSupabaseServices: () => ({ apiKeys: {}, aiUsage: { track: trackUsage } })
+  createSupabaseServices: () => ({
+    apiKeys: {},
+    aiUsage: { track: trackUsage },
+    usage: { incrementAiParses }
+  })
 }));
 vi.mock('../../src/utils/auth', () => ({
   resolveUserId: vi.fn(async (request: Request) =>
@@ -35,6 +40,7 @@ describe('handleVisionExtract', () => {
 
   beforeEach(() => {
     trackUsage.mockImplementation(async (_params, fn) => fn({ record: vi.fn() }));
+    incrementAiParses.mockResolvedValue({ allowed: true, used: 1, limit: 15 });
   });
 
   it('rejects an unauthenticated request before invoking the model', async () => {
@@ -102,6 +108,24 @@ describe('handleVisionExtract', () => {
   it('rejects missing image input without invoking the model', async () => {
     const response = await handleVisionExtract(request({}), env);
     expect(response.status).toBe(400);
+    expect(extractImageObservations).not.toHaveBeenCalled();
+    expect(incrementAiParses).not.toHaveBeenCalled();
+  });
+
+  it('uses the existing AI request quota and skips the model when it is exhausted', async () => {
+    incrementAiParses.mockResolvedValue({ allowed: false, used: 15, limit: 15 });
+
+    const response = await handleVisionExtract(request({ image_data_url: imageDataUrl }), env);
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({
+      error: 'Parse limit reached',
+      code: 'PARSE_LIMIT_REACHED',
+      used: 15,
+      limit: 15
+    });
+    expect(incrementAiParses).toHaveBeenCalledWith('user-1');
+    expect(trackUsage).not.toHaveBeenCalled();
     expect(extractImageObservations).not.toHaveBeenCalled();
   });
 

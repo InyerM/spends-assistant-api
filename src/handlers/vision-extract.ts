@@ -38,6 +38,19 @@ export async function handleVisionExtract(request: Request, env: Env): Promise<R
     return json({ error: 'Invalid image data' }, 400);
   }
 
+  const usageCheck = await services.usage.incrementAiParses(userId);
+  if (!usageCheck.allowed) {
+    return json(
+      {
+        error: 'Parse limit reached',
+        code: 'PARSE_LIMIT_REACHED',
+        used: usageCheck.used,
+        limit: usageCheck.limit
+      },
+      429
+    );
+  }
+
   try {
     const result = await services.aiUsage.track(
       { userId, operation: 'extract_document', model: DEFAULT_VISION_MODEL },
