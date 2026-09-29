@@ -27,6 +27,7 @@ async function database(): Promise<PGlite> {
       account_id uuid NOT NULL REFERENCES public.accounts(id),
       transfer_to_account_id uuid REFERENCES public.accounts(id),
       deleted_at timestamptz);
+    GRANT SELECT, DELETE ON public.accounts, public.transactions TO authenticated;
     INSERT INTO public.accounts(id,user_id,is_default,balance) VALUES
       ('${source}','${owner}',false,100),
       ('${destination}','${owner}',false,200),
@@ -153,6 +154,30 @@ describe('atomic account deletion', () => {
       await expect(db.query(`SELECT public.soft_delete_empty_account('${empty}')`)).rejects.toThrow(
         /permission denied/i
       );
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('revokes direct hard deletion of accounts and transactions from authenticated clients', async () => {
+    const db = await database();
+    try {
+      expect(
+        (
+          await db.query(`SELECT
+        has_table_privilege('authenticated','public.accounts','DELETE') AS account_delete,
+        has_table_privilege('authenticated','public.transactions','DELETE') AS transaction_delete`)
+        ).rows
+      ).toEqual([{ account_delete: false, transaction_delete: false }]);
+      await db.exec(`SET request.jwt.claim.sub = '${owner}'; SET ROLE authenticated;`);
+      await expect(db.exec(`DELETE FROM public.accounts WHERE id='${empty}'`)).rejects.toThrow(
+        /permission denied/i
+      );
+      await expect(
+        db.exec(`DELETE FROM public.transactions
+        WHERE id='77777777-7777-4777-8777-777777777777'`)
+      ).rejects.toThrow(/permission denied/i);
+      await db.exec('RESET ROLE;');
     } finally {
       await db.close();
     }

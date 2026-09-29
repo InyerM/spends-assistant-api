@@ -1,4 +1,8 @@
 -- Run after 20260929000150. Preserve active transaction history when removing accounts.
+-- Mobile sync and web routes use soft deletion. Hard deletion would bypass the
+-- account guard and may cascade through financial or reviewed records.
+REVOKE DELETE ON public.accounts, public.transactions FROM PUBLIC, anon, authenticated;
+
 CREATE FUNCTION public.soft_delete_empty_account(p_account_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
