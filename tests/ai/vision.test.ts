@@ -77,7 +77,9 @@ describe('extractImageObservations', () => {
     });
 
     expect(result.model).toBe('qwen/qwen3-vl-235b-a22b-instruct');
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).model).toBe(result.model);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.model).toBe(result.model);
+    expect(body.provider.max_price.completion).toBe(1.6);
   });
 
   it('rejects unsupported or oversized input before making a request', async () => {

@@ -173,10 +173,10 @@ export async function extractImageObservations(input: ExtractionInput): Promise<
         max_tokens: 2048,
         provider: {
           data_collection: 'deny',
-          max_price: { prompt: 0.4, completion: 1 }
+          max_price: { prompt: 0.4, completion: input.escalate ? 1.6 : 1 }
         }
       }),
-      signal: AbortSignal.timeout(30_000)
+      signal: AbortSignal.timeout(input.escalate ? 60_000 : 30_000)
     });
   } catch {
     throw new Error('Vision request failed');

@@ -25,6 +25,8 @@ Dedicated OCR is a separate option: [Mistral OCR 4.1](https://docs.mistral.ai/mo
 
 At the assumed volume, 1,000 Qwen3 VL 30B image extractions plus 1,000 DeepSeek V4.1 Flash consultations cost approximately **$0.65 in model tokens**. This is a token-based estimate, not a guarantee that a user's entire monthly workload will remain under $10. Multi-page PDFs, high-resolution images, retries, complex reasoning, embeddings, and provider selection can increase the bill.
 
+The successful synthetic Qwen3 VL 235B escalation used a provider priced above the table's lowest listed rate. Its request used 2,538 input and 319 output tokens and OpenRouter reported $0.00099164; the adapter allows up to $0.40/$1.60 per million tokens for this explicit escalation. See the [synthetic validation](../evaluations/2026-09-28-openrouter-synthetic.md).
+
 ## Selection and cost controls
 
 1. Benchmark Qwen3 VL 30B, DeepSeek V4.1 Flash, GPT-5 Mini, and Claude Haiku 4.5 on the same private, redacted examples: single receipt, multiple receipts in one screenshot, SMS screenshot, noisy bank statement, and ambiguous Nequi text. Add Qwen3 VL 235B and Claude Sonnet only where cheaper models fail. Score field accuracy, missed movements, false movements, JSON validity, latency, and actual cost per accepted observation.
