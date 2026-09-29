@@ -24,7 +24,8 @@ export const FIXTURES: Fixture[] = [
         category: 'groceries',
         bank: 'bancolombia',
         payment_type: 'debit',
-        source: ['bancolombia_sms', 'bancolombia_email'],
+        // The raw notification text does not identify its delivery channel.
+        source: 'manual',
         original_date: '14/03/2026',
         original_time: '18:22',
         last_four: '1111',
@@ -109,7 +110,7 @@ export const FIXTURES: Fixture[] = [
       fields: {
         amount: 18000,
         bank: 'nequi',
-        payment_type: ['transfer', 'qr'],
+        payment_type: 'unknown',
         source: 'nequi_sms'
       }
     }

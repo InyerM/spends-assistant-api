@@ -12,8 +12,9 @@ node --experimental-strip-types --no-warnings --import ./scripts/eval/text-model
   scripts/eval/text-models/run.ts
 
 # Live (opt-in): requires --live AND a local key. Sends synthetic fixtures only.
-OPENROUTER_API_KEY=sk-or-... node --experimental-strip-types --no-warnings \
-  --import ./scripts/eval/text-models/register.mjs scripts/eval/text-models/run.ts --live
+DOTENV_CONFIG_PATH=.env.local node --experimental-strip-types --no-warnings \
+  --import dotenv/config --import ./scripts/eval/text-models/register.mjs \
+  scripts/eval/text-models/run.ts --live
 ```
 
 | Flag                 | Default                            | Meaning                                                                                                           |
@@ -50,7 +51,7 @@ To add a case, write a new **invented** message and run the offline command. The
 
 ## Privacy and safety
 
-- Only synthetic fixtures are sent. Requests use `provider.zdr: true`, `data_collection: "deny"`, and a per-token price cap equal to the model's list price. Requests fail if no eligible endpoint exists, so a model without a ZDR endpoint shows up as HTTP errors, not as a silent policy downgrade.
+- Only synthetic fixtures are sent. DeepSeek text requests use `provider.zdr: true` and `data_collection: "deny"`. Qwen requests use `data_collection: "deny"` without ZDR, as approved for temporary provider retention without training. A per-token price cap is set to each model's list price; unavailable routes return HTTP errors.
 - Reports contain fixture ids, field names, and aggregates. They never include message text, model output, or upstream error bodies. HTTP failures keep only the status code.
 - The API key is read from the environment, never logged, and never written to disk. Do not put it in a committed file.
 - Reports go to `scripts/eval/text-models/results/`, which is git-ignored. Do not commit live results. Paste the Markdown summary into the issue instead.

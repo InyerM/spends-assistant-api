@@ -103,10 +103,10 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
 
   let responder = createOracleResponder();
   if (options.live) {
-    const apiKey = deps.env.OPENROUTER_API_KEY?.trim();
+    const apiKey = (deps.env.OPENROUTER_API_KEY || deps.env.OR_API_KEY)?.trim();
     if (!apiKey) {
       log(
-        'Error: --live requires OPENROUTER_API_KEY in the local environment. No requests were sent.'
+        'Error: --live requires OPENROUTER_API_KEY or OR_API_KEY in the local environment. No requests were sent.'
       );
       return 2;
     }
