@@ -1,7 +1,7 @@
 -- ====================================
 -- AI USAGE TELEMETRY (NON-ENFORCING)
 -- ====================================
--- Records model, token and estimated USD cost for OpenRouter text operations
+-- Records model, token and estimated USD cost for OpenRouter text and vision operations
 -- so internal cost reporting can compare real spend with planning targets.
 -- This is visibility only: nothing here blocks or limits requests.
 -- Request-count quotas in usage_tracking remain the only product limits.

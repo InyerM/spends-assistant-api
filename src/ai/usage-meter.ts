@@ -1,4 +1,4 @@
-/** Aggregate metadata for OpenRouter text requests. No prompts or responses are retained. */
+/** Aggregate metadata for OpenRouter requests. No prompts, images, or responses are retained. */
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;

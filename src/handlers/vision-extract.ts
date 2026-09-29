@@ -1,4 +1,4 @@
-import { extractImageObservations } from '../ai/vision';
+import { DEFAULT_VISION_MODEL, extractImageObservations } from '../ai/vision';
 import { createSupabaseServices } from '../services/supabase';
 import type { Env } from '../types/env';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
@@ -39,11 +39,16 @@ export async function handleVisionExtract(request: Request, env: Env): Promise<R
   }
 
   try {
-    const result = await extractImageObservations({
-      apiKey: env.OPENROUTER_API_KEY,
-      imageDataUrl,
-      escalate: false
-    });
+    const result = await services.aiUsage.track(
+      { userId, operation: 'extract_document', model: DEFAULT_VISION_MODEL },
+      (meter) =>
+        extractImageObservations({
+          apiKey: env.OPENROUTER_API_KEY,
+          imageDataUrl,
+          escalate: false,
+          meter
+        })
+    );
     return json(result, 200);
   } catch {
     // The upstream response can contain the private image; do not echo or log it.

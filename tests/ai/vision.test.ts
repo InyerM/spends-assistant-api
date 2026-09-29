@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { extractImageObservations } from '../../src/ai/vision';
+import { AiUsageMeter } from '../../src/ai/usage-meter';
 
 const imageDataUrl = 'data:image/png;base64,aGVsbG8=';
 
@@ -63,6 +64,56 @@ describe('extractImageObservations', () => {
     expect(body.messages[1].content).toContainEqual({
       type: 'image_url',
       image_url: { url: imageDataUrl }
+    });
+  });
+
+  it('meters provider cost and tokens without retaining image content', async () => {
+    const meter = new AiUsageMeter();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response(extracted))
+    );
+
+    await extractImageObservations({ apiKey: 'key', imageDataUrl, meter });
+
+    expect(meter.summary()).toEqual({
+      billedCalls: 1,
+      inputTokens: 2000,
+      outputTokens: 300,
+      estimatedCostMicros: 416,
+      costSource: 'upstream'
+    });
+  });
+
+  it('records an unknown-cost attempt when the provider fails', async () => {
+    const meter = new AiUsageMeter();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('private', { status: 500 }))
+    );
+
+    await expect(extractImageObservations({ apiKey: 'key', imageDataUrl, meter })).rejects.toThrow(
+      'Vision request failed (500)'
+    );
+
+    expect(meter.summary()).toMatchObject({ billedCalls: 1, costSource: 'unknown' });
+  });
+
+  it('keeps billed usage when a successful provider response is unusable', async () => {
+    const meter = new AiUsageMeter();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response({ document_type: 'receipt' }))
+    );
+
+    await expect(extractImageObservations({ apiKey: 'key', imageDataUrl, meter })).rejects.toThrow(
+      'Invalid vision response'
+    );
+
+    expect(meter.summary()).toMatchObject({
+      billedCalls: 1,
+      estimatedCostMicros: 416,
+      costSource: 'upstream'
     });
   });
 

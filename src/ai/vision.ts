@@ -1,3 +1,5 @@
+import type { AiUsageMeter } from './usage-meter';
+
 export type DocumentImageType =
   | 'receipt'
   | 'bank_screenshot'
@@ -25,6 +27,7 @@ interface ExtractionInput {
   apiKey: string;
   imageDataUrl: string;
   escalate?: boolean;
+  meter?: AiUsageMeter;
 }
 
 interface VisionResponse {
@@ -35,7 +38,7 @@ interface VisionResponse {
   usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
 }
 
-const DEFAULT_MODEL = 'qwen/qwen3-vl-30b-a3b-instruct';
+export const DEFAULT_VISION_MODEL = 'qwen/qwen3-vl-30b-a3b-instruct';
 const ESCALATION_MODEL = 'qwen/qwen3-vl-235b-a22b-instruct';
 const MAX_DATA_URL_LENGTH = 8_000_000;
 const DOCUMENT_TYPES: DocumentImageType[] = [
@@ -132,7 +135,7 @@ export async function extractImageObservations(input: ExtractionInput): Promise<
     throw new Error('Unsupported image data');
   }
 
-  const model = input.escalate ? ESCALATION_MODEL : DEFAULT_MODEL;
+  const model = input.escalate ? ESCALATION_MODEL : DEFAULT_VISION_MODEL;
   let response: Response;
   try {
     response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -179,20 +182,40 @@ export async function extractImageObservations(input: ExtractionInput): Promise<
       signal: AbortSignal.timeout(input.escalate ? 60_000 : 30_000)
     });
   } catch {
+    input.meter?.record(null);
     throw new Error('Vision request failed');
   }
 
   // Upstream bodies can include private image content. Never include them in errors.
-  if (!response.ok) throw new Error(`Vision request failed (${response.status})`);
+  if (!response.ok) {
+    input.meter?.record(null);
+    throw new Error(`Vision request failed (${response.status})`);
+  }
 
   let payload: VisionResponse;
   try {
     payload = (await response.json()) as VisionResponse;
   } catch {
+    input.meter?.record(null);
     throw new Error('Invalid vision response');
   }
 
-  const choice = payload.choices?.[0];
+  const rawUsage = payload?.usage;
+  input.meter?.record(
+    rawUsage &&
+      Number.isSafeInteger(rawUsage.prompt_tokens) &&
+      rawUsage.prompt_tokens! >= 0 &&
+      Number.isSafeInteger(rawUsage.completion_tokens) &&
+      rawUsage.completion_tokens! >= 0
+      ? {
+          inputTokens: rawUsage.prompt_tokens!,
+          outputTokens: rawUsage.completion_tokens!,
+          costUsd: rawUsage.cost ?? undefined
+        }
+      : null
+  );
+
+  const choice = payload?.choices?.[0];
   if (choice?.finish_reason === 'length') throw new Error('Vision response truncated');
   if (!choice?.message?.content) throw new Error('Invalid vision response');
 

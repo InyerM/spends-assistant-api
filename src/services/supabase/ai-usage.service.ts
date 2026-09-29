@@ -3,7 +3,7 @@ import { AiUsageMeter } from '../../ai/usage-meter';
 
 export interface TrackAiUsageParams {
   userId: string;
-  operation: 'parse_expense' | 'generate_automation';
+  operation: 'parse_expense' | 'generate_automation' | 'extract_document';
   model: string;
 }
 

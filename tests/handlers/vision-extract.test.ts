@@ -1,11 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleVisionExtract } from '../../src/handlers/vision-extract';
 import { extractImageObservations } from '../../src/ai/vision';
 import { createMockEnv } from '../__test-helpers__/factories';
 
-vi.mock('../../src/ai/vision', () => ({ extractImageObservations: vi.fn() }));
+const trackUsage = vi.hoisted(() => vi.fn());
+vi.mock('../../src/ai/vision', () => ({
+  DEFAULT_VISION_MODEL: 'qwen/qwen3-vl-30b-a3b-instruct',
+  extractImageObservations: vi.fn()
+}));
 vi.mock('../../src/services/supabase', () => ({
-  createSupabaseServices: () => ({ apiKeys: {} })
+  createSupabaseServices: () => ({ apiKeys: {}, aiUsage: { track: trackUsage } })
 }));
 vi.mock('../../src/utils/auth', () => ({
   resolveUserId: vi.fn(async (request: Request) =>
@@ -28,6 +32,10 @@ function request(body: unknown, token = 'valid'): Request {
 
 describe('handleVisionExtract', () => {
   afterEach(() => vi.clearAllMocks());
+
+  beforeEach(() => {
+    trackUsage.mockImplementation(async (_params, fn) => fn({ record: vi.fn() }));
+  });
 
   it('rejects an unauthenticated request before invoking the model', async () => {
     const response = await handleVisionExtract(
@@ -78,8 +86,17 @@ describe('handleVisionExtract', () => {
     expect(extractImageObservations).toHaveBeenCalledWith({
       apiKey: env.OPENROUTER_API_KEY,
       imageDataUrl,
-      escalate: false
+      escalate: false,
+      meter: expect.anything()
     });
+    expect(trackUsage).toHaveBeenCalledWith(
+      {
+        userId: 'user-1',
+        operation: 'extract_document',
+        model: 'qwen/qwen3-vl-30b-a3b-instruct'
+      },
+      expect.any(Function)
+    );
   });
 
   it('rejects missing image input without invoking the model', async () => {
