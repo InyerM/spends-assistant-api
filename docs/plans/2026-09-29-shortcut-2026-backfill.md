@@ -124,3 +124,21 @@ node scripts/shortcut-ledger-compare.mjs \
 ```
 
 The script identifies a unique owner only while exactly one profile has the confirmed active count; it stops if the count changes. Its output is aggregate only. Re-run after the missing Bancolombia windows arrive and before any inbox upload. Even a notice with identical raw text needs owner review before linking, because eight notices currently have more than one identical-raw ledger row. Do not bulk-create the 190 non-identical cases.
+
+## Follow-up Bancolombia export, September 29
+
+The owner supplied `Bancolombia mayo-2.txt`, a private UTF-16LE export with **489** dated message objects from **2026-05-28 05:00:03** through **2026-09-29 13:25:08** Colombia time. The first Bancolombia file ended on May 28 at 11:56:40, and three message-and-instant pairs appear in both Bancolombia files. That verified overlap removes the previously observed date-window gap between the two exports. The follow-up file is below 500 items and reaches the day it was generated. It does not prove that every message was indexed by Shortcuts, that the Read filter was removed, or that a body omitting the bank name could be found by the current query.
+
+The three supplied files contain **1,121** objects. The converter removed ten identical cross-file message-and-instant overlaps, leaving **1,111 unique 2026 inbox items** in **45** batches. It wrote those batches and a manifest locally to the private directory `../backfill-private-2026-09-29` with `0700` directory and `0600` file permissions. The files have not been posted to the web inbox, and the preparation did not use an inbox export, so `already_in_export` is zero by construction.
+
+The live read-only ledger comparison again found **1,516 active rows**. Of the 1,111 unique notices, **789 have identical raw text** in at least one active row and **322 have no identical raw text**. The latter group includes 107 failed-payment notices, 10 marketing notices, 8 security notices, 46 unknown notices, 104 possible purchases/payments, 41 possible outgoing transfers, and 6 possible incoming transfers. These are heuristic review queues, not 322 missing financial events. Eight notices have more than one identical-raw ledger row and require manual link review. Reproduce the aggregate comparison with:
+
+```sh
+node scripts/shortcut-ledger-compare.mjs \
+  --input=Bancolombia-01.txt \
+  --input='Bancolombia mayo-2.txt' \
+  --input=Nequi-01.txt \
+  --expected-count=1516
+```
+
+Next, review the 322 non-identical notices without creating ledger rows: start with failed/security/marketing exclusions, then compare the remaining 197 possible financial or unknown notices against dated bank statements, CSV imports, account identity, amount, and posting date. The 789 exact-text matches should be linked only after checking ambiguous duplicate rows. Establish dated balance baselines before any historic financial creation. The private prepared batches are an inbox intake artifact, not an approved transaction import.
