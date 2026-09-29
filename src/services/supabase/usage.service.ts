@@ -1,11 +1,6 @@
 import { BaseService } from './base.service';
 import type { UsageTracking } from '../../types/usage';
 
-interface Subscription {
-  plan: 'free' | 'pro';
-  status: 'active' | 'canceled' | 'past_due';
-}
-
 interface AppSetting {
   key: string;
   value: number;
@@ -17,20 +12,6 @@ const DEFAULT_TRANSACTIONS_LIMIT = 50;
 export class UsageService extends BaseService {
   private getCurrentMonth(): string {
     return new Date().toISOString().slice(0, 7);
-  }
-
-  private async isProUser(userId: string): Promise<boolean> {
-    const params = new URLSearchParams({
-      user_id: `eq.${userId}`,
-      plan: 'eq.pro',
-      status: 'eq.active',
-    });
-
-    const results = await this.fetch<Subscription[]>(
-      `/rest/v1/subscriptions?${params.toString()}&select=plan,status`
-    );
-
-    return results.length > 0;
   }
 
   private async getAppSettingValue(key: string, fallback: number): Promise<number> {
@@ -82,63 +63,24 @@ export class UsageService extends BaseService {
   async incrementAiParses(
     userId: string
   ): Promise<{ allowed: boolean; used: number; limit: number }> {
-    const [usage, isPro] = await Promise.all([
-      this.getOrCreateMonthlyUsage(userId),
-      this.isProUser(userId),
-    ]);
-
-    // Pro users have unlimited AI parses
-    if (isPro) {
-      const newCount = usage.ai_parses_used + 1;
-      const patchParams = new URLSearchParams({ id: `eq.${usage.id}` });
-
-      await this.fetch<UsageTracking[]>(
-        `/rest/v1/usage_tracking?${patchParams.toString()}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({
-            ai_parses_used: newCount,
-            updated_at: new Date().toISOString(),
-          }),
-        }
-      );
-
-      return { allowed: true, used: newCount, limit: -1 };
+    const results = await this.fetch<unknown[]>('/rest/v1/rpc/reserve_ai_parse', {
+      method: 'POST',
+      body: JSON.stringify({ p_user_id: userId })
+    });
+    const reservation = results[0];
+    if (
+      !reservation ||
+      typeof reservation !== 'object' ||
+      !('allowed' in reservation) ||
+      typeof reservation.allowed !== 'boolean' ||
+      !('used' in reservation) ||
+      !Number.isSafeInteger(reservation.used) ||
+      !('limit' in reservation) ||
+      !Number.isSafeInteger(reservation.limit)
+    ) {
+      throw new Error('Invalid AI parse reservation response');
     }
-
-    // Free users: check against dynamic limit from app_settings
-    const dynamicLimit = await this.getAppSettingValue(
-      'free_ai_parses_limit',
-      DEFAULT_AI_PARSES_LIMIT
-    );
-
-    if (usage.ai_parses_used >= dynamicLimit) {
-      return {
-        allowed: false,
-        used: usage.ai_parses_used,
-        limit: dynamicLimit,
-      };
-    }
-
-    const newCount = usage.ai_parses_used + 1;
-    const params = new URLSearchParams({ id: `eq.${usage.id}` });
-
-    await this.fetch<UsageTracking[]>(
-      `/rest/v1/usage_tracking?${params.toString()}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({
-          ai_parses_used: newCount,
-          updated_at: new Date().toISOString(),
-        }),
-      }
-    );
-
-    return {
-      allowed: true,
-      used: newCount,
-      limit: dynamicLimit,
-    };
+    return reservation as { allowed: boolean; used: number; limit: number };
   }
 
   async incrementTransactions(userId: string): Promise<void> {

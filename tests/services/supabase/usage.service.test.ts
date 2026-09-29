@@ -87,72 +87,38 @@ describe('UsageService', () => {
   });
 
   describe('incrementAiParses', () => {
-    it('allows increment for free user under limit', async () => {
-      const usage = makeUsage({ ai_parses_used: 5 });
-      mockFetchByUrl({
-        usage_tracking: [usage],
-        subscriptions: [],
-        free_ai_parses_limit: [{ key: 'free_ai_parses_limit', value: 15 }],
-      });
+    it.each([
+      [{ allowed: true, used: 6, limit: 15 }],
+      [{ allowed: false, used: 15, limit: 15 }],
+      [{ allowed: true, used: 101, limit: -1 }]
+    ])('returns the atomic reservation result %j', async (reservation) => {
+      const fetchMock = vi.fn(async () => jsonResponse([reservation]));
+      vi.stubGlobal('fetch', fetchMock);
 
       const result = await service.incrementAiParses('user-1');
-      expect(result.allowed).toBe(true);
-      expect(result.used).toBe(6);
-      expect(result.limit).toBe(15);
+
+      expect(result).toEqual(reservation);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const [url, options] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe(`${URL}/rest/v1/rpc/reserve_ai_parse`);
+      expect(options.method).toBe('POST');
+      expect(JSON.parse(options.body as string)).toEqual({ p_user_id: 'user-1' });
     });
 
-    it('denies increment for free user at limit', async () => {
-      const usage = makeUsage({ ai_parses_used: 15 });
-      mockFetchByUrl({
-        usage_tracking: [usage],
-        subscriptions: [],
-        free_ai_parses_limit: [{ key: 'free_ai_parses_limit', value: 15 }],
-      });
+    it('fails closed when the database rejects a reservation', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response('RPC unavailable', { status: 503, statusText: 'Unavailable' }))
+      );
 
-      const result = await service.incrementAiParses('user-1');
-      expect(result.allowed).toBe(false);
-      expect(result.used).toBe(15);
-      expect(result.limit).toBe(15);
+      await expect(service.incrementAiParses('user-1')).rejects.toThrow('API Error: Unavailable');
     });
 
-    it('denies increment for free user over limit', async () => {
-      const usage = makeUsage({ ai_parses_used: 20 });
-      mockFetchByUrl({
-        usage_tracking: [usage],
-        subscriptions: [],
-        free_ai_parses_limit: [{ key: 'free_ai_parses_limit', value: 15 }],
-      });
-
-      const result = await service.incrementAiParses('user-1');
-      expect(result.allowed).toBe(false);
-      expect(result.used).toBe(20);
-    });
-
-    it('always allows pro users regardless of usage count', async () => {
-      const usage = makeUsage({ ai_parses_used: 100 });
-      mockFetchByUrl({
-        usage_tracking: [usage],
-        subscriptions: [{ plan: 'pro', status: 'active' }],
-      });
-
-      const result = await service.incrementAiParses('user-1');
-      expect(result.allowed).toBe(true);
-      expect(result.used).toBe(101);
-      expect(result.limit).toBe(-1);
-    });
-
-    it('uses dynamic limit from app_settings instead of hardcoded value', async () => {
-      const usage = makeUsage({ ai_parses_used: 10, ai_parses_limit: 15 });
-      mockFetchByUrl({
-        usage_tracking: [usage],
-        subscriptions: [],
-        free_ai_parses_limit: [{ key: 'free_ai_parses_limit', value: 8 }],
-      });
-
-      const result = await service.incrementAiParses('user-1');
-      // usage_tracking says limit=15, but app_settings says 8, and used=10 >= 8
-      expect(result.allowed).toBe(false);
-      expect(result.limit).toBe(8);
+    it('fails closed when the reservation response is malformed', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => jsonResponse([])));
+      await expect(service.incrementAiParses('user-1')).rejects.toThrow(
+        'Invalid AI parse reservation response'
+      );
     });
   });
 

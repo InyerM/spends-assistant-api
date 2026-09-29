@@ -101,19 +101,9 @@ describe('handleParse', () => {
             headers: { 'Content-Type': 'application/json' }
           });
         }
-        if (url.includes('usage_tracking')) {
+        if (url.includes('/rpc/reserve_ai_parse')) {
           return new Response(
-            JSON.stringify([
-              {
-                id: 'usage-1',
-                user_id: env.DEFAULT_USER_ID,
-                month: new Date().toISOString().slice(0, 7),
-                ai_parses_used: 5,
-                ai_parses_limit: 15,
-                transactions_count: 0,
-                transactions_limit: 50
-              }
-            ]),
+            JSON.stringify([{ allowed: true, used: 6, limit: 15 }]),
             {
               status: 200,
               headers: { 'Content-Type': 'application/json' }
@@ -182,20 +172,9 @@ describe('handleParse', () => {
             headers: { 'Content-Type': 'application/json' }
           });
         }
-        if (url.includes('usage_tracking')) {
-          // Return usage at limit
+        if (url.includes('/rpc/reserve_ai_parse')) {
           return new Response(
-            JSON.stringify([
-              {
-                id: 'usage-1',
-                user_id: env.DEFAULT_USER_ID,
-                month: new Date().toISOString().slice(0, 7),
-                ai_parses_used: 15,
-                ai_parses_limit: 15,
-                transactions_count: 0,
-                transactions_limit: 50
-              }
-            ]),
+            JSON.stringify([{ allowed: false, used: 15, limit: 15 }]),
             {
               status: 200,
               headers: { 'Content-Type': 'application/json' }
@@ -233,19 +212,9 @@ describe('handleParse', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
-        if (url.includes('usage_tracking')) {
+        if (url.includes('/rpc/reserve_ai_parse')) {
           return new Response(
-            JSON.stringify([
-              {
-                id: 'usage-1',
-                user_id: env.DEFAULT_USER_ID,
-                month: new Date().toISOString().slice(0, 7),
-                ai_parses_used: 0,
-                ai_parses_limit: 15,
-                transactions_count: 0,
-                transactions_limit: 50
-              }
-            ]),
+            JSON.stringify([{ allowed: true, used: 1, limit: 15 }]),
             {
               status: 200,
               headers: { 'Content-Type': 'application/json' }
