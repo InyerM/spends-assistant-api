@@ -46,6 +46,17 @@ async function database(): Promise<PGlite> {
       duplicate_status text, duplicate_of uuid REFERENCES public.transactions(id),
       deleted_at timestamptz, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()
     );
+    CREATE TABLE public.document_observations (
+      id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES auth.users(id),
+      status text NOT NULL, match_transaction_id uuid REFERENCES public.transactions(id)
+    );
+    CREATE TABLE public.shortcut_inbox_match_decisions (
+      id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES auth.users(id),
+      transaction_id uuid NOT NULL REFERENCES public.transactions(id)
+    );
+    CREATE TABLE public.shortcut_inbox_match_reversals (
+      decision_id uuid PRIMARY KEY REFERENCES public.shortcut_inbox_match_decisions(id)
+    );
     GRANT INSERT ON public.transactions TO authenticated;
     CREATE TABLE public.usage_tracking (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -148,6 +159,55 @@ describe('atomic manual transaction confirmation', () => {
         .toEqual([{ transactions_count: 1 }]);
       expect((await db.query(`SELECT deleted_at IS NOT NULL AS deleted FROM public.transactions WHERE id='${originalId}'`)).rows)
         .toEqual([{ deleted: true }]);
+    } finally { await db.close(); }
+  });
+
+  it('rejects replacing a document-confirmed transaction without changing its balance or link', async () => {
+    const db = await database();
+    try {
+      const first = await call(db, id(22), payload());
+      const originalId = (first.transaction as { id: string }).id;
+      await db.query(`INSERT INTO public.document_observations(id,user_id,status,match_transaction_id)
+        VALUES ($1,$2,'confirmed',$3)`, [id(23), owner, originalId]);
+
+      await expect(call(db, id(24), payload({ amount: 500 }), { replaceId: originalId }))
+        .rejects.toThrow(/reviewed document or Shortcut decision/);
+      expect((await db.query(`SELECT deleted_at FROM public.transactions WHERE id=$1`, [originalId])).rows)
+        .toEqual([{ deleted_at: null }]);
+      expect((await db.query(`SELECT status,match_transaction_id FROM public.document_observations
+        WHERE id=$1`, [id(23)])).rows)
+        .toEqual([{ status: 'confirmed', match_transaction_id: originalId }]);
+      expect((await db.query(`SELECT balance FROM public.accounts WHERE id=$1`, [account])).rows)
+        .toEqual([{ balance: '8800.00' }]);
+      expect((await db.query(`SELECT transactions_count FROM public.usage_tracking
+        WHERE user_id=$1`, [owner])).rows).toEqual([{ transactions_count: 1 }]);
+      expect((await db.query(`SELECT count(*)::integer AS count FROM public.transactions`)).rows)
+        .toEqual([{ count: 1 }]);
+    } finally { await db.close(); }
+  });
+
+  it('rejects replacing an active Shortcut match but permits an already reversed match', async () => {
+    const db = await database();
+    try {
+      const first = await call(db, id(25), payload());
+      const originalId = (first.transaction as { id: string }).id;
+      await db.query(`INSERT INTO public.shortcut_inbox_match_decisions(id,user_id,transaction_id)
+        VALUES ($1,$2,$3)`, [id(26), owner, originalId]);
+
+      await expect(call(db, id(27), payload({ amount: 500 }), { replaceId: originalId }))
+        .rejects.toThrow(/reviewed document or Shortcut decision/);
+      expect((await db.query(`SELECT balance FROM public.accounts WHERE id=$1`, [account])).rows)
+        .toEqual([{ balance: '8800.00' }]);
+      expect((await db.query(`SELECT deleted_at FROM public.transactions WHERE id=$1`, [originalId])).rows)
+        .toEqual([{ deleted_at: null }]);
+
+      await db.query(`INSERT INTO public.shortcut_inbox_match_reversals(decision_id)
+        VALUES ($1)`, [id(26)]);
+      const replacement = await call(db, id(27), payload({ amount: 500 }),
+        { replaceId: originalId });
+      expect(replacement.status).toBe('created');
+      expect((await db.query(`SELECT balance FROM public.accounts WHERE id=$1`, [account])).rows)
+        .toEqual([{ balance: '9500.00' }]);
     } finally { await db.close(); }
   });
 

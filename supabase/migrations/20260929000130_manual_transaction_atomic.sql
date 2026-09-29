@@ -154,6 +154,21 @@ BEGIN
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Replacement transaction changed during review' USING ERRCODE = '23514';
     END IF;
+    -- Reviewed links cannot follow the new transaction ID without changing an
+    -- immutable decision. The row lock also serializes new document/Shortcut
+    -- matches, which lock this transaction before writing their decision.
+    IF EXISTS (
+      SELECT 1 FROM public.document_observations
+      WHERE user_id = v_user AND match_transaction_id = p_replace_id AND status = 'confirmed'
+    ) OR EXISTS (
+      SELECT 1 FROM public.shortcut_inbox_match_decisions d
+      WHERE d.user_id = v_user AND d.transaction_id = p_replace_id
+        AND NOT EXISTS (SELECT 1 FROM public.shortcut_inbox_match_reversals r
+          WHERE r.decision_id = d.id)
+    ) THEN
+      RAISE EXCEPTION 'Replacement transaction has a reviewed document or Shortcut decision'
+        USING ERRCODE = '23514';
+    END IF;
   END IF;
 
   INSERT INTO public.usage_tracking(user_id,month)
