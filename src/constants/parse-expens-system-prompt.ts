@@ -16,8 +16,9 @@ CURRENT_TIME: ${currentTime ?? 'unknown'} (format: HH:MM, 24-hour)
 The above date and time are in Colombia timezone (America/Bogota, UTC-5). You MUST use these values to resolve ALL relative date references (hoy, ayer, esta semana, etc.). Output dates in DD/MM/YYYY format.
 
 POSSIBLE INPUTS:
-1. Bancolombia email/SMS: "Bancolombia: Compraste $X en Y con tu T.Deb/Crédito *XXXX, el DD/MM/YYYY a las HH:MM"
+1. Bancolombia notification: "Bancolombia: Compraste $X en Y con tu T.Deb/Crédito *XXXX, el DD/MM/YYYY a las HH:MM" (email or SMS channel must be supplied separately)
 2. Nequi SMS (number 85954): "Nequi: Pagaste $X en Y. Saldo: $Z"
+   Nequi peer transfer: "Nequi: Enviaste $X a Y. Saldo: $Z"
 3. Manual message: "20k in rappi", "50mil for lunch", "bought 100mil groceries" (spanish or english)
 
 CRITICAL: Before parsing, determine if this is an actual financial transaction or an informational/non-transactional message.
@@ -48,7 +49,7 @@ OUTPUT (strict JSON without markdown):
   "description": string,
   "category": "slug-from-list-below",
   "bank": "bancolombia|nequi|daviplata|cash|other",
-  "payment_type": "debit|credit|cash|transfer|qr",
+  "payment_type": "debit|credit|cash|transfer|qr|unknown",
   "source": "bancolombia_email|bancolombia_sms|nequi_sms|manual",
   "confidence": number (0-100),
   "original_date": string | null,
@@ -59,7 +60,7 @@ OUTPUT (strict JSON without markdown):
 
 NOTE: When is_transaction=false, amount/description/category can be 0/""/missing since they won't be used.
 
-CATEGORY SLUGS - Choose the MOST SPECIFIC category that matches:
+CATEGORY SLUGS - Choose a specific category only when the text supports it:
 
 FOOD & DRINKS:
 - bar-cafe: cafes, coffee shops, bars, juan valdez, starbucks, oma
@@ -156,7 +157,7 @@ OTHERS:
 
 CATEGORIZATION RULES:
 
-1. ALWAYS choose a specific subcategory, never a parent (e.g., "restaurant" not "food-drinks")
+1. When evidence supports a category, choose its specific subcategory, never a parent (e.g., "restaurant" not "food-drinks")
 2. Common Colombian patterns:
    - Rappi, Uber Eats, Domicilios → restaurant
    - Exito, Carrefour, Jumbo, Ara, D1 → groceries
@@ -169,8 +170,7 @@ CATEGORIZATION RULES:
    - EPM, Codensa → utilities
    - Terpel, Mobil, Esso → fuel
 
-3. If unsure between categories, choose the more specific one
-4. If truly unknown → missing
+3. If the evidence is insufficient, choose "missing"; do not infer a merchant or purpose from the payment channel alone
 
 PARSING RULES:
 
@@ -180,9 +180,10 @@ Amounts:
 - Colombian format: $119.000,00 → 119000
 
 Source:
-- "Ban colombiatext contains "Bancolombia:" → "bancolombia_email"
-- "Nequi:" or 85954 → "nequi_sms"
-- Otherwise → "manual"
+- Email headers or explicit email channel with Bancolombia notification → "bancolombia_email"
+- Explicit SMS channel or sender with Bancolombia notification → "bancolombia_sms"
+- Explicit Nequi SMS channel, sender 85954, or "Nequi:" notification prefix → "nequi_sms"
+- Bank name alone does not establish the channel. Without channel evidence → "manual"
 
 Bank:
 - bancolombia_email/bancolombia_sms → "bancolombia"
@@ -192,7 +193,9 @@ Bank:
 Payment type:
 - "T.Deb" or "débito" → "debit"
 - "Crédito" or "T.Cred" → "credit"
-- Nequi → "transfer"
+- Nequi peer transfer ("Enviaste", "Transferiste") → "transfer"
+- Nequi QR purchase → "qr" only when QR is explicit
+- If the payment method is not stated, use "unknown" for Nequi purchase messages such as "Nequi: Pagaste $X en Y"
 - Manual default → "cash"
 
 Account type:
@@ -250,7 +253,7 @@ Output: {
   "account_type": null
 }
 
-Input: "Bancolombia: Compraste $119.000,00 en CODASHOP con tu T.Deb *7799, el 23/11/2024 a las 19:47"
+Input: "SMS from Bancolombia: Compraste $119.000,00 en CODASHOP con tu T.Deb *7799, el 23/11/2024 a las 19:47"
 Output: {
   "is_transaction": true,
   "skip_reason": null,
@@ -259,7 +262,7 @@ Output: {
   "category": "software",
   "bank": "bancolombia",
   "payment_type": "debit",
-  "source": "bancolombia_email",
+  "source": "bancolombia_sms",
   "confidence": 100,
   "original_date": "23/11/2024",
   "original_time": "19:47",
@@ -311,7 +314,7 @@ Output: {
   "category": "missing",
   "bank": "bancolombia",
   "payment_type": "debit",
-  "source": "bancolombia_email",
+  "source": "manual",
   "confidence": 95,
   "original_date": null,
   "original_time": null,
