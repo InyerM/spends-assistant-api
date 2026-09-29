@@ -1,7 +1,7 @@
-# Configuración de Secretos (Producción)
+# Secrets setup (production)
 
-Ejecuta estos comandos en tu terminal para configurar las variables sensibles en Cloudflare. 
-Te pedirá el valor para cada una.
+Run these commands in your terminal to configure sensitive variables in Cloudflare.
+You will be prompted for each value.
 
 ```bash
 # Telegram
@@ -9,29 +9,34 @@ npx wrangler secret put TELEGRAM_BOT_TOKEN
 npx wrangler secret put TELEGRAM_BOT_USERNAME
 npx wrangler secret put YOUR_CHAT_ID
 
-# Gemini
-npx wrangler secret put GEMINI_API_KEY
+# OpenRouter
+npx wrangler secret put OPENROUTER_API_KEY
 
-# Google Sheets
+# API and database
+npx wrangler secret put API_KEY
+npx wrangler secret put SUPABASE_SERVICE_KEY
+
+# Legacy Google Sheets integration, if deployed
 npx wrangler secret put GOOGLE_SHEET_ID
 npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_EMAIL
 npx wrangler secret put GOOGLE_CREDENTIALS_JSON
 ```
 
-> **Nota:** Para `GOOGLE_CREDENTIALS_JSON`, asegúrate de pegar el contenido MINIFICADO (todo en una línea) del JSON de tu service account, o su versión en base64 si así lo implementaste.
+> **Note:** For `GOOGLE_CREDENTIALS_JSON`, paste the minified service-account JSON (one line), or its base64 representation if that is how your deployment handles it.
 
 ---
 
-# Configuración Local (.dev.vars)
+# Local setup (.dev.vars)
 
-Para desarrollo local (`npm run dev`), asegúrate de tener un archivo `.dev.vars` en la raíz del proyecto con este formato:
+For local development (`npm run dev`), create a `.dev.vars` file in the project root with this format:
 
 ```ini
-TELEGRAM_BOT_TOKEN=tu_token
-TELEGRAM_BOT_USERNAME=tu_usuario
-YOUR_CHAT_ID=tu_chat_id
-GEMINI_API_KEY=tu_api_key
-GOOGLE_SHEET_ID=tu_sheet_id
-GOOGLE_SERVICE_ACCOUNT_EMAIL=tu_email
-GOOGLE_CREDENTIALS_JSON=tu_json_en_una_linea
+TELEGRAM_BOT_TOKEN=your_token
+TELEGRAM_BOT_USERNAME=your_username
+YOUR_CHAT_ID=your_chat_id
+OPENROUTER_API_KEY=your_openrouter_api_key
+OPENROUTER_TEXT_MODEL=deepseek/deepseek-v4.1-flash
+API_KEY=your_api_key
+SUPABASE_URL=http://localhost:54321
+SUPABASE_SERVICE_KEY=your_service_key
 ```

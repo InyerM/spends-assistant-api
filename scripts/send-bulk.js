@@ -51,7 +51,7 @@ async function main() {
     }
   }
 
-  return `${messages.length} procesados: ${success} transacciones, ${skipped} skipped, ${errors} errores`;
+  return `${messages.length} processed: ${success} transactions, ${skipped} skipped, ${errors} errors`;
 }
 
 async function sendOne(text) {
