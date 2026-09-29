@@ -32,5 +32,6 @@ describe('parse expense system prompt', () => {
     expect(userPrompt).not.toContain('CATEGORY SLUGS - Choose');
     expect(userPrompt).not.toContain('- restaurant: restaurants');
     expect(userPrompt).toContain('If none fits, use "missing"');
+    expect(userPrompt).toContain('Choose the most specific matching slug');
   });
 });
