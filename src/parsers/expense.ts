@@ -4,10 +4,12 @@ import { completeJson } from '../ai/openrouter';
 import type { AiUsageService } from '../services/supabase/ai-usage.service';
 import type { AiUsageMeter } from '../ai/usage-meter';
 import { buildSystemPrompt } from '../constants/parse-expens-system-prompt';
+import type { PromptCategory } from '../constants/parse-expens-system-prompt';
 import { getCurrentColombiaTimes } from '../utils/date';
 
 export interface ParseExpenseOptions {
   dynamicPrompts?: string[];
+  categoryCatalog?: PromptCategory[];
   model?: string;
   telemetry?: { userId: string; service: AiUsageService };
 }
@@ -21,7 +23,10 @@ async function parseExpenseCore(
 ): Promise<ParsedExpense> {
   const model = options?.model ?? 'deepseek/deepseek-v4.1-flash';
   const { date, time } = getCurrentColombiaTimes();
-  const system = [buildSystemPrompt(date, time), ...(options?.dynamicPrompts ?? [])].join('\n\n');
+  const system = [
+    buildSystemPrompt(date, time, options?.categoryCatalog),
+    ...(options?.dynamicPrompts ?? [])
+  ].join('\n\n');
   const cacheKey = cache
     ? `openrouter:${cache.hashKey(JSON.stringify({ model, system, text }))}`
     : null;
@@ -47,6 +52,13 @@ async function parseExpenseCore(
   }
   if (!expense.description?.trim()) throw new Error('Missing description');
   if (!expense.category) throw new Error('Missing category');
+
+  if (
+    options?.categoryCatalog &&
+    !options.categoryCatalog.some(({ slug }) => slug === expense.category)
+  ) {
+    expense.category = 'missing';
+  }
 
   if (cache && cacheKey) await cache.set(cacheKey, JSON.stringify(expense), 86_400);
   return expense;

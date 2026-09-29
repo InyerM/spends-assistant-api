@@ -16,6 +16,8 @@ Date: 2026-09-28 (America/Bogota). These checks used the local `OR_API_KEY` and 
 
 The text evaluation code and fixture IDs are in `scripts/eval/text-models/`; the request-building tests are in `tests/eval/text-models/`, and the image adapter tests are in `tests/ai/vision.test.ts`. The synthetic receipt PNG was generated locally outside the repository and is not a durable accuracy fixture.
 
+After adding the active user category catalog to text ingestion, one additional synthetic DeepSeek call with the invented input `20k en almuerzo de trabajo` and a single custom `work-lunch` category returned `work-lunch` as a transaction. OpenRouter reported 2,646 prompt and 121 completion tokens; this probe did not record a cost. The check confirms that a custom slug can be selected, but one example cannot establish category accuracy or regression safety. The local temporary probe contained no customer records.
+
 OpenRouter [distinguishes zero retention from data collection controls](https://openrouter.ai/docs/guides/get-started/sovereign-ai). After the 404, the user permitted Qwen without ZDR while requiring no training. The adapter therefore sends `provider.data_collection: "deny"`; this can permit transient provider retention. Production DeepSeek text requests still require ZDR. Provider eligibility and behavior must be rechecked before production deployment.
 
 Next validation: use a consented, redacted set of actual bank screenshots and ambiguous transaction text; score missed and false movements, amount/date/counterparty accuracy, JSON validity, latency, and cost per accepted observation. The 235B route succeeded after a higher per-token price cap permitted an additional provider, but it remains an explicit escalation until reliability has been measured.

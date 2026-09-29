@@ -166,6 +166,9 @@ describe('handleParse', () => {
       env.DEFAULT_USER_ID
     );
     expect(vi.mocked(parseExpense).mock.calls.at(-1)?.[3]?.telemetry?.service).toBeDefined();
+    expect(vi.mocked(parseExpense).mock.calls.at(-1)?.[3]?.categoryCatalog).toEqual([
+      { slug: 'food', name: category.name, type: category.type }
+    ]);
   });
 
   it('returns 429 when parse limit reached', async () => {

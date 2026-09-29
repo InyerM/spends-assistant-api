@@ -229,4 +229,25 @@ describe('parseExpense', () => {
     const promptText = body.messages[0].content;
     expect(promptText).toContain('Custom rule 1');
   });
+
+  it('maps a model category outside the user catalog to missing', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify(createOpenRouterResponse({ ...validExpense, category: 'restaurant' })),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            }
+          )
+      )
+    );
+
+    const result = await parseExpense('Compraste $50,000', API_KEY, undefined, {
+      categoryCatalog: [{ slug: 'custom-lunch', name: 'Lunch at work', type: 'expense' }]
+    });
+    expect(result.category).toBe('missing');
+  });
 });

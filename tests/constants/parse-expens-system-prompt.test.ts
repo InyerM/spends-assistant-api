@@ -22,4 +22,15 @@ describe('parse expense system prompt', () => {
     expect(prompt).toContain('If the evidence is insufficient, choose "missing"');
     expect(prompt).not.toContain('If unsure between categories, choose the more specific one');
   });
+
+  it('uses only the active user catalog when it is supplied', () => {
+    const userPrompt = buildSystemPrompt('2026-09-28', '10:30', [
+      { slug: 'custom-lunch', name: 'Lunch at work', type: 'expense' }
+    ]);
+    expect(userPrompt).toContain('custom-lunch');
+    expect(userPrompt).toContain('Lunch at work');
+    expect(userPrompt).not.toContain('CATEGORY SLUGS - Choose');
+    expect(userPrompt).not.toContain('- restaurant: restaurants');
+    expect(userPrompt).toContain('If none fits, use "missing"');
+  });
 });

@@ -119,12 +119,14 @@ async function processExpense(
     ctx.sendChatAction('typing');
 
     // Fetch dynamic prompts and rules for this user.
-    const [activePrompts, transferRules, allRules, accountDetectionRules] = await Promise.all([
-      services.automationRules.getActivePrompts(userId),
-      services.automationRules.getTransferRules(userId),
-      services.automationRules.getAutomationRules(userId),
-      services.automationRules.getAccountDetectionRules(userId)
-    ]);
+    const [activePrompts, transferRules, allRules, accountDetectionRules, categories] =
+      await Promise.all([
+        services.automationRules.getActivePrompts(userId),
+        services.automationRules.getTransferRules(userId),
+        services.automationRules.getAutomationRules(userId),
+        services.automationRules.getAccountDetectionRules(userId),
+        services.categories.getCategories(userId)
+      ]);
 
     // Pre-parse account detection: check raw text against account_detection rules
     const generalRules = allRules.filter((r) => r.rule_type !== 'account_detection');
@@ -150,6 +152,7 @@ async function processExpense(
 
     const expense = await parseExpense(text, env.OPENROUTER_API_KEY, cache, {
       dynamicPrompts,
+      categoryCatalog: categories.map(({ slug, name, type }) => ({ slug, name, type })),
       model: env.OPENROUTER_TEXT_MODEL,
       telemetry: { userId, service: services.aiUsage }
     });
