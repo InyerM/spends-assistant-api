@@ -66,8 +66,11 @@ Extracts:
 
 The document inbox migration `20260929000010_document_inbox.sql` adds a private
 image bucket plus user-scoped `documents` and `document_observations` tables.
-Apply it before enabling the web document flow. It does not add embeddings or
-automatic reconciliation; those require a separate review workflow.
+It also adds atomic claim and completion functions for extraction. Apply it
+before enabling the web document flow. The CSV confirmation migration
+`20260929000020_atomic_csv_import.sql` must be applied before enabling the
+web import flow. Neither migration adds embeddings or automatic reconciliation;
+those require a separate review workflow.
 
 **Main Tables**:
 
