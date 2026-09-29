@@ -3,17 +3,29 @@ import { extractImageObservations } from '../../../src/ai/vision';
 import { AiUsageMeter } from '../../../src/ai/usage-meter';
 import { BenchmarkExtractionError, runBenchmark, type PageExtractor } from './benchmark';
 import { SYNTHETIC_PAGES } from './fixture';
-import type { RenderedPage } from './render';
+import type { RenderedPage, RenderedTile } from './render';
+import { runTiledBenchmark } from './tiles';
 
 export function parseBenchmarkArgs(
   args: string[],
   apiKey: string
-): { live: boolean; escalateDensePage: boolean } {
-  if (args.length === 0) return { live: false, escalateDensePage: false };
-  if (args[0] !== '--live' || args.length > 2 || (args.length === 2 && args[1] !== '--escalate'))
-    throw new Error('Only --live is supported; input is always synthetic');
-  if (!apiKey) throw new Error('OpenRouter key required for --live');
-  return { live: true, escalateDensePage: args[1] === '--escalate' };
+): { live: boolean; escalateDensePage: boolean; tileDensePage: boolean } {
+  if (args.length === 0) return { live: false, escalateDensePage: false, tileDensePage: false };
+  if (args.includes('--escalate') && args.includes('--tile'))
+    throw new Error('--escalate and --tile cannot be combined');
+  const valid =
+    (args.length === 1 && (args[0] === '--live' || args[0] === '--tile')) ||
+    (args.length === 2 &&
+      args[0] === '--live' &&
+      (args[1] === '--escalate' || args[1] === '--tile'));
+  if (!valid) throw new Error('Only --live is supported; input is always synthetic');
+  const live = args.includes('--live');
+  if (live && !apiKey) throw new Error('OpenRouter key required for --live');
+  return {
+    live,
+    escalateDensePage: args.includes('--escalate'),
+    tileDensePage: args.includes('--tile')
+  };
 }
 
 export function shouldEscalatePage(pageNumber: number, escalateDensePage: boolean): boolean {
@@ -37,6 +49,16 @@ export async function oraclePage(page: RenderedPage) {
     })),
     model: 'synthetic-oracle',
     usage: null
+  };
+}
+
+export async function oracleTile(tile: RenderedTile) {
+  const page = await oraclePage(tile);
+  return {
+    ...page,
+    observations: page.observations.filter((observation) =>
+      tile.expectedReferences.includes(observation.reference)
+    )
   };
 }
 
@@ -72,11 +94,16 @@ export function createLiveExtractor(
 
 async function main(): Promise<void> {
   const apiKey = process.env.OR_API_KEY || process.env.OPENROUTER_API_KEY || '';
-  const { live, escalateDensePage } = parseBenchmarkArgs(process.argv.slice(2), apiKey);
+  const { live, escalateDensePage, tileDensePage } = parseBenchmarkArgs(
+    process.argv.slice(2),
+    apiKey
+  );
   const extractor: PageExtractor = live
     ? createLiveExtractor(apiKey, escalateDensePage)
     : oraclePage;
-  const result = await runBenchmark(extractor);
+  const result = tileDensePage
+    ? await runTiledBenchmark(extractor, live ? createLiveExtractor(apiKey, false) : oracleTile)
+    : await runBenchmark(extractor);
   process.stdout.write(
     `${JSON.stringify(
       {
@@ -84,6 +111,7 @@ async function main(): Promise<void> {
         mode: live ? 'live-image-adapter' : 'offline-synthetic-oracle',
         modelAttempted: live,
         densePageEscalated: escalateDensePage,
+        densePageTiled: tileDensePage,
         ...result
       },
       null,

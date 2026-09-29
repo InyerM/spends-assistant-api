@@ -11,7 +11,7 @@ export interface Observation {
   source_excerpt: string;
   confidence: number;
 }
-interface ExtractionResult {
+export interface ExtractionResult {
   observations: Observation[];
   model: string;
   usage: { prompt_tokens: number; completion_tokens: number; cost: number | null } | null;
@@ -79,7 +79,7 @@ export function scorePageOutputs(expectedPages: SyntheticPage[], outputs: PageOu
   };
 }
 
-function safeError(error: unknown): string {
+export function safeError(error: unknown): string {
   return error instanceof Error && error.message === 'Vision response truncated'
     ? 'Vision response truncated'
     : 'Extraction failed';

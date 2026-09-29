@@ -66,14 +66,36 @@ describe('synthetic PDF statement benchmark', () => {
     await expect(renderSyntheticPages(Buffer.from('%PDF-1.4\nprivate'))).rejects.toThrow(
       'Only the built-in synthetic PDF'
     );
-    expect(parseBenchmarkArgs([], '')).toEqual({ live: false, escalateDensePage: false });
+    expect(parseBenchmarkArgs([], '')).toEqual({
+      live: false,
+      escalateDensePage: false,
+      tileDensePage: false
+    });
     expect(() => parseBenchmarkArgs(['--live'], '')).toThrow('OpenRouter key required');
     expect(() => parseBenchmarkArgs(['private.pdf'], 'key')).toThrow('Only --live is supported');
-    expect(parseBenchmarkArgs(['--live'], 'key')).toEqual({ live: true, escalateDensePage: false });
+    expect(parseBenchmarkArgs(['--live'], 'key')).toEqual({
+      live: true,
+      escalateDensePage: false,
+      tileDensePage: false
+    });
     expect(parseBenchmarkArgs(['--live', '--escalate'], 'key')).toEqual({
       live: true,
-      escalateDensePage: true
+      escalateDensePage: true,
+      tileDensePage: false
     });
+    expect(parseBenchmarkArgs(['--tile'], '')).toEqual({
+      live: false,
+      escalateDensePage: false,
+      tileDensePage: true
+    });
+    expect(parseBenchmarkArgs(['--live', '--tile'], 'key')).toEqual({
+      live: true,
+      escalateDensePage: false,
+      tileDensePage: true
+    });
+    expect(() => parseBenchmarkArgs(['--live', '--escalate', '--tile'], 'key')).toThrow(
+      'cannot be combined'
+    );
     expect(() => parseBenchmarkArgs(['--escalate'], 'key')).toThrow('Only --live');
   });
 
