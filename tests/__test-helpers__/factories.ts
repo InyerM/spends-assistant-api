@@ -1,5 +1,12 @@
 import { vi } from 'vitest';
-import type { Transaction, CreateTransactionInput, Account, Category, AutomationRule, UsageTracking } from '../../src/types';
+import type {
+  Transaction,
+  CreateTransactionInput,
+  Account,
+  Category,
+  AutomationRule,
+  UsageTracking
+} from '../../src/types';
 
 export function createMockTransaction(overrides: Partial<Transaction> = {}): Transaction {
   return {
@@ -28,12 +35,12 @@ export function createMockTransaction(overrides: Partial<Transaction> = {}): Tra
     duplicate_of: null,
     created_at: '2024-01-15T19:30:00Z',
     updated_at: '2024-01-15T19:30:00Z',
-    ...overrides,
+    ...overrides
   };
 }
 
 export function createMockTransactionInput(
-  overrides: Partial<CreateTransactionInput> = {},
+  overrides: Partial<CreateTransactionInput> = {}
 ): CreateTransactionInput {
   return {
     user_id: 'test-user-id',
@@ -44,7 +51,7 @@ export function createMockTransactionInput(
     account_id: 'acc-1',
     type: 'expense',
     source: 'api',
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -63,7 +70,7 @@ export function createMockAccount(overrides: Partial<Account> = {}): Account {
     icon: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -79,7 +86,7 @@ export function createMockCategory(overrides: Partial<Category> = {}): Category 
     color: null,
     is_active: true,
     created_at: '2024-01-01T00:00:00Z',
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -97,7 +104,7 @@ export function createMockAutomationRule(overrides: Partial<AutomationRule> = {}
     actions: {},
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -105,12 +112,13 @@ export function createMockEnv() {
   return {
     SUPABASE_URL: 'https://test.supabase.co',
     SUPABASE_SERVICE_KEY: 'test-service-key',
-    GEMINI_API_KEY: 'test-gemini-key',
+    OPENROUTER_API_KEY: 'test-openrouter-key',
+    OPENROUTER_TEXT_MODEL: 'deepseek/deepseek-v4.1-flash',
     TELEGRAM_BOT_TOKEN: 'test-telegram-token',
     API_KEY: 'test-api-key',
     DEFAULT_USER_ID: 'test-user-id',
     REDIS_URL: 'redis://localhost:6379',
-    REDIS_PASSWORD: 'test-password',
+    REDIS_PASSWORD: 'test-password'
   };
 }
 
@@ -125,7 +133,7 @@ export function createMockUsage(overrides: Partial<UsageTracking> = {}): UsageTr
     transactions_limit: 50,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -146,14 +154,14 @@ export function createMockFetch(responses: Record<string, MockResponse>) {
         return new Response(JSON.stringify(response.data), {
           status,
           statusText: ok ? 'OK' : 'Error',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' }
         });
       }
     }
 
     return new Response(JSON.stringify([]), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' }
     });
   });
 }

@@ -8,7 +8,7 @@ Intelligent expense tracking system that automatically processes and categorizes
 
 **Platform**: Cloudflare Workers (TypeScript)  
 **Database**: Supabase PostgreSQL  
-**AI**: Google Gemini 2.5 Flash  
+**AI**: OpenRouter (DeepSeek V4.1 Flash by default)
 **Cache**: Redis (optional)  
 **Timezone**: America/Bogota
 
@@ -27,8 +27,8 @@ The microservice accepts expenses from three channels:
 ```
 1. Message arrives → Handler receives text
 2. Check Redis cache for duplicate message
-3. If not cached: Send to Gemini AI for parsing
-4. Gemini extracts: amount, description, category, bank, payment method
+3. If not cached: Send to OpenRouter for parsing
+4. The model extracts: amount, description, category, bank, payment method
 5. Lookup account and category in database
 6. Apply automation rules (e.g., detect transfers)
 7. Save transaction to Supabase
@@ -36,14 +36,22 @@ The microservice accepts expenses from three channels:
 9. Send confirmation
 ```
 
-### 3. AI Parsing (Gemini)
+### 3. AI Parsing (OpenRouter)
+
+The Worker uses `deepseek/deepseek-v4.1-flash` by default and can select another
+text model with `OPENROUTER_TEXT_MODEL`. Requests require zero data retention,
+deny provider data collection, and cap per-token prices. A per-user monthly
+spending limit is planned; do not deploy the migration before that control and
+real-message evaluation are complete.
 
 Handles multiple input formats:
+
 - **Bank SMS**: "Bancolombia: Compraste $11.000 en DLO*GOOGLE con tu T.Deb *7799, el 23/11/2024 a las 21:02"
 - **Manual**: "20k en almuerzo" or "bought 50k groceries"
 - **Nequi**: "Nequi: Pagaste $50.000 en UBER"
 
 Extracts:
+
 - Amount, description, category
 - Bank, payment type (debit/credit/cash), source
 - Original date/time (if present in SMS)
@@ -53,6 +61,7 @@ Extracts:
 ### 4. Database Schema
 
 **Main Tables**:
+
 - `accounts`: Bank accounts (Bancolombia, Nequi, Cash)
 - `categories`: Expense/income categories
 - `transactions`: All financial transactions
@@ -61,17 +70,20 @@ Extracts:
 ### 5. Smart Features
 
 **Automation Rules**:
+
 - Auto-detect transfers between accounts
 - Auto-categorize by keywords/patterns
 - Link related transactions
 
 **Redis Caching**:
-- Stores parsed Gemini responses (24h)
+
+- Stores parsed model responses (24h)
 - Prevents duplicate API calls for same message
 - SHA-256 hash of message text as key
 - Fail-open: works without Redis
 
 **Multi-Card Support**:
+
 - Matches transactions to specific card by last 4 digits
 - Falls back to default account if not found
 
@@ -91,6 +103,7 @@ src/services/
 ## Key Flows
 
 ### Telegram Flow
+
 ```
 User sends "20k almuerzo"
 ↓
@@ -98,7 +111,7 @@ Telegram handler receives update
 ↓
 CacheService checks if message processed before
 ↓
-Gemini parses: {amount: 20000, category: "food", ...}
+The model parses: {amount: 20000, category: "food", ...}
 ↓
 AccountsService finds "cash" account
 ↓
@@ -114,6 +127,7 @@ Bot sends confirmation message
 ```
 
 ### Email Flow
+
 ```
 Gmail forwards Bancolombia email
 ↓
@@ -131,18 +145,22 @@ Return JSON response
 ## Environment Variables
 
 **Required**:
+
 - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
-- `GEMINI_API_KEY`
+- `OPENROUTER_API_KEY`
 - `TELEGRAM_BOT_TOKEN`
 - `API_KEY`
 
 **Optional**:
+
 - `REDIS_URL`, `REDIS_PASSWORD`
 - `APP_URL`
+- `OPENROUTER_TEXT_MODEL` (defaults to `deepseek/deepseek-v4.1-flash`)
 
 ## Data Models
 
 **Transaction**:
+
 ```typescript
 {
   date: "2024-11-23",
@@ -160,7 +178,7 @@ Return JSON response
 
 ## Performance
 
-- **First request**: ~6s (Gemini API call)
+- **First request**: varies by provider and model
 - **Cached request**: ~50ms (Redis hit)
 - **Database**: ~100ms (Supabase query)
 

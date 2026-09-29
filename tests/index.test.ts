@@ -3,32 +3,32 @@ import worker from '../src/index';
 
 // Mock all handlers
 vi.mock('../src/handlers/telegram', () => ({
-  handleTelegram: vi.fn(async () => new Response('telegram ok')),
+  handleTelegram: vi.fn(async () => new Response('telegram ok'))
 }));
 vi.mock('../src/handlers/email', () => ({
-  handleEmail: vi.fn(async () => new Response('email ok')),
+  handleEmail: vi.fn(async () => new Response('email ok'))
 }));
 vi.mock('../src/handlers/transaction', () => ({
-  handleTransaction: vi.fn(async () => new Response('transaction ok')),
+  handleTransaction: vi.fn(async () => new Response('transaction ok'))
 }));
 vi.mock('../src/handlers/parse', () => ({
-  handleParse: vi.fn(async () => new Response('parse ok')),
+  handleParse: vi.fn(async () => new Response('parse ok'))
 }));
 vi.mock('../src/handlers/balance', () => ({
-  handleBalance: vi.fn(async () => new Response('balance ok')),
+  handleBalance: vi.fn(async () => new Response('balance ok'))
 }));
 
 const env = {
   SUPABASE_URL: 'https://test.supabase.co',
   SUPABASE_SERVICE_KEY: 'test-key',
-  GEMINI_API_KEY: 'test-key',
+  OPENROUTER_API_KEY: 'test-key',
   TELEGRAM_BOT_TOKEN: 'test-token',
-  API_KEY: 'test-api-key',
+  API_KEY: 'test-api-key'
 };
 
 const ctx = {
   waitUntil: vi.fn(),
-  passThroughOnException: vi.fn(),
+  passThroughOnException: vi.fn()
 } as unknown as ExecutionContext;
 
 describe('Worker routing', () => {

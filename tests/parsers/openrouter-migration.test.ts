@@ -1,0 +1,90 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseExpense } from '../../src/parsers/expense';
+import type { CacheService } from '../../src/services/cache.service';
+
+const validExpense = {
+  is_transaction: true,
+  amount: 50000,
+  description: 'Lunch',
+  category: 'restaurant',
+  bank: 'bancolombia',
+  payment_type: 'debit',
+  source: 'sms',
+  confidence: 90
+};
+
+describe('expense parser OpenRouter migration', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('uses the selected model and preserves dynamic rules', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: JSON.stringify(validExpense) }, finish_reason: 'stop' }]
+          }),
+          { status: 200 }
+        )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await parseExpense('Compraste $50.000', 'key', undefined, {
+      model: 'deepseek/deepseek-v4.1-flash',
+      dynamicPrompts: ['Rule: restaurant']
+    });
+
+    expect(result.amount).toBe(50000);
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.model).toBe('deepseek/deepseek-v4.1-flash');
+    expect(body.messages[0].content).toContain('Rule: restaurant');
+    expect(body.messages[1].content).toContain('Compraste $50.000');
+  });
+
+  it('uses a model and prompt specific cache key', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: JSON.stringify(validExpense) }, finish_reason: 'stop' }]
+          }),
+          { status: 200 }
+        )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const cache = {
+      hashKey: vi.fn((value: string) => value),
+      get: vi.fn().mockResolvedValue(null),
+      set: vi.fn()
+    } as unknown as CacheService;
+
+    await parseExpense('Pago privado', 'key', cache, { model: 'model-a' });
+    await parseExpense('Pago privado', 'key', cache, { model: 'model-b' });
+
+    expect(cache.get).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(cache.get).mock.calls[0][0]).not.toEqual(
+      vi.mocked(cache.get).mock.calls[1][0]
+    );
+  });
+
+  it('does not write a bank message or model response to logs', async () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              choices: [
+                { message: { content: JSON.stringify(validExpense) }, finish_reason: 'stop' }
+              ]
+            }),
+            { status: 200 }
+          )
+      )
+    );
+
+    await parseExpense('Nequi secreto 12345', 'key');
+    expect(JSON.stringify(spy.mock.calls)).not.toContain('Nequi secreto 12345');
+    expect(JSON.stringify(spy.mock.calls)).not.toContain('Lunch');
+  });
+});

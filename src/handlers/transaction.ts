@@ -2,8 +2,18 @@ import { createSupabaseServices } from '../services/supabase';
 import { CacheService } from '../services/cache.service';
 import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
-import { getCurrentColombiaTimes, convertDateFormat, validateAndFixDate, validateAndFixTime } from '../utils/date';
-import { isTransferMessage, processTransfer, buildTransferPromptSection, buildAutomationRulesPromptSection } from '../services/transfer-processor';
+import {
+  getCurrentColombiaTimes,
+  convertDateFormat,
+  validateAndFixDate,
+  validateAndFixTime
+} from '../utils/date';
+import {
+  isTransferMessage,
+  processTransfer,
+  buildTransferPromptSection,
+  buildAutomationRulesPromptSection
+} from '../services/transfer-processor';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 
 interface TransactionRequest {
@@ -18,27 +28,27 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
     const userId = await resolveUserId(request, env, services.apiKeys);
     if (!userId) return unauthorizedResponse();
 
-    const body = await request.json() as TransactionRequest;
+    const body = (await request.json()) as TransactionRequest;
     const { text, source = 'api' } = body;
 
     if (!text) {
       return new Response('Missing text', { status: 400 });
     }
 
-    const { parseExpense } = await import('../parsers/gemini');
+    const { parseExpense } = await import('../parsers/expense');
     const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
 
-    // Fetch dynamic prompts, transfer rules, and all rules for Gemini (scoped to user)
+    // Fetch dynamic prompts and rules for this user.
     const [activePrompts, transferRules, allRules, accountDetectionRules] = await Promise.all([
       services.automationRules.getActivePrompts(userId),
       services.automationRules.getTransferRules(userId),
       services.automationRules.getAutomationRules(userId),
-      services.automationRules.getAccountDetectionRules(userId),
+      services.automationRules.getAccountDetectionRules(userId)
     ]);
 
     // Pre-parse account detection: check raw text against account_detection rules
-    const generalRules = allRules.filter(r => r.rule_type !== 'account_detection');
-    const preMatchedAccount = accountDetectionRules.find(rule =>
+    const generalRules = allRules.filter((r) => r.rule_type !== 'account_detection');
+    const preMatchedAccount = accountDetectionRules.find((rule) =>
       services.automationRules.matchesConditions(
         { raw_text: text } as Partial<CreateTransactionInput>,
         rule.conditions,
@@ -55,10 +65,13 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
       accountHint,
       ...activePrompts,
       buildTransferPromptSection(transferRules),
-      buildAutomationRulesPromptSection(generalRules),
+      buildAutomationRulesPromptSection(generalRules)
     ].filter(Boolean);
 
-    const expense = await parseExpense(text, env.GEMINI_API_KEY, cache, { dynamicPrompts });
+    const expense = await parseExpense(text, env.OPENROUTER_API_KEY, cache, {
+      dynamicPrompts,
+      model: env.OPENROUTER_TEXT_MODEL
+    });
 
     // Handle non-transactional messages
     if (expense.is_transaction === false) {
@@ -67,15 +80,18 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
         raw_text: text,
         source,
         reason: expense.skip_reason ?? 'not_transaction',
-        parsed_data: expense as unknown as Record<string, unknown>,
+        parsed_data: expense as unknown as Record<string, unknown>
       });
-      return new Response(JSON.stringify({
-        status: 'skipped',
-        reason: expense.skip_reason ?? 'not_transaction',
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          status: 'skipped',
+          reason: expense.skip_reason ?? 'not_transaction'
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     const colombiaTimes = getCurrentColombiaTimes();
@@ -100,12 +116,19 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
       accountId = preMatchedAccount.actions.set_account;
       console.log(`[Account] Using account_detection rule: ${preMatchedAccount.name}`);
     } else {
-      const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type, userId);
+      const account = await services.accounts.getAccount(
+        expense.bank,
+        expense.last_four,
+        expense.account_type,
+        userId
+      );
       if (account) {
         accountId = account.id;
       } else {
-        const fallback = await services.accounts.getAccount('cash', null, null, userId) || await services.accounts.getAccount('bancolombia', null, null, userId);
-        if (!fallback) throw new Error("No default account found");
+        const fallback =
+          (await services.accounts.getAccount('cash', null, null, userId)) ||
+          (await services.accounts.getAccount('bancolombia', null, null, userId));
+        if (!fallback) throw new Error('No default account found');
         accountId = fallback.id;
       }
     }
@@ -138,12 +161,7 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
       : null;
     const existingNear = existingExact
       ? null
-      : await services.transactions.findNearDuplicate(
-          date,
-          expense.amount,
-          accountId,
-          userId
-        );
+      : await services.transactions.findNearDuplicate(date, expense.amount, accountId, userId);
     const duplicateMatch = existingExact ?? existingNear;
 
     if (duplicateMatch) {
@@ -171,23 +189,36 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
       // Create all transactions (1 or 2)
       for (const tx of result.transactions) {
         const finalTx = await services.automationRules.applyAutomationRules(tx, userId);
-        savedTransaction = await services.transactions.createTransaction(finalTx, services.accounts, cache);
+        savedTransaction = await services.transactions.createTransaction(
+          finalTx,
+          services.accounts,
+          cache
+        );
       }
     } else {
       // Normal flow
-      const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput, userId);
-      savedTransaction = await services.transactions.createTransaction(finalTransaction, services.accounts, cache);
+      const finalTransaction = await services.automationRules.applyAutomationRules(
+        transactionInput,
+        userId
+      );
+      savedTransaction = await services.transactions.createTransaction(
+        finalTransaction,
+        services.accounts,
+        cache
+      );
     }
 
-    return new Response(JSON.stringify({
-      status: 'success',
-      transaction: savedTransaction,
-      transfer: transferInfo
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-
+    return new Response(
+      JSON.stringify({
+        status: 'success',
+        transaction: savedTransaction,
+        transfer: transferInfo
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
   } catch (error: unknown) {
     console.error('Transaction API Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

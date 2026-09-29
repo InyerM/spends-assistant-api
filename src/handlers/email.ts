@@ -1,10 +1,20 @@
-import { parseExpense } from '../parsers/gemini';
+import { parseExpense } from '../parsers/expense';
 import { createSupabaseServices } from '../services/supabase';
 import { CacheService } from '../services/cache.service';
-import { getCurrentColombiaTimes, convertDateFormat, validateAndFixDate, validateAndFixTime } from '../utils/date';
+import {
+  getCurrentColombiaTimes,
+  convertDateFormat,
+  validateAndFixDate,
+  validateAndFixTime
+} from '../utils/date';
 import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
-import { isTransferMessage, processTransfer, buildTransferPromptSection, buildAutomationRulesPromptSection } from '../services/transfer-processor';
+import {
+  isTransferMessage,
+  processTransfer,
+  buildTransferPromptSection,
+  buildAutomationRulesPromptSection
+} from '../services/transfer-processor';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 
 interface AppsScriptPayload {
@@ -25,7 +35,7 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
     let emailData: AppsScriptPayload;
 
     if (contentType.includes('application/json')) {
-      emailData = await request.json() as AppsScriptPayload;
+      emailData = (await request.json()) as AppsScriptPayload;
       console.log('[Email] Received from Apps Script:', emailData);
 
       const emailText = emailData.body || emailData.text || emailData.subject || '';
@@ -52,17 +62,17 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
 
       const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
 
-      // Fetch dynamic prompts, transfer rules, and all rules for Gemini (scoped to user)
+      // Fetch dynamic prompts and rules for this user.
       const [activePrompts, transferRules, allRules, accountDetectionRules] = await Promise.all([
         services.automationRules.getActivePrompts(userId),
         services.automationRules.getTransferRules(userId),
         services.automationRules.getAutomationRules(userId),
-        services.automationRules.getAccountDetectionRules(userId),
+        services.automationRules.getAccountDetectionRules(userId)
       ]);
 
       // Pre-parse account detection: check raw text against account_detection rules
-      const generalRules = allRules.filter(r => r.rule_type !== 'account_detection');
-      const preMatchedAccount = accountDetectionRules.find(rule =>
+      const generalRules = allRules.filter((r) => r.rule_type !== 'account_detection');
+      const preMatchedAccount = accountDetectionRules.find((rule) =>
         services.automationRules.matchesConditions(
           { raw_text: cleanText } as Partial<CreateTransactionInput>,
           rule.conditions,
@@ -79,10 +89,13 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
         accountHint,
         ...activePrompts,
         buildTransferPromptSection(transferRules),
-        buildAutomationRulesPromptSection(generalRules),
+        buildAutomationRulesPromptSection(generalRules)
       ].filter(Boolean);
 
-      const expense = await parseExpense(cleanText, env.GEMINI_API_KEY, cache, { dynamicPrompts });
+      const expense = await parseExpense(cleanText, env.OPENROUTER_API_KEY, cache, {
+        dynamicPrompts,
+        model: env.OPENROUTER_TEXT_MODEL
+      });
 
       // Handle non-transactional messages
       if (expense.is_transaction === false) {
@@ -91,16 +104,19 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
           raw_text: cleanText,
           source: 'bancolombia_email',
           reason: expense.skip_reason ?? 'not_transaction',
-          parsed_data: expense as unknown as Record<string, unknown>,
+          parsed_data: expense as unknown as Record<string, unknown>
         });
         console.log('[Email] Non-transactional message skipped:', expense.skip_reason);
-        return new Response(JSON.stringify({
-          status: 'skipped',
-          reason: expense.skip_reason ?? 'not_transaction',
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify({
+            status: 'skipped',
+            reason: expense.skip_reason ?? 'not_transaction'
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
       }
 
       const colombiaTimes = getCurrentColombiaTimes();
@@ -119,11 +135,18 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
       }
 
       let accountId: string;
-      const account = await services.accounts.getAccount('bancolombia', expense.last_four, expense.account_type, userId);
+      const account = await services.accounts.getAccount(
+        'bancolombia',
+        expense.last_four,
+        expense.account_type,
+        userId
+      );
       if (account) {
         accountId = account.id;
       } else {
-        throw new Error(`Bancolombia account not found${expense.last_four ? ` with card ending in ${expense.last_four}` : ''}`);
+        throw new Error(
+          `Bancolombia account not found${expense.last_four ? ` with card ending in ${expense.last_four}` : ''}`
+        );
       }
 
       let categoryId: string | undefined;
@@ -175,40 +198,48 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
         }
       } else {
         // Normal flow
-        const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput, userId);
+        const finalTransaction = await services.automationRules.applyAutomationRules(
+          transactionInput,
+          userId
+        );
         await services.transactions.createTransaction(finalTransaction, services.accounts, cache);
       }
 
       console.log('[Email] Processed successfully');
 
-      return new Response(JSON.stringify({
-        status: 'success',
-        expense: {
-          amount: expense.amount,
-          description: expense.description,
-          category: expense.category
+      return new Response(
+        JSON.stringify({
+          status: 'success',
+          expense: {
+            amount: expense.amount,
+            description: expense.description,
+            category: expense.category
+          }
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
         }
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      );
     }
 
     return new Response(JSON.stringify({ status: 'error', reason: 'invalid_format' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }
     });
-
   } catch (error: unknown) {
     console.error('[Email] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({
-      status: 'error',
-      message: errorMessage
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return new Response(
+      JSON.stringify({
+        status: 'error',
+        message: errorMessage
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
   }
 }
 

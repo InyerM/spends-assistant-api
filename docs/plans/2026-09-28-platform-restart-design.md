@@ -1,21 +1,38 @@
 # Spends Assistant restart: audit and initial design
 
-Date: 2026-09-28. Status: draft for review with the owner. Production records have not been inspected or changed.
+Date: 2026-09-28. Status: draft for joint review and explicit approval before the roadmap phases. Production records were inspected read-only and were not changed.
 
 ## Evidence and starting point
 
 The latest backend commit is from 2026-02-25, web from 2026-02-21, and mobile from 2026-02-26. Web and backend were clean at the start of this review. Mobile had uncommitted local changes to automation, synchronization, accounts, categories, subscriptions, and translations; those changes have been preserved.
 
-| Area | Existing functionality | Verified work remaining |
-| --- | --- | --- |
-| Ingestion | Worker with Telegram, email, `/transaction`, and `/parse`; web and mobile call the Worker | Gemini is embedded in `src/parsers/gemini.ts` and rule generation. There is no OpenRouter integration or dollar spending limit. |
-| Imports | Web and mobile CSV imports, a private `imports` bucket, import history, and a web duplicate check before import | The web import API inserts rows without rechecking duplicates; mobile creates imports with fields incompatible with the remote `imports` table and does not check duplicates. |
-| Documents | Private bucket for CSV files and an `imports` table | No OCR, document classification, extraction of multiple receipts, pgvector, or document-to-transaction links. |
-| Reconciliation | `reconciliations` table and fields on `transactions` | No complete proposal, evidence, and approval flow. |
-| Net worth | `investment`, `crypto`, and `credit` account types | No positions, valuations, cost basis, amortization, interest, or separation of liabilities from everyday spending. |
-| Mobile | Expo/WatermelonDB, importer, and recent local UI changes | Synchronization has no explicit pagination and converts read errors to empty sets. Check the `imports` schema and synchronization tests before a historical import. |
+| Area           | Existing functionality                                                                                          | Verified work remaining                                                                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ingestion      | Worker with Telegram, email, `/transaction`, and `/parse`; web and mobile call the Worker                       | At the start of the audit Gemini was embedded in the parser and rule generation. The local code now uses OpenRouter; there is still no dollar spending limit or evaluated production rollout. |
+| Imports        | Web and mobile CSV imports, a private `imports` bucket, import history, and a web duplicate check before import | The web import API inserts rows without rechecking duplicates; mobile creates imports with fields incompatible with the remote `imports` table and does not check duplicates.                 |
+| Documents      | Private bucket for CSV files and an `imports` table                                                             | No OCR, document classification, extraction of multiple receipts, pgvector, or document-to-transaction links.                                                                                 |
+| Reconciliation | `reconciliations` table and fields on `transactions`                                                            | No complete proposal, evidence, and approval flow.                                                                                                                                            |
+| Net worth      | `investment`, `crypto`, and `credit` account types                                                              | No positions, valuations, cost basis, amortization, interest, or separation of liabilities from everyday spending.                                                                            |
+| Mobile         | Expo/WatermelonDB, importer, and recent local UI changes                                                        | Synchronization has no explicit pagination and converts read errors to empty sets. Check the `imports` schema and synchronization tests before a historical import.                           |
 
 `docs/project_status_and_roadmap.md` describes an earlier stage and does not reflect all development from February 2026. Use the current code, migrations, and tests for prioritization.
+
+### Read-only production audit
+
+The resumed Supabase project returned **2,110 transactions** across two users: **1,539 active** and **571 soft-deleted**. The account with the most data has **1,516 active transactions** dated from 2024-03-27 through 2026-09-07; the other has 23. The largest account is the likely target for the historical review, but its ownership has not been independently confirmed. No raw text, names, account identifiers, or balances were written to this document.
+
+| Signal in the largest account                   |                                                        Count | Planning implication                                                |
+| ----------------------------------------------- | -----------------------------------------------------------: | ------------------------------------------------------------------- |
+| `sms-shortcut`                                  |                          705, including 226 without category | Prioritize Shortcut intake and category review.                     |
+| `csv_import`                                    | 504, including 62 without category and 31 empty descriptions | Include CSV cleanup and description proposals.                      |
+| `sms-bulk`                                      |                            250, including 3 without category | Reuse existing batch examples for parser evaluation.                |
+| Category missing / `uncategorized`              |                                                     292 / 51 | Review 343 records before any automatic category rewrite.           |
+| CSV source rows linked to an import record      |                                                    24 of 504 | Investigate the 480 unlinked rows before relying on import history. |
+| Duplicate status `pending_review` / `confirmed` |                                                      14 / 15 | Resolve pending cases before a large backfill.                      |
+| Reconciled transactions                         |                                                            0 | Reconciliation needs a complete workflow.                           |
+| Same date, account, and amount groups           |                                   20 groups covering 43 rows | These are candidates for review, not proven duplicates.             |
+
+The largest account has ten active accounts, all in COP. None is named for Tyba or Binance; two match Lulo. These are name-based checks, so missing naming does not prove an investment or loan is absent. The latest month has 17 transactions through September 7; do not assume September 8 onward is complete. Source totals and category gaps were calculated across every active row in that account. The 571 soft-deleted records were counted but not treated as transactions to reimport.
 
 ## Proposed decisions
 
@@ -70,10 +87,10 @@ Use the smallest capable model and the minimum repository context needed for eac
 
 ## Observed blockers and limits
 
-- The local Supabase URL matches the linked project, but its host returns `ENOTFOUND` in this environment. No real counts or samples have been verified.
-- No `OPENROUTER_API_KEY` is configured. Candidate models have not been compared on personal messages, and no API spending has occurred.
-- Supabase access was offered in this conversation. Until the connection is confirmed, production inspection remains pending.
-- Web: TypeScript and 490 tests pass. Backend: TypeScript passes after explicitly setting module resolution; 166 tests pass and 12 fail on the baseline. Mobile: TypeScript passes, and 26 tests run after declaring missing Babel dependencies.
+- Supabase was paused at the start of this review. After it was resumed, read-only pagination worked and produced the aggregate audit above. The database has not been modified.
+- The local Worker migration uses OpenRouter for text parsing and rule generation. No `OPENROUTER_API_KEY` is configured, candidate models have not been compared on personal messages, and no API spending has occurred. The migration is not ready to deploy.
+- The user requested explicit approval before implementing the larger roadmap. The local OpenRouter migration and English documentation cleanup were already in progress when that boundary was set; no other roadmap phase has begun.
+- Web: TypeScript and 490 tests pass. Backend: TypeScript and lint pass after explicitly setting module resolution; 174 tests pass and the same 12 baseline tests fail. Mobile: TypeScript and 26 tests pass after declaring missing Babel dependencies. The repository-wide backend Prettier check still reports pre-existing formatting differences.
 
 ## External references
 

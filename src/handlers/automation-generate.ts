@@ -1,6 +1,6 @@
 import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
-import { GeminiResponse } from '../types/expense';
+import { completeJson } from '../ai/openrouter';
 import { automationGenerateSystemPrompt } from '../constants/automation-generate-system-prompt';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 import type {
@@ -8,7 +8,7 @@ import type {
   AutomationRuleConditions,
   AutomationRuleActions,
   RuleType,
-  ConditionLogic,
+  ConditionLogic
 } from '../types/rule';
 
 interface AutomationGenerateRequest {
@@ -25,10 +25,7 @@ interface GeneratedRule {
   actions: AutomationRuleActions;
 }
 
-export async function handleAutomationGenerate(
-  request: Request,
-  env: Env
-): Promise<Response> {
+export async function handleAutomationGenerate(request: Request, env: Env): Promise<Response> {
   try {
     const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
 
@@ -39,38 +36,38 @@ export async function handleAutomationGenerate(
     const { prompt } = body;
 
     if (!prompt || !prompt.trim()) {
-      return new Response(
-        JSON.stringify({ error: 'Missing prompt' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Missing prompt' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     // Fetch user context in parallel
     const [accounts, categories, existingRules] = await Promise.all([
       services.accounts.getAccounts(userId),
       services.categories.getCategories(userId),
-      services.automationRules.getAutomationRules(userId),
+      services.automationRules.getAutomationRules(userId)
     ]);
 
     // Build dynamic context
     const accountsContext = accounts.map((a) => ({
       id: a.id,
       name: a.name,
-      type: a.type,
+      type: a.type
     }));
 
     const categoriesContext = categories.map((c) => ({
       id: c.id,
       name: c.name,
       slug: c.slug,
-      type: c.type,
+      type: c.type
     }));
 
     const existingRulesContext = existingRules.map((r: AutomationRule) => ({
       name: r.name,
       rule_type: r.rule_type,
       conditions: r.conditions,
-      actions: r.actions,
+      actions: r.actions
     }));
 
     const dynamicContext = `
@@ -86,65 +83,17 @@ EXISTING RULES (avoid creating duplicates):
 ${JSON.stringify(existingRulesContext, null, 2)}
 `;
 
-    // Call Gemini API
-    const model = 'gemini-2.5-flash';
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
-
-    const requestBody = {
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: automationGenerateSystemPrompt },
-            { text: dynamicContext },
-            { text: `User request: "${prompt}"` },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        topP: 0.95,
-        topK: 40,
-        maxOutputTokens: 8192,
-        responseMimeType: 'application/json',
-        thinkingConfig: {
-          thinkingBudget: 0,
-        },
-      },
-    };
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-    const response = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal,
+    const { data } = await completeJson<{ rules: GeneratedRule[] }>({
+      apiKey: env.OPENROUTER_API_KEY,
+      model: env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
+      system: `${automationGenerateSystemPrompt}\nReturn a JSON object with a "rules" array.`,
+      user: `${dynamicContext}\nUser request: ${prompt}`
     });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API Error: ${response.status} - ${errorText}`);
-    }
-
-    const data = (await response.json()) as GeminiResponse;
-
-    const candidate = data.candidates?.[0];
-    if (!candidate?.content?.parts?.[0]?.text) {
-      const finishReason = candidate?.finishReason || 'UNKNOWN';
-      throw new Error(`Gemini returned no content (reason: ${finishReason})`);
-    }
-
-    const content = candidate.content.parts[0].text;
-    const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
-    const generatedRules = JSON.parse(cleanContent) as GeneratedRule[];
+    const generatedRules = data.rules;
 
     // Validate that we got an array
     if (!Array.isArray(generatedRules)) {
-      throw new Error('Gemini did not return an array of rules');
+      throw new Error('OpenRouter did not return an array of rules');
     }
 
     // Normalize each rule with defaults
@@ -155,19 +104,19 @@ ${JSON.stringify(existingRulesContext, null, 2)}
       rule_type: rule.rule_type || 'general',
       condition_logic: rule.condition_logic || 'or',
       conditions: rule.conditions || {},
-      actions: rule.actions || {},
+      actions: rule.actions || {}
     }));
 
-    return new Response(
-      JSON.stringify({ rules, prompt }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ rules, prompt }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (error: unknown) {
     console.error('Automation Generate Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }

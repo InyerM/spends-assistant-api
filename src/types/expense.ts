@@ -13,14 +13,3 @@ export interface ParsedExpense {
   is_transaction?: boolean;
   skip_reason?: string | null;
 }
-
-export interface GeminiResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text: string;
-      }>;
-    };
-    finishReason?: string;
-  }>;
-}

@@ -25,10 +25,10 @@ export function extractPhoneNumber(rawText: string): string | null {
   // Pattern for Colombian phone numbers (10 digits, optionally prefixed with *)
   // Matches: *3104633357, 3104633357, cuenta *3104633357
   const patterns = [
-    /\*(\d{10})\b/,           // *3104633357
+    /\*(\d{10})\b/, // *3104633357
     /cuenta\s*\*?(\d{10})\b/i, // cuenta *3104633357 or cuenta 3104633357
-    /a\s+(\d{10})\b/,         // a 3104633357
-    /al?\s+\*?(\d{10})\b/i,   // al *3104633357
+    /a\s+(\d{10})\b/, // a 3104633357
+    /al?\s+\*?(\d{10})\b/i // al *3104633357
   ];
 
   for (const pattern of patterns) {
@@ -49,7 +49,7 @@ export function extractOriginAccount(rawText: string): string | null {
   const patterns = [
     /desde\s+tu\s+cuenta\s+(\d{4})\b/i,
     /cuenta\s+(\d{4})\s+a\s+la/i,
-    /\*(\d{4})\s*,?\s*el\s+\d/i,
+    /\*(\d{4})\s*,?\s*el\s+\d/i
   ];
 
   for (const pattern of patterns) {
@@ -73,11 +73,11 @@ export function isTransferMessage(rawText: string): boolean {
     'envío a',
     'envio a',
     'transfer to',
-    'sent to',
+    'sent to'
   ];
 
   const lowerText = rawText.toLowerCase();
-  return transferKeywords.some(keyword => lowerText.includes(keyword));
+  return transferKeywords.some((keyword) => lowerText.includes(keyword));
 }
 
 /**
@@ -98,22 +98,24 @@ export async function processTransfer(
   const transferInfo: TransferInfo = {
     destinationPhone: phone,
     fromAccountLastFour: originAccount,
-    isInternalTransfer: false,
+    isInternalTransfer: false
   };
 
   // 2. If no phone found, return as missing category
   if (!phone) {
     console.log('[Transfer] No phone number found in message');
     return {
-      transactions: [{
-        ...transaction,
-        category_id: categoryId,
-        type: 'expense',
-        notes: transaction.notes 
-          ? `${transaction.notes}\nTransfer - no matching phone found`
-          : 'Transfer - no matching phone found',
-      }],
-      transferInfo,
+      transactions: [
+        {
+          ...transaction,
+          category_id: categoryId,
+          type: 'expense',
+          notes: transaction.notes
+            ? `${transaction.notes}\nTransfer - no matching phone found`
+            : 'Transfer - no matching phone found'
+        }
+      ],
+      transferInfo
     };
   }
 
@@ -124,24 +126,26 @@ export async function processTransfer(
     // No rule match → category: missing (or keep original)
     console.log(`[Transfer] No rule found for phone: ${phone}`);
     return {
-      transactions: [{
-        ...transaction,
-        category_id: categoryId,
-        type: 'expense',
-        notes: transaction.notes 
-          ? `${transaction.notes}\nTransfer to ${phone} - no matching rule`
-          : `Transfer to ${phone} - no matching rule`,
-      }],
+      transactions: [
+        {
+          ...transaction,
+          category_id: categoryId,
+          type: 'expense',
+          notes: transaction.notes
+            ? `${transaction.notes}\nTransfer to ${phone} - no matching rule`
+            : `Transfer to ${phone} - no matching rule`
+        }
+      ],
       transferInfo: {
         ...transferInfo,
-        isInternalTransfer: false,
-      },
+        isInternalTransfer: false
+      }
     };
   }
 
   // 4. Internal transfer detected - create dual transactions
   console.log(`[Transfer] Rule matched: ${rule.name} for phone: ${phone}`);
-  
+
   transferInfo.isInternalTransfer = true;
   transferInfo.linkedAccountId = rule.transfer_to_account_id || undefined;
   transferInfo.ruleName = rule.name;
@@ -160,9 +164,9 @@ export async function processTransfer(
     transfer_to_account_id: rule.transfer_to_account_id || undefined,
     transfer_id: transferId,
     description: `Transfer to ${rule.name}`,
-    notes: transaction.notes 
+    notes: transaction.notes
       ? `${transaction.notes}\nInternal transfer to ${phone}`
-      : `Internal transfer to ${phone}`,
+      : `Internal transfer to ${phone}`
   };
 
   // Incoming transaction (to destination account)
@@ -173,12 +177,12 @@ export async function processTransfer(
     category_id: transferCategoryId,
     transfer_id: transferId,
     description: `Transfer from ${transaction.description || 'Bancolombia'}`,
-    notes: `Internal transfer from account ending in ${originAccount || 'unknown'}`,
+    notes: `Internal transfer from account ending in ${originAccount || 'unknown'}`
   };
 
   return {
     transactions: [outgoing, incoming],
-    transferInfo,
+    transferInfo
   };
 }
 
@@ -191,8 +195,8 @@ export function buildTransferPromptSection(rules: AutomationRule[]): string {
   }
 
   const ruleLines = rules
-    .filter(r => r.match_phone)
-    .map(r => `*${r.match_phone}→transfer`)
+    .filter((r) => r.match_phone)
+    .map((r) => `*${r.match_phone}→transfer`)
     .join(', ');
 
   if (!ruleLines) {
@@ -204,42 +208,48 @@ export function buildTransferPromptSection(rules: AutomationRule[]): string {
 
 /**
  * Build dynamic prompt section from automation rules' conditions/actions.
- * This allows Gemini to proactively apply known rules during parsing.
+ * This allows the parser model to proactively apply known rules during parsing.
  */
 export function buildAutomationRulesPromptSection(rules: AutomationRule[]): string {
   const actionRules = rules.filter(
-    r => r.conditions && r.actions &&
-    (r.actions.set_type || r.actions.set_category || r.actions.link_to_account) &&
-    !r.match_phone
+    (r) =>
+      r.conditions &&
+      r.actions &&
+      (r.actions.set_type || r.actions.set_category || r.actions.link_to_account) &&
+      !r.match_phone
   );
 
   if (actionRules.length === 0) return '';
 
-  const lines = actionRules.map(r => {
-    const condParts: string[] = [];
-    if (r.conditions.description_contains?.length) {
-      condParts.push(`description contains [${r.conditions.description_contains.join(', ')}]`);
-    }
-    if (r.conditions.description_regex) {
-      condParts.push(`description matches /${r.conditions.description_regex}/`);
-    }
-    if (r.conditions.amount_between) {
-      condParts.push(`amount between ${r.conditions.amount_between[0]}-${r.conditions.amount_between[1]}`);
-    }
-    if (r.conditions.source?.length) {
-      condParts.push(`source is [${r.conditions.source.join(', ')}]`);
-    }
+  const lines = actionRules
+    .map((r) => {
+      const condParts: string[] = [];
+      if (r.conditions.description_contains?.length) {
+        condParts.push(`description contains [${r.conditions.description_contains.join(', ')}]`);
+      }
+      if (r.conditions.description_regex) {
+        condParts.push(`description matches /${r.conditions.description_regex}/`);
+      }
+      if (r.conditions.amount_between) {
+        condParts.push(
+          `amount between ${r.conditions.amount_between[0]}-${r.conditions.amount_between[1]}`
+        );
+      }
+      if (r.conditions.source?.length) {
+        condParts.push(`source is [${r.conditions.source.join(', ')}]`);
+      }
 
-    const actParts: string[] = [];
-    if (r.actions.set_type) actParts.push(`type→"${r.actions.set_type}"`);
-    if (r.actions.set_category) actParts.push(`category→"${r.actions.set_category}"`);
+      const actParts: string[] = [];
+      if (r.actions.set_type) actParts.push(`type→"${r.actions.set_type}"`);
+      if (r.actions.set_category) actParts.push(`category→"${r.actions.set_category}"`);
 
-    if (condParts.length === 0 || actParts.length === 0) return '';
+      if (condParts.length === 0 || actParts.length === 0) return '';
 
-    const logic = r.condition_logic ?? 'or';
-    const logicLabel = logic === 'and' ? ' AND ' : ' OR ';
-    return `- RULE "${r.name}" (${logic.toUpperCase()}): IF ${condParts.join(logicLabel)} THEN ${actParts.join(', ')}`;
-  }).filter(Boolean);
+      const logic = r.condition_logic ?? 'or';
+      const logicLabel = logic === 'and' ? ' AND ' : ' OR ';
+      return `- RULE "${r.name}" (${logic.toUpperCase()}): IF ${condParts.join(logicLabel)} THEN ${actParts.join(', ')}`;
+    })
+    .filter(Boolean);
 
   if (lines.length === 0) return '';
 

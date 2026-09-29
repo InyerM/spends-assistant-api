@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleParse } from '../../src/handlers/parse';
-import { createMockEnv, createMockAccount, createMockCategory } from '../__test-helpers__/factories';
+import {
+  createMockEnv,
+  createMockAccount,
+  createMockCategory
+} from '../__test-helpers__/factories';
 
-vi.mock('../../src/parsers/gemini', () => ({
-  parseExpense: vi.fn(),
+vi.mock('../../src/parsers/expense', () => ({
+  parseExpense: vi.fn()
 }));
 
 /** Stub fetch so that user_api_keys lookups (resolveUser) return empty and
@@ -11,12 +15,13 @@ vi.mock('../../src/parsers/gemini', () => ({
 function stubFetchDefault(): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () =>
-      new Response(JSON.stringify([]), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    ),
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+    )
   );
 }
 
@@ -31,7 +36,7 @@ describe('handleParse', () => {
     const request = new Request('http://localhost/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: 'test' }),
+      body: JSON.stringify({ text: 'test' })
     });
     const response = await handleParse(request, env);
     expect(response.status).toBe(401);
@@ -44,9 +49,9 @@ describe('handleParse', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Bearer wrong-key',
+        Authorization: 'Bearer wrong-key'
       },
-      body: JSON.stringify({ text: 'test' }),
+      body: JSON.stringify({ text: 'test' })
     });
     const response = await handleParse(request, env);
     expect(response.status).toBe(401);
@@ -59,9 +64,9 @@ describe('handleParse', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.API_KEY}`,
+        Authorization: `Bearer ${env.API_KEY}`
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({})
     });
     const response = await handleParse(request, env);
     expect(response.status).toBe(400);
@@ -79,66 +84,74 @@ describe('handleParse', () => {
       source: 'sms',
       confidence: 95,
       last_four: '2651',
-      account_type: 'savings' as const,
+      account_type: 'savings' as const
     };
 
     // Mock: dynamic import of parseExpense
-    const { parseExpense } = await import('../../src/parsers/gemini');
+    const { parseExpense } = await import('../../src/parsers/expense');
     vi.mocked(parseExpense).mockResolvedValue(parsedExpense);
 
     // Mock supabase fetch for api_keys + usage + rules + accounts + categories
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url.includes('user_api_keys')) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('user_api_keys')) {
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        if (url.includes('usage_tracking')) {
+          return new Response(
+            JSON.stringify([
+              {
+                id: 'usage-1',
+                user_id: env.DEFAULT_USER_ID,
+                month: new Date().toISOString().slice(0, 7),
+                ai_parses_used: 5,
+                ai_parses_limit: 15,
+                transactions_count: 0,
+                transactions_limit: 50
+              }
+            ]),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            }
+          );
+        }
+        if (url.includes('automation_rules')) {
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        if (url.includes('accounts')) {
+          return new Response(JSON.stringify([account]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        if (url.includes('categories')) {
+          return new Response(JSON.stringify([category]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
         return new Response(JSON.stringify([]), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' }
         });
-      }
-      if (url.includes('usage_tracking')) {
-        return new Response(JSON.stringify([{
-          id: 'usage-1',
-          user_id: env.DEFAULT_USER_ID,
-          month: new Date().toISOString().slice(0, 7),
-          ai_parses_used: 5,
-          ai_parses_limit: 15,
-          transactions_count: 0,
-          transactions_limit: 50,
-        }]), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      if (url.includes('automation_rules')) {
-        return new Response(JSON.stringify([]), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      if (url.includes('accounts')) {
-        return new Response(JSON.stringify([account]), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      if (url.includes('categories')) {
-        return new Response(JSON.stringify([category]), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      return new Response(JSON.stringify([]), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }));
+      })
+    );
 
     const request = new Request('http://localhost/parse', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.API_KEY}`,
+        Authorization: `Bearer ${env.API_KEY}`
       },
-      body: JSON.stringify({ text: 'Compraste $50,000 en restaurante' }),
+      body: JSON.stringify({ text: 'Compraste $50,000 en restaurante' })
     });
 
     const response = await handleParse(request, env);
@@ -147,45 +160,55 @@ describe('handleParse', () => {
     expect(body.parsed.amount).toBe(50000);
     expect(body.resolved.account_id).toBe(account.id);
     expect(body.resolved.category_id).toBe(category.id);
+    expect(vi.mocked(parseExpense).mock.calls.at(-1)?.[1]).toBe(env.OPENROUTER_API_KEY);
+    expect(vi.mocked(parseExpense).mock.calls.at(-1)?.[3]?.model).toBe(env.OPENROUTER_TEXT_MODEL);
   });
 
   it('returns 429 when parse limit reached', async () => {
     // Mock: usage check returns not allowed
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url.includes('user_api_keys')) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('user_api_keys')) {
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        if (url.includes('usage_tracking')) {
+          // Return usage at limit
+          return new Response(
+            JSON.stringify([
+              {
+                id: 'usage-1',
+                user_id: env.DEFAULT_USER_ID,
+                month: new Date().toISOString().slice(0, 7),
+                ai_parses_used: 15,
+                ai_parses_limit: 15,
+                transactions_count: 0,
+                transactions_limit: 50
+              }
+            ]),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            }
+          );
+        }
         return new Response(JSON.stringify([]), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' }
         });
-      }
-      if (url.includes('usage_tracking')) {
-        // Return usage at limit
-        return new Response(JSON.stringify([{
-          id: 'usage-1',
-          user_id: env.DEFAULT_USER_ID,
-          month: new Date().toISOString().slice(0, 7),
-          ai_parses_used: 15,
-          ai_parses_limit: 15,
-          transactions_count: 0,
-          transactions_limit: 50,
-        }]), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      return new Response(JSON.stringify([]), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }));
+      })
+    );
 
     const request = new Request('http://localhost/parse', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.API_KEY}`,
+        Authorization: `Bearer ${env.API_KEY}`
       },
-      body: JSON.stringify({ text: 'Compraste $50,000' }),
+      body: JSON.stringify({ text: 'Compraste $50,000' })
     });
 
     const response = await handleParse(request, env);
@@ -197,37 +220,45 @@ describe('handleParse', () => {
   });
 
   it('returns 500 on error', async () => {
-    const { parseExpense } = await import('../../src/parsers/gemini');
-    vi.mocked(parseExpense).mockRejectedValue(new Error('Gemini API Error'));
+    const { parseExpense } = await import('../../src/parsers/expense');
+    vi.mocked(parseExpense).mockRejectedValue(new Error('OpenRouter request failed'));
 
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url.includes('usage_tracking')) {
-        return new Response(JSON.stringify([{
-          id: 'usage-1',
-          user_id: env.DEFAULT_USER_ID,
-          month: new Date().toISOString().slice(0, 7),
-          ai_parses_used: 0,
-          ai_parses_limit: 15,
-          transactions_count: 0,
-          transactions_limit: 50,
-        }]), {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('usage_tracking')) {
+          return new Response(
+            JSON.stringify([
+              {
+                id: 'usage-1',
+                user_id: env.DEFAULT_USER_ID,
+                month: new Date().toISOString().slice(0, 7),
+                ai_parses_used: 0,
+                ai_parses_limit: 15,
+                transactions_count: 0,
+                transactions_limit: 50
+              }
+            ]),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            }
+          );
+        }
+        return new Response(JSON.stringify([]), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' }
         });
-      }
-      return new Response(JSON.stringify([]), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }));
+      })
+    );
 
     const request = new Request('http://localhost/parse', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.API_KEY}`,
+        Authorization: `Bearer ${env.API_KEY}`
       },
-      body: JSON.stringify({ text: 'test' }),
+      body: JSON.stringify({ text: 'test' })
     });
 
     const response = await handleParse(request, env);

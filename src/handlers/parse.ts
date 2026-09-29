@@ -3,7 +3,10 @@ import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
 import { validateAndFixDate, validateAndFixTime } from '../utils/date';
-import { buildTransferPromptSection, buildAutomationRulesPromptSection } from '../services/transfer-processor';
+import {
+  buildTransferPromptSection,
+  buildAutomationRulesPromptSection
+} from '../services/transfer-processor';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 
 interface ParseRequest {
@@ -23,7 +26,7 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
     if (!text) {
       return new Response(JSON.stringify({ error: 'Missing text' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' }
       });
     }
 
@@ -35,25 +38,25 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
           error: 'Parse limit reached',
           code: 'PARSE_LIMIT_REACHED',
           used: usageCheck.used,
-          limit: usageCheck.limit,
+          limit: usageCheck.limit
         }),
-        { status: 429, headers: { 'Content-Type': 'application/json' } },
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const { parseExpense } = await import('../parsers/gemini');
+    const { parseExpense } = await import('../parsers/expense');
     const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
 
     const [activePrompts, transferRules, allRules, accountDetectionRules] = await Promise.all([
       services.automationRules.getActivePrompts(userId),
       services.automationRules.getTransferRules(userId),
       services.automationRules.getAutomationRules(userId),
-      services.automationRules.getAccountDetectionRules(userId),
+      services.automationRules.getAccountDetectionRules(userId)
     ]);
 
     // Pre-parse account detection: check raw text against account_detection rules
-    const generalRules = allRules.filter(r => r.rule_type !== 'account_detection');
-    const preMatchedAccount = accountDetectionRules.find(rule =>
+    const generalRules = allRules.filter((r) => r.rule_type !== 'account_detection');
+    const preMatchedAccount = accountDetectionRules.find((rule) =>
       services.automationRules.matchesConditions(
         { raw_text: text } as Partial<CreateTransactionInput>,
         rule.conditions,
@@ -69,10 +72,13 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
       accountHint,
       ...activePrompts,
       buildTransferPromptSection(transferRules),
-      buildAutomationRulesPromptSection(generalRules),
+      buildAutomationRulesPromptSection(generalRules)
     ].filter(Boolean);
 
-    const expense = await parseExpense(text, env.GEMINI_API_KEY, cache, { dynamicPrompts });
+    const expense = await parseExpense(text, env.OPENROUTER_API_KEY, cache, {
+      dynamicPrompts,
+      model: env.OPENROUTER_TEXT_MODEL
+    });
 
     // Handle non-transactional messages
     if (expense.is_transaction === false) {
@@ -81,17 +87,17 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
         raw_text: text,
         source: 'api',
         reason: expense.skip_reason ?? 'not_transaction',
-        parsed_data: expense as unknown as Record<string, unknown>,
+        parsed_data: expense as unknown as Record<string, unknown>
       });
       return new Response(
         JSON.stringify({
           status: 'skipped',
-          reason: expense.skip_reason ?? 'not_transaction',
+          reason: expense.skip_reason ?? 'not_transaction'
         }),
         {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        },
+          headers: { 'Content-Type': 'application/json' }
+        }
       );
     }
 
@@ -112,7 +118,7 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
         expense.bank,
         expense.last_four,
         expense.account_type,
-        userId,
+        userId
       );
       if (account) {
         accountId = account.id;
@@ -136,20 +142,20 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
         parsed: expense,
         resolved: {
           account_id: accountId,
-          category_id: categoryId,
-        },
+          category_id: categoryId
+        }
       }),
       {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      },
+        headers: { 'Content-Type': 'application/json' }
+      }
     );
   } catch (error: unknown) {
     console.error('Parse API Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' }
     });
   }
 }

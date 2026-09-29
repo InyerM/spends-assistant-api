@@ -1,13 +1,24 @@
 import { Telegraf, Context } from 'telegraf';
 import { message } from 'telegraf/filters';
-import { parseExpense } from '../parsers/gemini';
+import { parseExpense } from '../parsers/expense';
 import { createSupabaseServices } from '../services/supabase';
 import { CacheService } from '../services/cache.service';
-import { getCurrentColombiaTimes, convertDateFormat, formatDateForDisplay, validateAndFixDate, validateAndFixTime } from '../utils/date';
+import {
+  getCurrentColombiaTimes,
+  convertDateFormat,
+  formatDateForDisplay,
+  validateAndFixDate,
+  validateAndFixTime
+} from '../utils/date';
 import { formatCurrency } from '../utils/formatting';
 import { Env } from '../types/env';
 import { CreateTransactionInput } from '../types/transaction';
-import { isTransferMessage, processTransfer, buildTransferPromptSection, buildAutomationRulesPromptSection } from '../services/transfer-processor';
+import {
+  isTransferMessage,
+  processTransfer,
+  buildTransferPromptSection,
+  buildAutomationRulesPromptSection
+} from '../services/transfer-processor';
 
 export async function handleTelegram(request: Request, env: Env): Promise<Response> {
   const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
@@ -32,7 +43,7 @@ I help you track expenses automatically using AI.
 🤖 I understand Spanish and English!
 
 Type /help for more info.`;
-    
+
     await ctx.reply(welcomeMessage);
   });
 
@@ -57,13 +68,13 @@ Type /help for more info.`;
 💳 **Banks:** bancolombia, nequi, cash
 
 Questions? Contact your admin.`;
-    
+
     await ctx.reply(helpMessage);
   });
 
   bot.command(['gasto', 'expense'], async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1).join(' ');
-    
+
     if (!args) {
       await ctx.reply('Usage: /gasto 20k almuerzo\nOr: /expense 50k uber');
       return;
@@ -78,7 +89,7 @@ Questions? Contact your admin.`;
     if (!text) return;
 
     // @ts-expect-error - Telegraf types might be slightly off for worker env
-    if (text.includes("Nequi") && !text.includes("85954") && !ctx.message?.forward_from) {
+    if (text.includes('Nequi') && !text.includes('85954') && !ctx.message?.forward_from) {
       // Optional stricter validation for Nequi SMS forwarding
     }
 
@@ -91,7 +102,7 @@ Questions? Contact your admin.`;
     await bot.handleUpdate(body as any);
     return new Response('OK');
   } catch (e) {
-    console.error("Error handling update:", e);
+    console.error('Error handling update:', e);
     return new Response('Error', { status: 500 });
   }
 }
@@ -107,17 +118,17 @@ async function processExpense(
   try {
     ctx.sendChatAction('typing');
 
-    // Fetch dynamic prompts, transfer rules, and all rules for Gemini (scoped to user)
+    // Fetch dynamic prompts and rules for this user.
     const [activePrompts, transferRules, allRules, accountDetectionRules] = await Promise.all([
       services.automationRules.getActivePrompts(userId),
       services.automationRules.getTransferRules(userId),
       services.automationRules.getAutomationRules(userId),
-      services.automationRules.getAccountDetectionRules(userId),
+      services.automationRules.getAccountDetectionRules(userId)
     ]);
 
     // Pre-parse account detection: check raw text against account_detection rules
-    const generalRules = allRules.filter(r => r.rule_type !== 'account_detection');
-    const preMatchedAccount = accountDetectionRules.find(rule =>
+    const generalRules = allRules.filter((r) => r.rule_type !== 'account_detection');
+    const preMatchedAccount = accountDetectionRules.find((rule) =>
       services.automationRules.matchesConditions(
         { raw_text: text } as Partial<CreateTransactionInput>,
         rule.conditions,
@@ -134,10 +145,13 @@ async function processExpense(
       accountHint,
       ...activePrompts,
       buildTransferPromptSection(transferRules),
-      buildAutomationRulesPromptSection(generalRules),
+      buildAutomationRulesPromptSection(generalRules)
     ].filter(Boolean);
 
-    const expense = await parseExpense(text, env.GEMINI_API_KEY, cache, { dynamicPrompts });
+    const expense = await parseExpense(text, env.OPENROUTER_API_KEY, cache, {
+      dynamicPrompts,
+      model: env.OPENROUTER_TEXT_MODEL
+    });
 
     // Handle non-transactional messages
     if (expense.is_transaction === false) {
@@ -146,7 +160,7 @@ async function processExpense(
         raw_text: text,
         source: 'telegram',
         reason: expense.skip_reason ?? 'not_transaction',
-        parsed_data: expense as unknown as Record<string, unknown>,
+        parsed_data: expense as unknown as Record<string, unknown>
       });
       await ctx.reply('ℹ️ Mensaje informativo detectado, no se creo transaccion.');
       return;
@@ -173,7 +187,12 @@ async function processExpense(
       accountId = preMatchedAccount.actions.set_account;
       console.log(`[Account] Using account_detection rule: ${preMatchedAccount.name}`);
     } else {
-      const account = await services.accounts.getAccount(expense.bank, expense.last_four, expense.account_type, userId);
+      const account = await services.accounts.getAccount(
+        expense.bank,
+        expense.last_four,
+        expense.account_type,
+        userId
+      );
       if (account) {
         accountId = account.id;
       } else {
@@ -181,7 +200,7 @@ async function processExpense(
         if (cashAccount) {
           accountId = cashAccount.id;
         } else {
-          throw new Error("Could not determine account - no cash fallback found");
+          throw new Error('Could not determine account - no cash fallback found');
         }
       }
     }
@@ -211,7 +230,7 @@ async function processExpense(
     // Check if it's a transfer message
     let savedTransaction;
     let transferInfo;
-    
+
     if (isTransferMessage(text) || expense.category === 'transfer') {
       // Process as transfer - may create dual transactions
       const missingCategory = await services.categories.getCategory('missing', userId);
@@ -228,7 +247,11 @@ async function processExpense(
       // Create all transactions (1 or 2)
       for (const tx of result.transactions) {
         const finalTx = await services.automationRules.applyAutomationRules(tx, userId);
-        savedTransaction = await services.transactions.createTransaction(finalTx, services.accounts, cache);
+        savedTransaction = await services.transactions.createTransaction(
+          finalTx,
+          services.accounts,
+          cache
+        );
       }
 
       if (transferInfo.isInternalTransfer) {
@@ -236,10 +259,17 @@ async function processExpense(
       }
     } else {
       // Normal flow
-      const finalTransaction = await services.automationRules.applyAutomationRules(transactionInput, userId);
-      savedTransaction = await services.transactions.createTransaction(finalTransaction, services.accounts, cache);
+      const finalTransaction = await services.automationRules.applyAutomationRules(
+        transactionInput,
+        userId
+      );
+      savedTransaction = await services.transactions.createTransaction(
+        finalTransaction,
+        services.accounts,
+        cache
+      );
     }
-    
+
     if (!savedTransaction) {
       throw new Error('Failed to save transaction');
     }
@@ -247,7 +277,7 @@ async function processExpense(
     const fechaFormateada = formatDateForDisplay(savedTransaction.date);
     const amountFormatted = formatCurrency(savedTransaction.amount);
 
-    const currentBalance = await services.accounts.getAccountBalance(accountId) ?? 0;
+    const currentBalance = (await services.accounts.getAccountBalance(accountId)) ?? 0;
     const balanceFormatted = formatCurrency(currentBalance);
 
     let confirmationMessage = `✅ Expense registered
@@ -258,7 +288,7 @@ async function processExpense(
 🏷️ ${expense.category}
 💳 ${expense.bank} - ${expense.payment_type}
 📊 Balance: ${balanceFormatted}`;
-    
+
     // Add transfer info if applicable
     if (transferInfo?.isInternalTransfer) {
       confirmationMessage = `✅ Internal Transfer
@@ -269,22 +299,24 @@ async function processExpense(
 📅 ${fechaFormateada} ${savedTransaction.time}
 📊 Balance: ${balanceFormatted}`;
     }
-    
-    confirmationMessage += `\n\n🔗 [View Dashboard](${env.APP_URL || '#'})`;
-    
-    await ctx.reply(confirmationMessage);
 
+    confirmationMessage += `\n\n🔗 [View Dashboard](${env.APP_URL || '#'})`;
+
+    await ctx.reply(confirmationMessage);
   } catch (error: unknown) {
-    console.error("Processing error:", error);
+    console.error('Processing error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
+
     let replyMessage = `❌ Could not process expense\n\nTry format:\n"20000 in rappi"\n"bought 50k groceries"\n\nOr forward the SMS/email as is.\nError: ${errorMessage}`;
 
-    if (errorMessage.includes("Rate limit")) {
-      replyMessage = "⏳ Service is busy. Please try again in 30 seconds.";
-    } else if (errorMessage.includes("timed out")) {
-      replyMessage = "⏱️ Request timed out. Please try again.";
-    } else if (errorMessage.includes("Invalid amount") || errorMessage.includes("Missing description")) {
+    if (errorMessage.includes('Rate limit')) {
+      replyMessage = '⏳ Service is busy. Please try again in 30 seconds.';
+    } else if (errorMessage.includes('timed out')) {
+      replyMessage = '⏱️ Request timed out. Please try again.';
+    } else if (
+      errorMessage.includes('Invalid amount') ||
+      errorMessage.includes('Missing description')
+    ) {
       replyMessage = `❌ Could not understand message. Try format:\n• '20000 in rappi'\n• '50k for lunch'\n• Or forward the bank SMS`;
     }
 

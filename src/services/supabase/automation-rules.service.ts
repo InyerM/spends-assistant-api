@@ -1,5 +1,11 @@
 import { BaseService } from './base.service';
-import type { AutomationRule, AutomationRuleConditions, CreateTransactionInput, AppliedRule, Account } from '../../types';
+import type {
+  AutomationRule,
+  AutomationRuleConditions,
+  CreateTransactionInput,
+  AppliedRule,
+  Account
+} from '../../types';
 import type { ConditionLogic } from '../../types/rule';
 
 export interface CreateRuleInput {
@@ -31,16 +37,14 @@ export class AutomationRulesService extends BaseService {
   }
 
   /**
-   * Get all active prompt texts for dynamic injection into Gemini
+   * Get all active prompt texts for dynamic injection into the parser model
    */
   async getActivePrompts(userId?: string): Promise<string[]> {
     const userFilter = userId ? `&user_id=eq.${userId}` : '';
     const rules = await this.fetch<AutomationRule[]>(
       `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&prompt_text=not.is.null&order=priority.desc&select=prompt_text${userFilter}`
     );
-    return rules
-      .filter(r => r.prompt_text)
-      .map(r => r.prompt_text as string);
+    return rules.filter((r) => r.prompt_text).map((r) => r.prompt_text as string);
   }
 
   /**
@@ -89,7 +93,7 @@ export class AutomationRulesService extends BaseService {
         appliedRules.push({
           rule_id: rule.id,
           rule_name: rule.name,
-          actions: rule.actions as unknown as Record<string, unknown>,
+          actions: rule.actions as unknown as Record<string, unknown>
         });
         console.log(`[Rule Applied] ${rule.name}`);
       }
@@ -116,11 +120,14 @@ export class AutomationRulesService extends BaseService {
   ): boolean {
     if (conditions.description_contains) {
       const desc = (transaction.description ?? '').toLowerCase();
-      const matchFn = logic === 'and'
-        ? conditions.description_contains.every((keyword: string) =>
-            desc.includes(keyword.toLowerCase()))
-        : conditions.description_contains.some((keyword: string) =>
-            desc.includes(keyword.toLowerCase()));
+      const matchFn =
+        logic === 'and'
+          ? conditions.description_contains.every((keyword: string) =>
+              desc.includes(keyword.toLowerCase())
+            )
+          : conditions.description_contains.some((keyword: string) =>
+              desc.includes(keyword.toLowerCase())
+            );
       if (!matchFn) return false;
     }
 
@@ -131,17 +138,24 @@ export class AutomationRulesService extends BaseService {
 
     if (conditions.raw_text_contains) {
       const rawText = (transaction.raw_text ?? '').toLowerCase();
-      const matchFn = logic === 'and'
-        ? conditions.raw_text_contains.every((keyword: string) =>
-            rawText.includes(keyword.toLowerCase()))
-        : conditions.raw_text_contains.some((keyword: string) =>
-            rawText.includes(keyword.toLowerCase()));
+      const matchFn =
+        logic === 'and'
+          ? conditions.raw_text_contains.every((keyword: string) =>
+              rawText.includes(keyword.toLowerCase())
+            )
+          : conditions.raw_text_contains.some((keyword: string) =>
+              rawText.includes(keyword.toLowerCase())
+            );
       if (!matchFn) return false;
     }
 
     if (conditions.amount_between) {
       const [min, max] = conditions.amount_between;
-      if (transaction.amount === undefined || transaction.amount < min || transaction.amount > max) {
+      if (
+        transaction.amount === undefined ||
+        transaction.amount < min ||
+        transaction.amount > max
+      ) {
         return false;
       }
     }
@@ -191,7 +205,7 @@ export class AutomationRulesService extends BaseService {
         rule_type: 'account_detection',
         condition_logic: 'and',
         conditions: { raw_text_contains: keywords },
-        actions: { set_account: account.id },
+        actions: { set_account: account.id }
       });
     }
 
@@ -204,13 +218,10 @@ export class AutomationRulesService extends BaseService {
   async createRuleWithPrompt(
     rule: CreateRuleInput & { ai_prompt?: string }
   ): Promise<AutomationRule> {
-    const results = await this.fetch<AutomationRule[]>(
-      '/rest/v1/automation_rules',
-      {
-        method: 'POST',
-        body: JSON.stringify(rule),
-      }
-    );
+    const results = await this.fetch<AutomationRule[]>('/rest/v1/automation_rules', {
+      method: 'POST',
+      body: JSON.stringify(rule)
+    });
     return results[0];
   }
 
@@ -220,13 +231,10 @@ export class AutomationRulesService extends BaseService {
   async bulkCreateRules(rules: CreateRuleInput[]): Promise<AutomationRule[]> {
     if (rules.length === 0) return [];
 
-    return await this.fetch<AutomationRule[]>(
-      '/rest/v1/automation_rules',
-      {
-        method: 'POST',
-        body: JSON.stringify(rules),
-      }
-    );
+    return await this.fetch<AutomationRule[]>('/rest/v1/automation_rules', {
+      method: 'POST',
+      body: JSON.stringify(rules)
+    });
   }
 
   private applyActions(
