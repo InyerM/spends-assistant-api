@@ -15,13 +15,16 @@ export default {
 
     // Health check
     if (url.pathname === '/' || url.pathname === '/health') {
-      return new Response(JSON.stringify({
-        status: 'ok',
-        service: 'expense-assistant',
-        timestamp: new Date().toISOString()
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return new Response(
+        JSON.stringify({
+          status: 'ok',
+          service: 'expense-assistant',
+          timestamp: new Date().toISOString()
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Setup webhook helper (protected — does not expose bot token)
@@ -36,13 +39,16 @@ export default {
       const res = await fetch(telegramApiUrl);
       const result = await res.json();
 
-      return new Response(JSON.stringify({
-        status: 'ok',
-        webhook: webhookUrl,
-        telegram_response: result,
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return new Response(
+        JSON.stringify({
+          status: 'ok',
+          webhook: webhookUrl,
+          telegram_response: result
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Balance endpoint
@@ -85,5 +91,6 @@ export default {
   async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
     const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
     await services.usage.cleanupOldRecords();
+    await services.aiUsage.cleanupOldEvents();
   }
 };

@@ -1,8 +1,10 @@
+import type { AiUsageMeter } from './usage-meter';
 interface CompletionInput {
   apiKey: string;
   model: string;
   system: string;
   user: string;
+  meter?: AiUsageMeter;
 }
 
 interface CompletionResponse {
@@ -10,7 +12,7 @@ interface CompletionResponse {
     message?: { content?: string | null };
     finish_reason?: string | null;
   }>;
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number | null };
 }
 
 export async function completeJson<T>(input: CompletionInput): Promise<{
@@ -44,18 +46,45 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
 
   let response: Response | undefined;
   for (let attempt = 0; attempt < 3; attempt++) {
-    response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      ...request,
-      signal: AbortSignal.timeout(30_000)
-    });
+    try {
+      response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        ...request,
+        signal: AbortSignal.timeout(30_000)
+      });
+    } catch (error) {
+      input.meter?.record(null);
+      throw error;
+    }
     if (response.status !== 429 || attempt === 2) break;
+    input.meter?.record(null);
     await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
   }
 
   // Upstream responses can contain private financial text. Keep errors generic.
-  if (!response?.ok) throw new Error(`OpenRouter request failed (${response?.status ?? 0})`);
+  if (!response?.ok) {
+    input.meter?.record(null);
+    throw new Error(`OpenRouter request failed (${response?.status ?? 0})`);
+  }
 
-  const result = (await response.json()) as CompletionResponse;
+  let result: CompletionResponse;
+  try {
+    result = (await response.json()) as CompletionResponse;
+  } catch {
+    input.meter?.record(null);
+    throw new Error('OpenRouter returned invalid JSON');
+  }
+  const rawUsage = result.usage;
+  input.meter?.record(
+    rawUsage &&
+      Number.isSafeInteger(rawUsage.prompt_tokens) &&
+      Number.isSafeInteger(rawUsage.completion_tokens)
+      ? {
+          inputTokens: rawUsage.prompt_tokens!,
+          outputTokens: rawUsage.completion_tokens!,
+          costUsd: rawUsage.cost ?? undefined
+        }
+      : null
+  );
   const choice = result.choices?.[0];
   if (choice?.finish_reason === 'length') throw new Error('OpenRouter response truncated');
   if (!choice?.message?.content) throw new Error('OpenRouter returned no content');

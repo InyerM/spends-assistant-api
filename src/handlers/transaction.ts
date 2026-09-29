@@ -70,7 +70,8 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
 
     const expense = await parseExpense(text, env.OPENROUTER_API_KEY, cache, {
       dynamicPrompts,
-      model: env.OPENROUTER_TEXT_MODEL
+      model: env.OPENROUTER_TEXT_MODEL,
+      telemetry: { userId, service: services.aiUsage }
     });
 
     // Handle non-transactional messages

@@ -162,6 +162,10 @@ describe('handleParse', () => {
     expect(body.resolved.category_id).toBe(category.id);
     expect(vi.mocked(parseExpense).mock.calls.at(-1)?.[1]).toBe(env.OPENROUTER_API_KEY);
     expect(vi.mocked(parseExpense).mock.calls.at(-1)?.[3]?.model).toBe(env.OPENROUTER_TEXT_MODEL);
+    expect(vi.mocked(parseExpense).mock.calls.at(-1)?.[3]?.telemetry?.userId).toBe(
+      env.DEFAULT_USER_ID
+    );
+    expect(vi.mocked(parseExpense).mock.calls.at(-1)?.[3]?.telemetry?.service).toBeDefined();
   });
 
   it('returns 429 when parse limit reached', async () => {

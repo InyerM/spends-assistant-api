@@ -1,19 +1,23 @@
 import type { ParsedExpense } from '../types/expense';
 import type { CacheService } from '../services/cache.service';
 import { completeJson } from '../ai/openrouter';
+import type { AiUsageService } from '../services/supabase/ai-usage.service';
+import type { AiUsageMeter } from '../ai/usage-meter';
 import { buildSystemPrompt } from '../constants/parse-expens-system-prompt';
 import { getCurrentColombiaTimes } from '../utils/date';
 
 export interface ParseExpenseOptions {
   dynamicPrompts?: string[];
   model?: string;
+  telemetry?: { userId: string; service: AiUsageService };
 }
 
-export async function parseExpense(
+async function parseExpenseCore(
   text: string,
   apiKey: string,
   cache?: CacheService,
-  options?: ParseExpenseOptions
+  options?: ParseExpenseOptions,
+  meter?: AiUsageMeter
 ): Promise<ParsedExpense> {
   const model = options?.model ?? 'deepseek/deepseek-v4.1-flash';
   const { date, time } = getCurrentColombiaTimes();
@@ -31,7 +35,8 @@ export async function parseExpense(
     apiKey,
     model,
     system,
-    user: `Input to parse: ${text}`
+    user: `Input to parse: ${text}`,
+    meter
   });
 
   if (expense.is_transaction === false) return expense;
@@ -45,4 +50,18 @@ export async function parseExpense(
 
   if (cache && cacheKey) await cache.set(cacheKey, JSON.stringify(expense), 86_400);
   return expense;
+}
+
+export async function parseExpense(
+  text: string,
+  apiKey: string,
+  cache?: CacheService,
+  options?: ParseExpenseOptions
+): Promise<ParsedExpense> {
+  if (!options?.telemetry) return parseExpenseCore(text, apiKey, cache, options);
+  const model = options.model ?? 'deepseek/deepseek-v4.1-flash';
+  return options.telemetry.service.track(
+    { userId: options.telemetry.userId, operation: 'parse_expense', model },
+    (meter) => parseExpenseCore(text, apiKey, cache, options, meter)
+  );
 }

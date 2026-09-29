@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { completeJson } from '../../src/ai/openrouter';
+import { AiUsageMeter } from '../../src/ai/usage-meter';
 
 describe('completeJson', () => {
   beforeEach(() => vi.restoreAllMocks());
@@ -94,5 +95,49 @@ describe('completeJson', () => {
     });
     expect(result.data.ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('meters each upstream text attempt without retaining content', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('', { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: '{"ok":true}' }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 8, completion_tokens: 2, cost: 0.000004 }
+          }),
+          { status: 200 }
+        )
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const meter = new AiUsageMeter();
+    await completeJson({
+      apiKey: 'key',
+      model: 'model',
+      system: 'secret system',
+      user: 'secret user',
+      meter
+    });
+    expect(meter.summary()).toEqual({
+      billedCalls: 2,
+      inputTokens: 8,
+      outputTokens: 2,
+      estimatedCostMicros: 4,
+      costSource: 'partial'
+    });
+    expect(JSON.stringify(meter)).not.toContain('secret');
+  });
+
+  it('meters a failed upstream call as unknown cost', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('private', { status: 500 }))
+    );
+    const meter = new AiUsageMeter();
+    await expect(
+      completeJson({ apiKey: 'key', model: 'model', system: 's', user: 'u', meter })
+    ).rejects.toThrow('OpenRouter request failed (500)');
+    expect(meter.summary()).toMatchObject({ billedCalls: 1, costSource: 'unknown' });
   });
 });

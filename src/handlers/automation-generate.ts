@@ -83,18 +83,23 @@ EXISTING RULES (avoid creating duplicates):
 ${JSON.stringify(existingRulesContext, null, 2)}
 `;
 
-    const { data } = await completeJson<{ rules: GeneratedRule[] }>({
-      apiKey: env.OPENROUTER_API_KEY,
-      model: env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
-      system: `${automationGenerateSystemPrompt}\nReturn a JSON object with a "rules" array.`,
-      user: `${dynamicContext}\nUser request: ${prompt}`
-    });
-    const generatedRules = data.rules;
-
-    // Validate that we got an array
-    if (!Array.isArray(generatedRules)) {
-      throw new Error('OpenRouter did not return an array of rules');
-    }
+    const model = env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash';
+    const generatedRules = await services.aiUsage.track(
+      { userId, operation: 'generate_automation', model },
+      async (meter) => {
+        const { data } = await completeJson<{ rules: GeneratedRule[] }>({
+          apiKey: env.OPENROUTER_API_KEY,
+          model,
+          system: `${automationGenerateSystemPrompt}\nReturn a JSON object with a "rules" array.`,
+          user: `${dynamicContext}\nUser request: ${prompt}`,
+          meter
+        });
+        if (!Array.isArray(data.rules)) {
+          throw new Error('OpenRouter did not return an array of rules');
+        }
+        return data.rules;
+      }
+    );
 
     // Normalize each rule with defaults
     const rules: GeneratedRule[] = generatedRules.map((rule) => ({

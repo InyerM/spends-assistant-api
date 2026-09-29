@@ -88,3 +88,43 @@ describe('expense parser OpenRouter migration', () => {
     expect(JSON.stringify(spy.mock.calls)).not.toContain('Lunch');
   });
 });
+
+it('records OpenRouter text usage for a tracked parse without storing input text', async () => {
+  const { AiUsageService } = await import('../../src/services/supabase/ai-usage.service');
+  const calls: Array<{ url: string; body?: string }> = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, body: init?.body as string | undefined });
+      if (url.includes('openrouter.ai'))
+        return new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: { content: JSON.stringify({ is_transaction: false }) },
+                finish_reason: 'stop'
+              }
+            ],
+            usage: { prompt_tokens: 10, completion_tokens: 3, cost: 0.000002 }
+          }),
+          { status: 200 }
+        );
+      return new Response('[]', { status: 200 });
+    })
+  );
+  await parseExpense('Private payment 12345', 'key', undefined, {
+    model: 'example/model',
+    telemetry: { userId: 'user-1', service: new AiUsageService('https://db.test', 'key') }
+  });
+  const event = calls.find((call) => call.url.includes('ai_usage_events'));
+  expect(event).toBeDefined();
+  expect(JSON.parse(event!.body!)).toMatchObject({
+    operation: 'parse_expense',
+    model: 'example/model',
+    billed_calls: 1,
+    input_tokens: 10,
+    output_tokens: 3,
+    estimated_cost_micros: 2
+  });
+  expect(event!.body).not.toContain('Private payment');
+});

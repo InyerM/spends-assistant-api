@@ -94,7 +94,8 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
 
       const expense = await parseExpense(cleanText, env.OPENROUTER_API_KEY, cache, {
         dynamicPrompts,
-        model: env.OPENROUTER_TEXT_MODEL
+        model: env.OPENROUTER_TEXT_MODEL,
+        telemetry: { userId, service: services.aiUsage }
       });
 
       // Handle non-transactional messages

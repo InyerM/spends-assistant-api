@@ -48,5 +48,37 @@ describe('automation rule generation via OpenRouter', () => {
     expect(body.rules[0].name).toBe('Restaurant');
     const openRouterCall = fetchMock.mock.calls.find(([url]) => url.includes('openrouter.ai'));
     expect(openRouterCall).toBeDefined();
+    const telemetryCall = fetchMock.mock.calls.find(([url]) => url.includes('ai_usage_events'));
+    expect(telemetryCall).toBeDefined();
+  });
+
+  it('records a failed event when returned rules are invalid', async () => {
+    const env = createMockEnv();
+    let event: Record<string, unknown> | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes('openrouter.ai'))
+          return new Response(
+            JSON.stringify({
+              choices: [{ message: { content: '{"rules":null}' }, finish_reason: 'stop' }],
+              usage: { prompt_tokens: 2, completion_tokens: 1, cost: 0.000001 }
+            }),
+            { status: 200 }
+          );
+        if (url.includes('ai_usage_events')) event = JSON.parse(init?.body as string);
+        return new Response('[]', { status: 200 });
+      })
+    );
+    const response = await handleAutomationGenerate(
+      new Request('http://localhost/automation/generate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'Make a rule' })
+      }),
+      env
+    );
+    expect(response.status).toBe(500);
+    expect(event).toMatchObject({ status: 'failed', billed_calls: 1 });
   });
 });
