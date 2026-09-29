@@ -9,10 +9,11 @@ Status: **review draft; nothing published**. This records the current local back
 | Text AI and OCR         | OpenRouter text/vision adapters, user category catalog, token and actual returned USD telemetry, existing request-count quota | `OPENROUTER_API_KEY` in the Worker; migration `00000` for telemetry and `00100` for atomic request reservations before Worker deployment            |
 | Private image documents | Image-only bucket/inbox, Worker draft extraction, owner-checked review and existing-transaction link                          | Migrations `00010`, `00060`, and `00070` plus the web extraction route must ship together; migration `00070` revokes the old browser completion RPC |
 | CSV import              | One reviewed confirmation RPC for imports, duplicates, balances, and replay                                                   | Migration `00020` and web import API; UTC month now matches the other request/transaction counters                                                  |
-| Historical Shortcut     | Idempotent raw-message inbox, candidate lookup, explicit existing match or new reviewed transaction                           | Migrations `00030`, `00080`, `00110` and the web `/transactions/shortcut-inbox` routes must ship together                                           |
+| Historical Shortcut     | Idempotent raw-message inbox, candidate lookup, explicit existing match/reversal or new reviewed transaction                  | Migrations `00030`, `00080`, `00110`, `00120` and the web `/transactions/shortcut-inbox` routes must ship together                                  |
+| Manual transactions     | Owner-scoped atomic creation/replacement, duplicate review, account balances, UTC quota, and request UUID replay              | Migration `00130` and web `POST /api/transactions` must ship together; validate form transfer/category fields before release                        |
 | Wealth journals         | Tyba/Binance positions and Lulo/Bancolombia loans with exact amounts, ownership, and replay safety                            | Migrations `00040`, `00050` and web `/investments`, `/loans`; real openings and repayment splits need source statements                             |
 
-Apply the new database migrations in filename order: `20260929000000`, `00010`, `00020`, `00030`, `00040`, `00050`, `00060`, `00070`, `00080`, `00100`, `00110`. There is deliberately no `00090` migration: PDF upload failed its synthetic quality gate and remains disabled. Do not create an empty placeholder.
+Apply the new database migrations in filename order: `20260929000000`, `00010`, `00020`, `00030`, `00040`, `00050`, `00060`, `00070`, `00080`, `00100`, `00110`, `00120`, `00130`. There is deliberately no `00090` migration: PDF upload failed its synthetic quality gate and remains disabled. Do not create an empty placeholder.
 
 ## Evidence available now
 
@@ -23,6 +24,7 @@ Apply the new database migrations in filename order: `20260929000000`, `00010`, 
 - The five-page invented PDF passed local rendering but failed model quality: Qwen 30B whole-page and Qwen 235B escalation missed the dense page; two tiled Qwen 30B runs recovered the dense page but scored only **19/21** exact rows end to end. See `docs/evaluations/2026-09-29-pdf-synthetic-tiles-live.md`.
 - An eight-case invented BGE-M3 benchmark improved the held-out correct first suggestion from **1/4 to 3/4**, but the no-match case still received a false suggestion. No real document embeddings or pgvector schema were created. See `docs/evaluations/2026-09-29-document-vector-synthetic.md`.
 - A read-only `supabase migration list --linked` check on 2026-09-29 showed the linked database ends at migration `20241125000019`; none of the local `20260929` migrations has been applied remotely. This check does not verify table grants, a backup, or application readiness.
+- The existing mobile offline sync upserts transactions directly as an authenticated user (`spends-assistant-mobile/src/database/sync.ts`). Migration `00130` keeps that grant to preserve compatibility, so its account/quota guarantees apply to the new web RPC, not every client. See `docs/plans/2026-09-29-manual-transaction-atomicity.md`.
 
 ## Approval and release sequence
 
@@ -34,4 +36,4 @@ Apply the new database migrations in filename order: `20260929000000`, `00010`, 
 
 ## Outside this release
 
-No PDF upload, pgvector backfill, personal-data model evaluation, automatic Nequi categorization, audited correction of a mistaken Shortcut match, or mobile parity is included. These remain in `docs/plans/2026-09-29-web-issue-drafts.md`. The existing mobile working tree remains untouched.
+No PDF upload, pgvector backfill, personal-data model evaluation, automatic Nequi categorization, reversal of a created financial transaction, or mobile parity is included. These remain in `docs/plans/2026-09-29-web-issue-drafts.md`. The existing mobile working tree remains untouched.
