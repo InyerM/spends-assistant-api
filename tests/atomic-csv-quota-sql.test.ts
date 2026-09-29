@@ -19,7 +19,8 @@ async function database(): Promise<PGlite> {
     $$;
     CREATE TABLE public.accounts (id uuid PRIMARY KEY, user_id uuid NOT NULL,
       balance numeric(15,2), deleted_at timestamptz);
-    CREATE TABLE public.categories (id uuid PRIMARY KEY, user_id uuid NOT NULL);
+    CREATE TABLE public.categories (id uuid PRIMARY KEY, user_id uuid NOT NULL,
+      type text NOT NULL);
     CREATE TABLE public.imports (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id uuid NOT NULL, source text NOT NULL, file_name text NOT NULL,
       file_path text, row_count integer NOT NULL, imported_count integer NOT NULL,
@@ -59,16 +60,75 @@ async function confirm(db: PGlite, requestId: string): Promise<unknown> {
   }
 }
 
+async function confirmRow(
+  db: PGlite,
+  requestId: string,
+  row: Record<string, unknown>
+): Promise<unknown> {
+  await db.exec(`SET request.jwt.claim.sub = '${owner}'; SET ROLE authenticated;`);
+  try {
+    return await db.query(
+      `SELECT public.confirm_csv_import(
+      $1::uuid, '{}'::jsonb, $2::jsonb, '[]'::jsonb, 'synthetic.csv', 1, false)`,
+      [requestId, JSON.stringify(row ? [row] : [])]
+    );
+  } finally {
+    await db.exec('RESET ROLE;');
+  }
+}
+
 describe('atomic CSV import transaction quota', () => {
+  it('rejects transfer rows before writing an unbalanced transaction', async () => {
+    const db = await database();
+    try {
+      await db.exec(`UPDATE public.subscriptions SET status = 'active' WHERE user_id = '${owner}'`);
+      await expect(
+        confirmRow(db, '55555555-5555-4555-8555-555555555555', {
+          amount: 100,
+          date: '2026-09-28',
+          account_id: account,
+          type: 'transfer'
+        })
+      ).rejects.toThrow(/unsupported transaction type/i);
+      expect(
+        (await db.query('SELECT count(*)::integer AS count FROM public.transactions')).rows
+      ).toEqual([{ count: 0 }]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('rejects a category whose type differs from the imported transaction', async () => {
+    const db = await database();
+    const category = '66666666-6666-4666-8666-666666666666';
+    try {
+      await db.exec(`UPDATE public.subscriptions SET status = 'active' WHERE user_id = '${owner}'`);
+      await db.exec(`INSERT INTO public.categories VALUES ('${category}', '${owner}', 'income')`);
+      await expect(
+        confirmRow(db, '77777777-7777-4777-8777-777777777777', {
+          amount: 100,
+          date: '2026-09-28',
+          account_id: account,
+          type: 'expense',
+          category_id: category
+        })
+      ).rejects.toThrow(/category type/i);
+      expect(
+        (await db.query('SELECT count(*)::integer AS count FROM public.transactions')).rows
+      ).toEqual([{ count: 0 }]);
+    } finally {
+      await db.close();
+    }
+  });
   it('treats canceled pro as free and rejects an import above the configured limit', async () => {
     const db = await database();
     try {
       await expect(confirm(db, '33333333-3333-4333-8333-333333333333')).rejects.toThrow(
         /Transaction limit exceeded/
       );
-      expect((await db.query('SELECT count(*)::integer AS count FROM public.transactions')).rows).toEqual([
-        { count: 0 },
-      ]);
+      expect(
+        (await db.query('SELECT count(*)::integer AS count FROM public.transactions')).rows
+      ).toEqual([{ count: 0 }]);
     } finally {
       await db.close();
     }
@@ -80,8 +140,10 @@ describe('atomic CSV import transaction quota', () => {
       await db.exec(`UPDATE public.subscriptions SET status = 'active' WHERE user_id = '${owner}'`);
       await confirm(db, '44444444-4444-4444-8444-444444444444');
       expect(
-        (await db.query(`SELECT transactions_count FROM public.usage_tracking
-          WHERE user_id = '${owner}' AND month = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM')`)).rows
+        (
+          await db.query(`SELECT transactions_count FROM public.usage_tracking
+          WHERE user_id = '${owner}' AND month = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM')`)
+        ).rows
       ).toEqual([{ transactions_count: 2 }]);
     } finally {
       await db.close();

@@ -95,9 +95,17 @@ BEGIN
       OR (v_row->>'account_id') IS NULL THEN
       RAISE EXCEPTION 'Invalid transaction row' USING ERRCODE = '22023';
     END IF;
+    -- CSV rows have only one account; transfers require a destination and two balance updates.
+    IF coalesce(v_row->>'type', 'expense') NOT IN ('expense', 'income') THEN
+      RAISE EXCEPTION 'Unsupported transaction type for CSV import' USING ERRCODE = '22023';
+    END IF;
     IF v_row->>'category_id' IS NOT NULL AND NOT EXISTS (
       SELECT 1 FROM public.categories WHERE id = (v_row->>'category_id')::uuid AND user_id = v_user
     ) THEN RAISE EXCEPTION 'Category does not belong to caller' USING ERRCODE = '42501'; END IF;
+    IF v_row->>'category_id' IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM public.categories WHERE id = (v_row->>'category_id')::uuid
+        AND user_id = v_user AND type = coalesce(v_row->>'type', 'expense')
+    ) THEN RAISE EXCEPTION 'Category type does not match transaction' USING ERRCODE = '22023'; END IF;
 
     SELECT coalesce(jsonb_agg(jsonb_build_object('index', v_index, 'match',
       jsonb_build_object('id', t.id, 'date', t.date, 'amount', t.amount,
@@ -183,13 +191,10 @@ BEGIN
         coalesce(v_row->>'source', 'csv_import'), (v_row->>'account_id')::uuid,
         (v_row->>'category_id')::uuid,
         CASE WHEN v_review->>'decision' = 'import' THEN 'confirmed' ELSE NULL END);
-      -- Match applyTransactionBalance: CSV rows have no destination for transfers.
-      IF coalesce(v_row->>'type', 'expense') IN ('expense', 'income') THEN
-        UPDATE public.accounts SET balance = coalesce(balance, 0) +
-          CASE WHEN coalesce(v_row->>'type', 'expense') = 'expense'
-            THEN -(v_row->>'amount')::numeric ELSE (v_row->>'amount')::numeric END
-          WHERE id = (v_row->>'account_id')::uuid AND user_id = v_user;
-      END IF;
+      UPDATE public.accounts SET balance = coalesce(balance, 0) +
+        CASE WHEN coalesce(v_row->>'type', 'expense') = 'expense'
+          THEN -(v_row->>'amount')::numeric ELSE (v_row->>'amount')::numeric END
+        WHERE id = (v_row->>'account_id')::uuid AND user_id = v_user;
       v_imported := v_imported + 1;
     END IF;
     v_review := NULL;
