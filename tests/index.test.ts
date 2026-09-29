@@ -14,6 +14,9 @@ vi.mock('../src/handlers/transaction', () => ({
 vi.mock('../src/handlers/parse', () => ({
   handleParse: vi.fn(async () => new Response('parse ok'))
 }));
+vi.mock('../src/handlers/vision-extract', () => ({
+  handleVisionExtract: vi.fn(async () => new Response('vision ok'))
+}));
 vi.mock('../src/handlers/balance', () => ({
   handleBalance: vi.fn(async () => new Response('balance ok'))
 }));
@@ -88,6 +91,14 @@ describe('Worker routing', () => {
     const request = new Request('http://localhost/parse', { method: 'POST' });
     await worker.fetch(request, env, ctx);
     expect(handleParse).toHaveBeenCalled();
+  });
+
+  it('routes /vision/extract POST to handleVisionExtract', async () => {
+    const { handleVisionExtract } = await import('../src/handlers/vision-extract');
+    const request = new Request('http://localhost/vision/extract', { method: 'POST' });
+    const response = await worker.fetch(request, env, ctx);
+    expect(response.status).toBe(200);
+    expect(handleVisionExtract).toHaveBeenCalled();
   });
 
   it('routes /email POST to handleEmail', async () => {

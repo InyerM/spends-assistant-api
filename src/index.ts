@@ -2,6 +2,7 @@ import { handleTelegram } from './handlers/telegram';
 import { handleEmail } from './handlers/email';
 import { handleTransaction } from './handlers/transaction';
 import { handleParse } from './handlers/parse';
+import { handleVisionExtract } from './handlers/vision-extract';
 import { handleBalance } from './handlers/balance';
 import { handleAutomationGenerate } from './handlers/automation-generate';
 import { createSupabaseServices } from './services/supabase';
@@ -62,6 +63,10 @@ export default {
     // Parse API (parse only, no save)
     if (url.pathname === '/parse' && request.method === 'POST') {
       return handleParse(request, env);
+    }
+
+    if (url.pathname === '/vision/extract' && request.method === 'POST') {
+      return handleVisionExtract(request, env);
     }
 
     // Transaction API

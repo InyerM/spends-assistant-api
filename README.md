@@ -21,6 +21,7 @@ The microservice accepts expenses from three channels:
 - **Telegram Bot** (`/telegram`): Manual messages or forwarded bank SMS
 - **Email** (`/email`): Gmail forwarded Bancolombia notifications
 - **API** (`/transaction`): Direct transaction creation (iOS Shortcut, etc.)
+- **Document drafts** (`/vision/extract`): Authenticated image classification and observation extraction for web review; this endpoint does not create transactions
 
 ### 2. Processing Flow
 
@@ -62,6 +63,11 @@ Extracts:
 - Confidence score (0-100)
 
 ### 4. Database Schema
+
+The document inbox migration `20260929000010_document_inbox.sql` adds a private
+image bucket plus user-scoped `documents` and `document_observations` tables.
+Apply it before enabling the web document flow. It does not add embeddings or
+automatic reconciliation; those require a separate review workflow.
 
 **Main Tables**:
 
