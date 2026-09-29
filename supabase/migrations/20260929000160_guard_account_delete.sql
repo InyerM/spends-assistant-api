@@ -85,7 +85,8 @@ BEGIN
       WHERE id IS NOT NULL ORDER BY id
   LOOP
     PERFORM 1 FROM public.accounts
-      WHERE id = v_account_id AND user_id = NEW.user_id AND deleted_at IS NULL
+      WHERE id = v_account_id AND user_id = NEW.user_id
+        AND is_active AND deleted_at IS NULL
       FOR SHARE;
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Transaction requires an active account owned by its user'

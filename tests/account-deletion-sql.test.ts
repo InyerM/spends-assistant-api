@@ -22,7 +22,7 @@ async function database(): Promise<PGlite> {
       SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
     CREATE TABLE public.accounts(id uuid PRIMARY KEY, user_id uuid NOT NULL,
       is_default boolean NOT NULL DEFAULT false, deleted_at timestamptz,
-      balance numeric(15,2) NOT NULL DEFAULT 0);
+      is_active boolean NOT NULL DEFAULT true, balance numeric(15,2) NOT NULL DEFAULT 0);
     CREATE TABLE public.transactions(id uuid PRIMARY KEY, user_id uuid NOT NULL,
       account_id uuid NOT NULL REFERENCES public.accounts(id),
       transfer_to_account_id uuid REFERENCES public.accounts(id),
@@ -98,6 +98,19 @@ describe('atomic account deletion', () => {
       await expect(
         db.exec(`INSERT INTO public.transactions VALUES
         ('99999999-9999-4999-8999-999999999999','${owner}','${source}','${empty}',NULL)`)
+      ).rejects.toThrow(/active account/i);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('prevents a new transaction from referencing an inactive account', async () => {
+    const db = await database();
+    try {
+      await db.exec(`UPDATE public.accounts SET is_active=false WHERE id='${empty}'`);
+      await expect(
+        db.exec(`INSERT INTO public.transactions VALUES
+        ('88888888-8888-4888-8888-888888888889','${owner}','${empty}',NULL,NULL)`)
       ).rejects.toThrow(/active account/i);
     } finally {
       await db.close();
