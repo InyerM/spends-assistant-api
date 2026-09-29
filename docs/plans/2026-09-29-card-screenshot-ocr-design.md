@@ -1,0 +1,27 @@
+# Credit card screenshot OCR review design
+
+Status: review draft, no real screenshot sent to an external model and no financial row created. The supplied screenshots remain private and untracked. This document records a local visual and Apple Vision text-recognition inspection on September 29, 2026; Apple Vision is a diagnostic baseline on this Mac, not the web implementation.
+
+## Evidence and failure modes
+
+The five supplied images show four CMR Falabella screens and one Lulo movements screen. Two CMR images are near duplicates: 99.6% of their pixels differ by at most 10 color levels. Across the CMR screens, the same billed rows appear in multiple captures. Counting every extracted row from every image would double count. The screens also contain balance and available-credit summaries, a minimum payment, cut and due dates, purchases, a card payment, interest, insurance, a collection charge, and a zero-value status row. The Lulo screen contains purchase rows and a separate zero-value authorization. These labels are visual review notes, not reconciled card-statement facts.
+
+Local Apple Vision read 24, 22, 22, 24, and 31 text lines from the five images. It missed a small CMR interest amount in one near-duplicate image and read it in the other. It also produced ambiguous CMR punctuation such as `2.990.00` where the screenshot uses a Colombian amount. This is evidence that one OCR pass and raw text parsing are insufficient for exact financial import; it does not measure Qwen, the current production draft model. The current generic [vision schema](../../src/ai/vision.ts) stores one positive amount, free-text date, description, and source excerpt per observation. It cannot distinguish a card purchase from a payment or charge, preserve the sign, identify non-posting zero rows, or link repeated rows across images.
+
+## Recommended web-first flow
+
+1. Upload each image into the existing private document inbox and show a quality preflight for resolution, crop, and duplicate-image similarity. Group captures by provider and card only after user confirmation; do not infer an account from a merchant name.
+2. Run the current Qwen3 VL 30B model once per distinct image using a versioned card-screen prompt and a structured draft. Escalate only a rejected or visibly incomplete draft to the 235B model. The prompt must extract _row evidence_ separately from balances, available credit, minimum payment, and other screen summaries. It must preserve the displayed sign and amount string, provider, row label, raw date label, and source image/region. A year or date inferred from a nearby header must be marked as inferred; relative labels such as “Yesterday” require a verified capture date or manual confirmation.
+3. Normalize amounts with provider-aware decimal separators only after the original string is retained. Distinguish `purchase`, `card_payment`, `interest`, `insurance`, `fee`, `authorization`, and `unknown`; keep zero-value rows as non-posting evidence. A card payment should be proposed as a liability transfer for review, not as a new expense.
+4. Propose cross-image duplicates using provider, reviewed card identity, event kind, exact normalized amount, date evidence, and row text. A duplicate image can be grouped automatically; an ambiguous repeated transaction row needs explicit review. Link every accepted observation to its image and never create a transaction or change a balance from OCR alone.
+5. After review, compare proposed rows with existing card transactions, email/SMS notices, and a dated card statement. The web flow may match an existing row or propose a missing one; financial creation stays behind the existing balance-baseline and staging gates.
+
+## Alternatives and gate
+
+| Approach                                                        | Benefit                                                                          | Main limitation                                                                                |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| One vision call per screenshot, plus review (recommended first) | Reuses the private image inbox and existing OpenRouter routing with bounded cost | Needs a richer schema, provider-specific validation, and screenshot grouping                   |
+| Dedicated OCR text pass followed by a second model call         | Makes tiny text and row boundaries easier to inspect                             | Adds latency/cost and still needs financial semantics and deduplication                        |
+| Automatic import from screenshot                                | Fewer manual clicks                                                              | Unsafe for repeated rows, zero authorizations, payments, relative dates, and ambiguous amounts |
+
+Acceptance requires a private labeled evaluation on these screenshots plus synthetic variants: all visible financial rows captured with exact signed amount, no balance/minimum-payment rows treated as transactions, zero rows marked non-posting, repeated CMR rows presented once for review, and no financial write before confirmation. Record model output, token/cost telemetry, and errors without committing screenshot content. Live model accuracy remains unverified because an OpenRouter key is not available in this local session.

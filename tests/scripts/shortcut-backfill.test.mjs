@@ -117,6 +117,54 @@ test('CLI writes private JSON and refuses to reuse an output directory', () => {
   }
 });
 
+test('CLI reads a UTF-16LE Shortcut export without changing message content', () => {
+  const root = mkdtempSync(join(tmpdir(), 'spends-utf16-test-'));
+  try {
+    const inputPath = join(root, 'messages.txt');
+    const outputPath = join(root, 'prepared');
+    const payload = JSON.stringify({
+      source: 'sms-manual-backfill',
+      items: [item('2026-09-01T12:00:00-05:00', 'Synthetic Bancolombia purchase')]
+    });
+    writeFileSync(
+      inputPath,
+      Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(payload, 'utf16le')])
+    );
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/shortcut-backfill.mjs', `--input=${inputPath}`, `--out-dir=${outputPath}`],
+      { encoding: 'utf8' }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const batch = JSON.parse(readFileSync(join(outputPath, 'batch-001.json'), 'utf8'));
+    assert.equal(batch.items[0].raw_text, 'Synthetic Bancolombia purchase');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('CLI does not print private input when JSON is invalid', () => {
+  const root = mkdtempSync(join(tmpdir(), 'spends-invalid-json-test-'));
+  try {
+    const inputPath = join(root, 'messages.txt');
+    writeFileSync(inputPath, 'private-sensitive-input');
+    const result = spawnSync(
+      process.execPath,
+      [
+        'scripts/shortcut-backfill.mjs',
+        `--input=${inputPath}`,
+        `--out-dir=${join(root, 'prepared')}`
+      ],
+      { encoding: 'utf8' }
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Invalid JSON input/);
+    assert.equal(result.stderr.includes('private-sensitive-input'), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('legacy Nequi receipt prefix becomes a timestamp without changing raw text', () => {
   const raw = '[Recibido: 15/09/2026 14:30] Nequi: Pagaste synthetic amount';
   assert.deepEqual(legacyMessagesToItems([raw]), [item('2026-09-15T14:30:00-05:00', raw)]);

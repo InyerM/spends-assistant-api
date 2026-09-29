@@ -194,6 +194,19 @@ function argument(name) {
   return process.argv.find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1);
 }
 
+async function readJson(path) {
+  const bytes = await readFile(path);
+  const text =
+    bytes[0] === 0xff && bytes[1] === 0xfe
+      ? bytes.subarray(2).toString('utf16le')
+      : bytes.toString('utf8').replace(/^\uFEFF/u, '');
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Invalid JSON input');
+  }
+}
+
 async function main() {
   const inputPath = argument('--input');
   const outDir = argument('--out-dir');
@@ -205,7 +218,7 @@ async function main() {
       'Usage: node scripts/shortcut-backfill.mjs --input=messages.json --out-dir=private-dir [--source=sms-manual-backfill] [--inbox-export=shortcut-inbox.json] [--year=2026]'
     );
   }
-  const parsed = JSON.parse(await readFile(inputPath, 'utf8'));
+  const parsed = await readJson(inputPath);
   const rawInput = Array.isArray(parsed) ? parsed : (parsed?.items ?? parsed?.messages);
   const input = Array.isArray(parsed?.emails)
     ? emailMessagesToItems(parsed.emails)
@@ -213,9 +226,7 @@ async function main() {
   const source = sourceArg ?? parsed?.source;
   if (sourceArg && parsed?.source && sourceArg !== parsed.source)
     throw new Error('Input source differs from --source');
-  const inboxExport = exportPath
-    ? JSON.parse(await readFile(exportPath, 'utf8'))
-    : { version: 1, items: [] };
+  const inboxExport = exportPath ? await readJson(exportPath) : { version: 1, items: [] };
   const { batches, counts } = buildBackfillBatches(input, source, inboxExport, year);
   await mkdir(outDir, { mode: 0o700 });
   for (const [index, batch] of batches.entries()) {
