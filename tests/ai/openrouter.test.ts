@@ -42,6 +42,7 @@ describe('completeJson', () => {
       max_price: { prompt: 0.4, completion: 1 }
     });
     expect(body.response_format).toEqual({ type: 'json_object' });
+    expect(body.usage).toEqual({ include: true });
   });
 
   it('does not log or echo the financial input on an upstream error', async () => {

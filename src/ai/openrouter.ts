@@ -34,6 +34,7 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
         { role: 'user', content: input.user }
       ],
       response_format: { type: 'json_object' },
+      usage: { include: true },
       temperature: 0.1,
       max_tokens: 2048,
       provider: {
