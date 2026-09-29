@@ -90,8 +90,8 @@ Create `.env.local`:
 SUPABASE_URL=http://localhost:54321
 SUPABASE_SERVICE_KEY=eyJhbGc... # Get from supabase status
 
-# Gemini API
-GEMINI_API_KEY=your_gemini_key
+# OpenRouter text and vision requests
+OPENROUTER_API_KEY=your_openrouter_key
 
 # Telegram
 TELEGRAM_BOT_TOKEN=your_bot_token
@@ -192,3 +192,9 @@ SUPABASE_URL = "https://xxxxx.supabase.co"
 supabase link --project-ref your-project-ref
 supabase db push
 ```
+
+For the 2026 web rollout, apply the migrations in timestamp order before deploying the Worker and
+web app. Back up the remote database and review the migration list against the linked project
+first. Local PGlite checks cover the new RPCs, but a full Supabase migration and RLS pass still
+requires the local Docker stack or a disposable Supabase project. `db push` changes the linked
+remote database; run it only after the release review is approved.
