@@ -5,12 +5,19 @@ import { BenchmarkExtractionError, runBenchmark, type PageExtractor } from './be
 import { SYNTHETIC_PAGES } from './fixture';
 import type { RenderedPage } from './render';
 
-export function parseBenchmarkArgs(args: string[], apiKey: string): { live: boolean } {
-  if (args.length === 0) return { live: false };
-  if (args.length !== 1 || args[0] !== '--live')
+export function parseBenchmarkArgs(
+  args: string[],
+  apiKey: string
+): { live: boolean; escalateDensePage: boolean } {
+  if (args.length === 0) return { live: false, escalateDensePage: false };
+  if (args[0] !== '--live' || args.length > 2 || (args.length === 2 && args[1] !== '--escalate'))
     throw new Error('Only --live is supported; input is always synthetic');
   if (!apiKey) throw new Error('OpenRouter key required for --live');
-  return { live: true };
+  return { live: true, escalateDensePage: args[1] === '--escalate' };
+}
+
+export function shouldEscalatePage(pageNumber: number, escalateDensePage: boolean): boolean {
+  return escalateDensePage && pageNumber === 4;
 }
 
 /** This offline oracle tests rendering, page binding, and scoring, not model quality. */
@@ -33,37 +40,41 @@ export async function oraclePage(page: RenderedPage) {
   };
 }
 
+/** The explicit escalation flag changes only the 15-row synthetic page. */
+export function createLiveExtractor(
+  apiKey: string,
+  escalateDensePage: boolean,
+  extract: typeof extractImageObservations = extractImageObservations
+): PageExtractor {
+  return async (page) => {
+    const meter = new AiUsageMeter();
+    try {
+      const result = await extract({
+        apiKey,
+        imageDataUrl: `data:image/png;base64,${page.png.toString('base64')}`,
+        escalate: shouldEscalatePage(page.pageNumber, escalateDensePage),
+        meter
+      });
+      return { observations: result.draft.observations, model: result.model, usage: result.usage };
+    } catch (error) {
+      const usage = meter.summary();
+      throw new BenchmarkExtractionError(
+        error instanceof Error ? error.message : 'Extraction failed',
+        {
+          prompt_tokens: usage.inputTokens,
+          completion_tokens: usage.outputTokens,
+          cost: usage.estimatedCostMicros === null ? null : usage.estimatedCostMicros / 1_000_000
+        }
+      );
+    }
+  };
+}
+
 async function main(): Promise<void> {
   const apiKey = process.env.OR_API_KEY || process.env.OPENROUTER_API_KEY || '';
-  const { live } = parseBenchmarkArgs(process.argv.slice(2), apiKey);
+  const { live, escalateDensePage } = parseBenchmarkArgs(process.argv.slice(2), apiKey);
   const extractor: PageExtractor = live
-    ? async (page) => {
-        const meter = new AiUsageMeter();
-        try {
-          const result = await extractImageObservations({
-            apiKey,
-            imageDataUrl: `data:image/png;base64,${page.png.toString('base64')}`,
-            escalate: false,
-            meter
-          });
-          return {
-            observations: result.draft.observations,
-            model: result.model,
-            usage: result.usage
-          };
-        } catch (error) {
-          const usage = meter.summary();
-          throw new BenchmarkExtractionError(
-            error instanceof Error ? error.message : 'Extraction failed',
-            {
-              prompt_tokens: usage.inputTokens,
-              completion_tokens: usage.outputTokens,
-              cost:
-                usage.estimatedCostMicros === null ? null : usage.estimatedCostMicros / 1_000_000
-            }
-          );
-        }
-      }
+    ? createLiveExtractor(apiKey, escalateDensePage)
     : oraclePage;
   const result = await runBenchmark(extractor);
   process.stdout.write(
@@ -71,7 +82,8 @@ async function main(): Promise<void> {
       {
         fixture: 'built-in-five-page-synthetic-statement',
         mode: live ? 'live-image-adapter' : 'offline-synthetic-oracle',
-        modelValidated: live,
+        modelAttempted: live,
+        densePageEscalated: escalateDensePage,
         ...result
       },
       null,

@@ -12,14 +12,15 @@ npm run eval:pdf-synthetic
 npm run test:run -- tests/eval/pdf-statements/benchmark.test.ts
 ```
 
-The default run renders each page at 110 DPI, binds the known page number before extraction, and scores a deterministic oracle. `modelValidated: false` and null token/cost fields mean this run proves only PDF generation, page separation, size limits, row attribution scoring, and report plumbing. The test suite also simulates a truncated model page and checks that the document fails the page-coverage gate and does not invent a total cost.
+The default run renders each page at 110 DPI, binds the known page number before extraction, and scores a deterministic oracle. `modelAttempted: false` and null token/cost fields mean this run proves only PDF generation, page separation, size limits, row attribution scoring, and report plumbing. The test suite also simulates a truncated model page and checks that the document fails the page-coverage gate and does not invent a total cost.
 
 A live **synthetic-only** run uses the current `extractImageObservations` Qwen adapter, one request per page:
 
 ```sh
 OR_API_KEY='your-key' npm run eval:pdf-synthetic -- --live
+OR_API_KEY='your-key' npm run eval:pdf-synthetic -- --live --escalate
 ```
 
-The adapter's existing provider controls apply (`data_collection: "deny"`, price ceilings, no ZDR). Never use this command for a personal PDF. The tool sends exactly the built-in five synthetic page images and prints page-level row counts, score, response time, tokens, and OpenRouter-reported cost when present. `knownCostUsd` sums reported costs; `totalCostComplete` is false when any page has no cost value or fails. A nonpassing live score exits with code 2. The harness does not print images, model prose, API keys, or raw provider errors.
+The `--escalate` option uses Qwen3 VL 235B only for the 15-row page 4; the other four pages still use Qwen3 VL 30B. It is a new five-page run, so those four pages incur new requests. The adapter's existing provider controls apply (`data_collection: "deny"`, price ceilings, no ZDR); the escalated page uses its existing 60-second timeout. Never use this command for a personal PDF. The tool sends exactly the built-in five synthetic page images and prints page-level row counts, score, response time, tokens, and OpenRouter-reported cost when present. `modelAttempted: true` indicates a live attempt, not a passing quality result. `knownCostUsd` sums reported costs; `totalCostComplete` is false when any page has no cost value. A nonpassing live score exits with code 2. The harness does not print images, model prose, API keys, or raw provider errors.
 
 A live result is still only a synthetic benchmark. It does not establish accuracy on scanned statements, handwriting, different bank layouts, deployment-runtime rendering, or provider privacy for real bank data. The release gate and schema coordination are in `docs/plans/2026-09-28-multipage-pdf-statement-gate.md`; provenance migration 70 is owned separately, and any PDF migration is reserved for 90 or later after benchmark review.

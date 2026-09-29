@@ -10,7 +10,13 @@ import {
   runBenchmark,
   scorePageOutputs
 } from '../../../scripts/eval/pdf-statements/benchmark';
-import { oraclePage, parseBenchmarkArgs } from '../../../scripts/eval/pdf-statements/run';
+import {
+  createLiveExtractor,
+  oraclePage,
+  parseBenchmarkArgs,
+  shouldEscalatePage
+} from '../../../scripts/eval/pdf-statements/run';
+import { vi } from 'vitest';
 
 const observation = (reference: string, amount: number, date: string) => ({
   amount,
@@ -60,10 +66,31 @@ describe('synthetic PDF statement benchmark', () => {
     await expect(renderSyntheticPages(Buffer.from('%PDF-1.4\nprivate'))).rejects.toThrow(
       'Only the built-in synthetic PDF'
     );
-    expect(parseBenchmarkArgs([], '')).toEqual({ live: false });
+    expect(parseBenchmarkArgs([], '')).toEqual({ live: false, escalateDensePage: false });
     expect(() => parseBenchmarkArgs(['--live'], '')).toThrow('OpenRouter key required');
     expect(() => parseBenchmarkArgs(['private.pdf'], 'key')).toThrow('Only --live is supported');
-    expect(parseBenchmarkArgs(['--live'], 'key')).toEqual({ live: true });
+    expect(parseBenchmarkArgs(['--live'], 'key')).toEqual({ live: true, escalateDensePage: false });
+    expect(parseBenchmarkArgs(['--live', '--escalate'], 'key')).toEqual({
+      live: true,
+      escalateDensePage: true
+    });
+    expect(() => parseBenchmarkArgs(['--escalate'], 'key')).toThrow('Only --live');
+  });
+
+  it('escalates only the dense fourth page when explicitly requested', async () => {
+    expect(shouldEscalatePage(4, true)).toBe(true);
+    expect(shouldEscalatePage(1, true)).toBe(false);
+    expect(shouldEscalatePage(4, false)).toBe(false);
+    const adapter = vi.fn().mockResolvedValue({
+      draft: { observations: [] },
+      model: 'test-model',
+      usage: null
+    });
+    const extractor = createLiveExtractor('test-key', true, adapter);
+    await extractor({ pageNumber: 1, png: Buffer.from('png') });
+    await extractor({ pageNumber: 4, png: Buffer.from('png') });
+    expect(adapter.mock.calls[0][0]).toMatchObject({ escalate: false });
+    expect(adapter.mock.calls[1][0]).toMatchObject({ escalate: true });
   });
 
   it('labels the offline oracle as a plumbing check rather than model evidence', async () => {
