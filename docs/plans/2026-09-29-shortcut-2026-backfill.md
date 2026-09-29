@@ -113,3 +113,14 @@ The 105 Nequi insufficient-funds notices are especially likely to be mistaken fo
 | Nequi       | 2026-02-03 18:05 to 2026-09-28 22:15 | Feb 6; May 17; Jun 28; Jul 34; Aug 37; Sep 10 |                              106 |
 
 The Bancolombia query is sorted oldest first and returned exactly 500 messages, stopping in May although the search upper bound was September 29. That strongly suggests incomplete coverage, but does **not** prove a documented 500-result cap in Messages. [Apple recommends narrower Find filters for broad queries](https://support.apple.com/en-ae/guide/shortcuts/apdbdab3433f/ios). Re-run the same timestamp-preserving Shortcut for Bancolombia in three date windows: January–March, April–June, and July–September 29. Keep the bank-body filter and remove the Read filter. Export each window to a separate private file. If a window again returns 500, split it by month. Overlap at a boundary is safe because the converter deduplicates identical body plus receipt instant. Compare the monthly counts and earliest/latest dates with `scripts/shortcut-notice-audit.mjs`; it now reports those aggregates without printing bodies. Do not post the current partial set as if it covered the year.
+
+On September 29, a separate read-only comparison against the count-confirmed owner profile found **1,516 active ledger rows**, still ending on **2026-09-07**. Of the 627 unique notices, **437 have identical raw text in at least one active ledger row** and **190 do not**. The 190 without identical raw text break down into 107 failed-payment notices, 9 marketing notices, 8 security notices, 34 unknown notices, 21 possible purchases/payments, 7 possible outgoing transfers, and 4 possible incoming transfers. This is a text comparison, not an assertion that the 190 are missing financial rows. CSV or edited rows can represent the same event with different or absent raw text, and some unknown notices may be non-financial. The comparison made only GET requests and did not post the exported SMS content. It is reproducible with:
+
+```sh
+node scripts/shortcut-ledger-compare.mjs \
+  --input=Bancolombia-01.txt \
+  --input=Nequi-01.txt \
+  --expected-count=1516
+```
+
+The script identifies a unique owner only while exactly one profile has the confirmed active count; it stops if the count changes. Its output is aggregate only. Re-run after the missing Bancolombia windows arrive and before any inbox upload. Even a notice with identical raw text needs owner review before linking, because eight notices currently have more than one identical-raw ledger row. Do not bulk-create the 190 non-identical cases.
