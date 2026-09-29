@@ -150,6 +150,7 @@ BEGIN
     PERFORM 1 FROM public.transactions WHERE id = p_replace_id AND user_id = v_user
       AND deleted_at IS NULL AND account_id = v_old.account_id
       AND transfer_to_account_id IS NOT DISTINCT FROM v_old.transfer_to_account_id
+      AND type = v_old.type AND amount = v_old.amount
       FOR UPDATE;
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Replacement transaction changed during review' USING ERRCODE = '23514';
