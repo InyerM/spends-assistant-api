@@ -7,6 +7,10 @@ const migration = readFileSync(
   join(process.cwd(), 'supabase/migrations/20260929000060_document_confirmation.sql'),
   'utf8'
 );
+const inboxMigration = readFileSync(
+  join(process.cwd(), 'supabase/migrations/20260929000010_document_inbox.sql'),
+  'utf8'
+);
 const userA = '00000000-0000-4000-8000-000000000001';
 const userB = '00000000-0000-4000-8000-000000000002';
 const documentA = '10000000-0000-4000-8000-000000000001';
@@ -21,31 +25,41 @@ async function database(): Promise<PGlite> {
     CREATE ROLE authenticated;
     CREATE ROLE service_role;
     CREATE SCHEMA auth;
+    CREATE SCHEMA storage;
+    CREATE TABLE auth.users (id uuid PRIMARY KEY);
+    CREATE TABLE storage.buckets (
+      id text PRIMARY KEY, name text NOT NULL, public boolean NOT NULL,
+      file_size_limit bigint, allowed_mime_types text[]
+    );
+    CREATE TABLE storage.objects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id text, name text);
+    CREATE FUNCTION storage.foldername(path text) RETURNS text[] LANGUAGE sql IMMUTABLE AS $$
+      SELECT string_to_array(path, '/')
+    $$;
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
       SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
     $$;
-    CREATE TABLE public.documents (
-      id uuid PRIMARY KEY, user_id uuid NOT NULL, status text NOT NULL,
-      processing_token uuid, model text, error_code text, document_type text
-    );
+    CREATE FUNCTION public.update_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN NEW.updated_at := now(); RETURN NEW; END;
+    $$;
     CREATE TABLE public.transactions (
-      id uuid PRIMARY KEY, user_id uuid NOT NULL, amount numeric(15,2) NOT NULL,
+      id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES auth.users(id), amount numeric(15,2) NOT NULL,
       date date NOT NULL, description text NOT NULL, deleted_at timestamptz
     );
-    CREATE TABLE public.document_observations (
-      id uuid PRIMARY KEY, document_id uuid NOT NULL, user_id uuid NOT NULL,
-      amount numeric(18,2), occurred_at_text text, description text NOT NULL,
-      status text NOT NULL DEFAULT 'pending'
-    );
-    GRANT SELECT, INSERT, UPDATE, DELETE ON public.documents TO authenticated;
-    GRANT SELECT, INSERT, UPDATE, DELETE ON public.document_observations TO authenticated;
-    INSERT INTO public.documents VALUES ('${documentA}', '${userA}', 'extracted');
-    INSERT INTO public.document_observations VALUES
-      ('${observationA}', '${documentA}', '${userA}', 1200, '2026-09-28', 'Receipt A', 'pending'),
-      ('${observationB}', '${documentA}', '${userA}', 1200, '2026-09-28', 'Receipt B', 'pending');
+    INSERT INTO auth.users VALUES ('${userA}'), ('${userB}');
     INSERT INTO public.transactions VALUES
       ('${transactionA}', '${userA}', 1200, '2026-09-29', 'Shop A', NULL),
       ('${transactionB}', '${userB}', 1200, '2026-09-29', 'Shop B', NULL);
+  `);
+  await db.exec(inboxMigration);
+  await db.exec(`
+    INSERT INTO public.documents (id, user_id, file_name, file_path, mime_type, sha256, status)
+      VALUES ('${documentA}', '${userA}', 'receipt.png', '${userA}/receipt.png', 'image/png',
+        '${'a'.repeat(64)}', 'extracted');
+    INSERT INTO public.document_observations
+      (id, document_id, user_id, ordinal, amount, occurred_at_text, description, source_excerpt, confidence)
+      VALUES
+      ('${observationA}', '${documentA}', '${userA}', 0, 1200, '2026-09-28', 'Receipt A', 'Receipt A', 0.9),
+      ('${observationB}', '${documentA}', '${userA}', 1, 1200, '2026-09-28', 'Receipt B', 'Receipt B', 0.9);
   `);
   await db.exec(migration);
   return db;
@@ -273,6 +287,93 @@ describe('document confirmation migration', () => {
         db.exec("UPDATE document_observation_decisions SET action = 'reject_observation'")
       ).rejects.toThrow();
       await expect(db.exec('DELETE FROM document_observation_decisions')).rejects.toThrow();
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('deletes reviewed evidence when its document is erased', async () => {
+    const db = await database();
+    try {
+      await asUser(
+        db,
+        userA,
+        `SELECT public.decide_document_observation('${observationA}', 'accept', '${transactionA}', gen_random_uuid())`
+      );
+      await asUser(
+        db,
+        userA,
+        `SELECT public.decide_document_observation('${observationB}', 'reject_observation', NULL, gen_random_uuid())`
+      );
+      await db.exec(`DELETE FROM documents WHERE id = '${documentA}'`);
+      expect(
+        (
+          await db.query(
+            `SELECT count(*)::int AS count FROM document_observations WHERE document_id = '${documentA}'`
+          )
+        ).rows
+      ).toEqual([{ count: 0 }]);
+      expect(
+        (await db.query('SELECT count(*)::int AS count FROM document_observation_decisions')).rows
+      ).toEqual([{ count: 0 }]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('erases reviewed evidence when the linked transaction is hard deleted', async () => {
+    const db = await database();
+    try {
+      await asUser(
+        db,
+        userA,
+        `SELECT public.decide_document_observation('${observationA}', 'accept', '${transactionA}', gen_random_uuid())`
+      );
+      await db.exec(`DELETE FROM transactions WHERE id = '${transactionA}'`);
+      expect(
+        (await db.query(`SELECT count(*)::int AS count FROM documents WHERE id = '${documentA}'`))
+          .rows
+      ).toEqual([{ count: 1 }]);
+      expect(
+        (
+          await db.query(
+            `SELECT count(*)::int AS count FROM document_observations WHERE id = '${observationA}'`
+          )
+        ).rows
+      ).toEqual([{ count: 0 }]);
+      expect(
+        (await db.query('SELECT count(*)::int AS count FROM document_observation_decisions')).rows
+      ).toEqual([{ count: 0 }]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('allows account erasure after legacy transaction cleanup and retains another owner', async () => {
+    const db = await database();
+    try {
+      await asUser(
+        db,
+        userA,
+        `SELECT public.decide_document_observation('${observationA}', 'accept', '${transactionA}', gen_random_uuid())`
+      );
+      // The existing transactions.user_id FK is NO ACTION, so user deletion
+      // requires transaction cleanup independently of document review.
+      await expect(db.exec(`DELETE FROM auth.users WHERE id = '${userA}'`)).rejects.toThrow();
+      await db.exec(`DELETE FROM transactions WHERE user_id = '${userA}'`);
+      await db.exec(`DELETE FROM auth.users WHERE id = '${userA}'`);
+      expect((await db.query('SELECT count(*)::int AS count FROM documents')).rows).toEqual([
+        { count: 0 }
+      ]);
+      expect(
+        (await db.query('SELECT count(*)::int AS count FROM document_observations')).rows
+      ).toEqual([{ count: 0 }]);
+      expect(
+        (await db.query('SELECT count(*)::int AS count FROM document_observation_decisions')).rows
+      ).toEqual([{ count: 0 }]);
+      expect(
+        (await db.query(`SELECT count(*)::int AS count FROM auth.users WHERE id = '${userB}'`)).rows
+      ).toEqual([{ count: 1 }]);
     } finally {
       await db.close();
     }

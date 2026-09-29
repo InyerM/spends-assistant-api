@@ -5,7 +5,8 @@ ALTER TABLE public.document_observations ADD CONSTRAINT document_observations_id
 ALTER TABLE public.document_observations ADD COLUMN match_transaction_id UUID;
 ALTER TABLE public.document_observations
   ADD CONSTRAINT document_observations_match_owner_fk
-  FOREIGN KEY (match_transaction_id, user_id) REFERENCES public.transactions (id, user_id);
+  FOREIGN KEY (match_transaction_id, user_id)
+    REFERENCES public.transactions (id, user_id) ON DELETE CASCADE;
 ALTER TABLE public.document_observations
   ADD CONSTRAINT document_observations_confirmed_link_check
   CHECK ((status = 'confirmed') = (match_transaction_id IS NOT NULL)) NOT VALID;
@@ -26,10 +27,10 @@ CREATE TABLE public.document_observation_decisions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT document_observation_decisions_owner_fk
     FOREIGN KEY (observation_id, user_id)
-    REFERENCES public.document_observations (id, user_id),
+    REFERENCES public.document_observations (id, user_id) ON DELETE CASCADE,
   CONSTRAINT document_observation_decisions_transaction_owner_fk
     FOREIGN KEY (transaction_id, user_id)
-    REFERENCES public.transactions (id, user_id),
+    REFERENCES public.transactions (id, user_id) ON DELETE CASCADE,
   CONSTRAINT document_observation_decisions_action_transaction_check
     CHECK ((action = 'accept') = (transaction_id IS NOT NULL)),
   CONSTRAINT document_observation_decisions_idempotency_unique UNIQUE (user_id, idempotency_key)
@@ -38,9 +39,17 @@ CREATE INDEX document_observation_decisions_observation_idx
   ON public.document_observation_decisions (user_id, observation_id, created_at);
 
 CREATE FUNCTION public.reject_document_decision_mutation()
-RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
-  RAISE EXCEPTION 'Document review decisions are append-only' USING ERRCODE = '23514';
+  -- A source document or transaction being erased must erase its private audit
+  -- record too. Direct edits remain forbidden while both parents exist.
+  IF TG_OP = 'UPDATE' OR
+    (EXISTS (SELECT 1 FROM public.document_observations WHERE id = OLD.observation_id)
+      AND (OLD.transaction_id IS NULL OR
+        EXISTS (SELECT 1 FROM public.transactions WHERE id = OLD.transaction_id))) THEN
+    RAISE EXCEPTION 'Document review decisions are append-only' USING ERRCODE = '23514';
+  END IF;
+  RETURN OLD;
 END;
 $$;
 CREATE TRIGGER document_observation_decisions_immutable
