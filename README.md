@@ -40,9 +40,9 @@ The microservice accepts expenses from three channels:
 
 The Worker uses `deepseek/deepseek-v4.1-flash` by default and can select another
 text model with `OPENROUTER_TEXT_MODEL`. Requests require zero data retention,
-deny provider data collection, and cap per-token prices. A per-user monthly
-spending limit is planned; do not deploy the migration before that control and
-real-message evaluation are complete.
+deny provider data collection, and cap per-token prices. The US$10 per-user
+monthly figure is an internal cost-planning target, not a request limit. Do not
+deploy the migration before real-message evaluation is complete.
 
 Handles multiple input formats:
 
