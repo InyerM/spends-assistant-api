@@ -9,22 +9,31 @@ import { runTiledBenchmark } from './tiles';
 export function parseBenchmarkArgs(
   args: string[],
   apiKey: string
-): { live: boolean; escalateDensePage: boolean; tileDensePage: boolean } {
-  if (args.length === 0) return { live: false, escalateDensePage: false, tileDensePage: false };
+): { live: boolean; escalateDensePage: boolean; tileDensePage: boolean; focusFinalPage: boolean } {
+  if (args.length === 0)
+    return { live: false, escalateDensePage: false, tileDensePage: false, focusFinalPage: false };
   if (args.includes('--escalate') && args.includes('--tile'))
     throw new Error('--escalate and --tile cannot be combined');
+  if (args.includes('--focus-final') && !args.includes('--tile'))
+    throw new Error('--focus-final requires --tile');
   const valid =
     (args.length === 1 && (args[0] === '--live' || args[0] === '--tile')) ||
     (args.length === 2 &&
       args[0] === '--live' &&
-      (args[1] === '--escalate' || args[1] === '--tile'));
+      (args[1] === '--escalate' || args[1] === '--tile')) ||
+    (args.length === 2 && args[0] === '--tile' && args[1] === '--focus-final') ||
+    (args.length === 3 &&
+      args[0] === '--live' &&
+      args[1] === '--tile' &&
+      args[2] === '--focus-final');
   if (!valid) throw new Error('Only --live is supported; input is always synthetic');
   const live = args.includes('--live');
   if (live && !apiKey) throw new Error('OpenRouter key required for --live');
   return {
     live,
     escalateDensePage: args.includes('--escalate'),
-    tileDensePage: args.includes('--tile')
+    tileDensePage: args.includes('--tile'),
+    focusFinalPage: args.includes('--focus-final')
   };
 }
 
@@ -94,7 +103,7 @@ export function createLiveExtractor(
 
 async function main(): Promise<void> {
   const apiKey = process.env.OR_API_KEY || process.env.OPENROUTER_API_KEY || '';
-  const { live, escalateDensePage, tileDensePage } = parseBenchmarkArgs(
+  const { live, escalateDensePage, tileDensePage, focusFinalPage } = parseBenchmarkArgs(
     process.argv.slice(2),
     apiKey
   );
@@ -102,7 +111,9 @@ async function main(): Promise<void> {
     ? createLiveExtractor(apiKey, escalateDensePage)
     : oraclePage;
   const result = tileDensePage
-    ? await runTiledBenchmark(extractor, live ? createLiveExtractor(apiKey, false) : oracleTile)
+    ? await runTiledBenchmark(extractor, live ? createLiveExtractor(apiKey, false) : oracleTile, {
+        focusFinalPage
+      })
     : await runBenchmark(extractor);
   process.stdout.write(
     `${JSON.stringify(
@@ -112,6 +123,7 @@ async function main(): Promise<void> {
         modelAttempted: live,
         densePageEscalated: escalateDensePage,
         densePageTiled: tileDensePage,
+        finalPageFocused: focusFinalPage,
         ...result
       },
       null,

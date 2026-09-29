@@ -25,26 +25,32 @@ export const SYNTHETIC_TILE_SPECS = [
     pageNumber: 4,
     tileNumber: 2,
     y: 235,
-    height: 245,
-    expectedReferences: [
-      'REF-405',
-      'REF-406',
-      'REF-407',
-      'REF-408',
-      'REF-409',
-      'REF-410',
-      'REF-411',
-      'REF-412'
-    ]
+    height: 150,
+    expectedReferences: ['REF-405', 'REF-406', 'REF-407', 'REF-408', 'REF-409']
   },
   {
     pageNumber: 4,
     tileNumber: 3,
+    y: 355,
+    height: 128,
+    expectedReferences: ['REF-409', 'REF-410', 'REF-411', 'REF-412']
+  },
+  {
+    pageNumber: 4,
+    tileNumber: 4,
     y: 445,
     height: 250,
     expectedReferences: ['REF-412', 'REF-413', 'REF-414', 'REF-415']
   }
 ] as const;
+
+export const SYNTHETIC_FINAL_TILE_SPEC = {
+  pageNumber: 5,
+  tileNumber: 5,
+  y: 0,
+  height: 265,
+  expectedReferences: ['REF-501', 'REF-502']
+} as const;
 
 export interface RenderedTile extends RenderedPage {
   tileNumber: number;
@@ -108,15 +114,23 @@ export async function renderSyntheticPages(pdf: Buffer): Promise<RenderedPage[]>
   }
 }
 
-/** Three fixed vertical regions; overlap rows 405 and 412 are audited downstream. */
-export async function renderSyntheticDenseTiles(pdf: Buffer): Promise<RenderedTile[]> {
+async function renderSyntheticTiles(
+  pdf: Buffer,
+  specs: readonly {
+    pageNumber: number;
+    tileNumber: number;
+    y: number;
+    height: number;
+    expectedReferences: readonly string[];
+  }[]
+): Promise<RenderedTile[]> {
   assertSyntheticPdf(pdf);
   const directory = await mkdtemp(join(tmpdir(), 'spends-pdf-tiles-'));
   const input = join(directory, 'synthetic-statement.pdf');
   try {
     await writeFile(input, pdf);
     const rendered: RenderedTile[] = [];
-    for (const spec of SYNTHETIC_TILE_SPECS) {
+    for (const spec of specs) {
       const output = join(directory, `tile-${spec.tileNumber}`);
       await exec(
         'pdftoppm',
@@ -150,4 +164,15 @@ export async function renderSyntheticDenseTiles(pdf: Buffer): Promise<RenderedTi
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+}
+
+/** Four fixed vertical regions; all three overlap references are audited downstream. */
+export async function renderSyntheticDenseTiles(pdf: Buffer): Promise<RenderedTile[]> {
+  return renderSyntheticTiles(pdf, SYNTHETIC_TILE_SPECS);
+}
+
+/** A bounded top crop keeps the final two rows legible in live probes. */
+export async function renderSyntheticFinalTile(pdf: Buffer): Promise<RenderedTile> {
+  const [tile] = await renderSyntheticTiles(pdf, [SYNTHETIC_FINAL_TILE_SPEC]);
+  return tile;
 }

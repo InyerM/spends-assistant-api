@@ -11,7 +11,9 @@ import {
 import { buildSyntheticStatementPdf, SYNTHETIC_PAGES, type SyntheticPage } from './fixture';
 import {
   renderSyntheticDenseTiles,
+  renderSyntheticFinalTile,
   renderSyntheticPages,
+  SYNTHETIC_FINAL_TILE_SPEC,
   SYNTHETIC_TILE_SPECS,
   type RenderedTile
 } from './render';
@@ -34,13 +36,20 @@ function fixtureRow(reference: string, pages: SyntheticPage[]) {
 export function scoreTiledOutputs(
   expectedPages: SyntheticPage[],
   pageOutputs: PageOutput[],
-  tileOutputs: TileOutput[]
+  tileOutputs: TileOutput[],
+  focusFinalPage = false
 ) {
-  const seen = new Map<string, { observation: Observation; tileNumbers: number[] }>();
+  const specs = focusFinalPage
+    ? [...SYNTHETIC_TILE_SPECS, SYNTHETIC_FINAL_TILE_SPEC]
+    : [...SYNTHETIC_TILE_SPECS];
+  const seen = new Map<
+    string,
+    { pageNumber: number; observation: Observation; tileNumbers: number[] }
+  >();
   let tileFalseRows = 0;
   let wrongTileRows = 0;
   for (const tile of tileOutputs) {
-    const spec = SYNTHETIC_TILE_SPECS.find((candidate) => candidate.tileNumber === tile.tileNumber);
+    const spec = specs.find((candidate) => candidate.tileNumber === tile.tileNumber);
     for (const observation of tile.observations) {
       const excerptMatches = expectedPages
         .flatMap((page) => page.rows)
@@ -51,10 +60,10 @@ export function scoreTiledOutputs(
       const row = reference ? fixtureRow(reference, expectedPages) : null;
       if (
         !spec ||
-        tile.pageNumber !== 4 ||
+        tile.pageNumber !== spec.pageNumber ||
         !reference ||
         !row ||
-        row.pageNumber !== 4 ||
+        row.pageNumber !== spec.pageNumber ||
         !spec.expectedReferences.some((expected) => expected === reference)
       ) {
         tileFalseRows++;
@@ -77,19 +86,30 @@ export function scoreTiledOutputs(
         }
         prior.tileNumbers.push(tile.tileNumber);
       } else {
-        seen.set(reference, { observation, tileNumbers: [tile.tileNumber] });
+        seen.set(reference, {
+          pageNumber: tile.pageNumber,
+          observation,
+          tileNumbers: [tile.tileNumber]
+        });
       }
     }
   }
-  const uniqueDenseObservations = [...seen.values()].map((value) => value.observation);
+  const tiledPages = [...new Set(specs.map((spec) => spec.pageNumber))];
   const base = scorePageOutputs(expectedPages, [
     ...pageOutputs,
-    { pageNumber: 4, observations: uniqueDenseObservations }
+    ...tiledPages
+      .filter((pageNumber) => tileOutputs.some((output) => output.pageNumber === pageNumber))
+      .map((pageNumber) => ({
+        pageNumber,
+        observations: [...seen.values()]
+          .filter((value) => value.pageNumber === pageNumber)
+          .map((value) => value.observation)
+      }))
   ]);
   const rowAttribution = [...seen.entries()]
     .map(([reference, value]) => ({
       reference,
-      pageNumber: 4,
+      pageNumber: value.pageNumber,
       tileNumbers: [...value.tileNumbers].sort((a, b) => a - b)
     }))
     .sort((a, b) => a.reference.localeCompare(b.reference));
@@ -102,7 +122,7 @@ export function scoreTiledOutputs(
     tilesAccountedFor,
     overlapDuplicates,
     rowAttribution,
-    pass: base.pass && tileFalseRows === 0 && tilesAccountedFor === SYNTHETIC_TILE_SPECS.length
+    pass: base.pass && tileFalseRows === 0 && tilesAccountedFor === specs.length
   };
 }
 
@@ -162,20 +182,26 @@ async function extractOne<T extends { pageNumber: number; png: Buffer }>(
 }
 
 /** A tile failure blocks the score even when overlap covers every row. */
-export async function runTiledBenchmark(extractPage: PageExtractor, extractTile: TileExtractor) {
+export async function runTiledBenchmark(
+  extractPage: PageExtractor,
+  extractTile: TileExtractor,
+  options: { focusFinalPage?: boolean } = {}
+) {
   const pdf = buildSyntheticStatementPdf();
   const renderStart = performance.now();
-  const [pages, tiles] = await Promise.all([
+  const [pages, denseTiles, finalTile] = await Promise.all([
     renderSyntheticPages(pdf),
-    renderSyntheticDenseTiles(pdf)
+    renderSyntheticDenseTiles(pdf),
+    options.focusFinalPage ? renderSyntheticFinalTile(pdf) : Promise.resolve(null)
   ]);
+  const tiles = finalTile ? [...denseTiles, finalTile] : denseTiles;
   const render = {
     pageCount: pages.length,
     tileCount: tiles.length,
     pdfBytes: pdf.length,
     sentPngBytes:
       pages
-        .filter((page) => page.pageNumber !== 4)
+        .filter((page) => page.pageNumber !== 4 && (!finalTile || page.pageNumber !== 5))
         .reduce((sum, page) => sum + page.png.length, 0) +
       tiles.reduce((sum, tile) => sum + tile.png.length, 0),
     durationMs: Math.round(performance.now() - renderStart)
@@ -185,7 +211,7 @@ export async function runTiledBenchmark(extractPage: PageExtractor, extractTile:
   const pageResults: ResultRow[] = [];
   const tileResults: ResultRow[] = [];
   for (const page of pages) {
-    if (page.pageNumber === 4) continue;
+    if (page.pageNumber === 4 || (finalTile && page.pageNumber === 5)) continue;
     const result = await extractOne(page, extractPage);
     pageResults.push(result.row);
     if (result.output)
@@ -200,9 +226,13 @@ export async function runTiledBenchmark(extractPage: PageExtractor, extractTile:
       cropHeight: tile.height
     });
     if (result.output)
-      tileOutputs.push({ pageNumber: 4, tileNumber: tile.tileNumber, observations: result.output });
+      tileOutputs.push({
+        pageNumber: tile.pageNumber,
+        tileNumber: tile.tileNumber,
+        observations: result.output
+      });
   }
-  const score = scoreTiledOutputs(SYNTHETIC_PAGES, pageOutputs, tileOutputs);
+  const score = scoreTiledOutputs(SYNTHETIC_PAGES, pageOutputs, tileOutputs, Boolean(finalTile));
   const results = [...pageResults, ...tileResults];
   const knownCostUsd =
     Math.round(results.reduce((sum, row) => sum + (row.costUsd ?? 0), 0) * 1e9) / 1e9;

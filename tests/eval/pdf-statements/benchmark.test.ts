@@ -69,30 +69,42 @@ describe('synthetic PDF statement benchmark', () => {
     expect(parseBenchmarkArgs([], '')).toEqual({
       live: false,
       escalateDensePage: false,
-      tileDensePage: false
+      tileDensePage: false,
+      focusFinalPage: false
     });
     expect(() => parseBenchmarkArgs(['--live'], '')).toThrow('OpenRouter key required');
     expect(() => parseBenchmarkArgs(['private.pdf'], 'key')).toThrow('Only --live is supported');
     expect(parseBenchmarkArgs(['--live'], 'key')).toEqual({
       live: true,
       escalateDensePage: false,
-      tileDensePage: false
+      tileDensePage: false,
+      focusFinalPage: false
     });
     expect(parseBenchmarkArgs(['--live', '--escalate'], 'key')).toEqual({
       live: true,
       escalateDensePage: true,
-      tileDensePage: false
+      tileDensePage: false,
+      focusFinalPage: false
     });
     expect(parseBenchmarkArgs(['--tile'], '')).toEqual({
       live: false,
       escalateDensePage: false,
-      tileDensePage: true
+      tileDensePage: true,
+      focusFinalPage: false
     });
     expect(parseBenchmarkArgs(['--live', '--tile'], 'key')).toEqual({
       live: true,
       escalateDensePage: false,
-      tileDensePage: true
+      tileDensePage: true,
+      focusFinalPage: false
     });
+    expect(parseBenchmarkArgs(['--live', '--tile', '--focus-final'], 'key')).toEqual({
+      live: true,
+      escalateDensePage: false,
+      tileDensePage: true,
+      focusFinalPage: true
+    });
+    expect(() => parseBenchmarkArgs(['--live', '--focus-final'], 'key')).toThrow('requires --tile');
     expect(() => parseBenchmarkArgs(['--live', '--escalate', '--tile'], 'key')).toThrow(
       'cannot be combined'
     );
