@@ -135,6 +135,7 @@ DECLARE
   v_gross numeric;
   v_fee numeric;
   v_basis numeric;
+  v_latest_trade_on date;
   v_allocated numeric := 0;
   v_realized_delta numeric := 0;
   v_result jsonb;
@@ -206,6 +207,16 @@ BEGIN
     IF coalesce(p_event->>'occurred_on', '') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
        OR coalesce(p_event->>'quantity_atoms', '') !~ '^[1-9][0-9]{0,37}$' THEN
       RAISE EXCEPTION 'Invalid trade date or quantity' USING ERRCODE = '22023';
+    END IF;
+    -- Weighted-average basis is applied when confirmed. A backdated trade would
+    -- change the basis of already recorded sales, so require chronological entry.
+    SELECT occurred_on INTO v_latest_trade_on FROM public.investment_trades
+      WHERE user_id = v_user AND position_id = v_position_id
+      ORDER BY occurred_on DESC LIMIT 1;
+    IF v_latest_trade_on IS NOT NULL
+       AND (p_event->>'occurred_on')::date < v_latest_trade_on THEN
+      RAISE EXCEPTION 'Trades must be entered in chronological order. Latest recorded trade date: %',
+        v_latest_trade_on USING ERRCODE = '23514';
     END IF;
     v_quantity := (p_event->>'quantity_atoms')::numeric;
     IF v_action = 'opening' THEN
