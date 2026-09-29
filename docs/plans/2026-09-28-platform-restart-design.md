@@ -1,6 +1,6 @@
 # Spends Assistant restart: audit and initial design
 
-Date: 2026-09-28. Status: draft for joint review and explicit approval before the roadmap phases. Production records were inspected read-only and were not changed.
+Date: 2026-09-28. Status: approved in principle on 2026-09-28, with web-first delivery and mobile after the web experience is ready. Production records were inspected read-only and were not changed.
 
 ## Evidence and starting point
 
@@ -16,6 +16,8 @@ The latest backend commit is from 2026-02-25, web from 2026-02-21, and mobile fr
 | Mobile         | Expo/WatermelonDB, importer, and recent local UI changes                                                        | Synchronization has no explicit pagination and converts read errors to empty sets. Check the `imports` schema and synchronization tests before a historical import.                           |
 
 `docs/project_status_and_roadmap.md` describes an earlier stage and does not reflect all development from February 2026. Use the current code, migrations, and tests for prioritization.
+
+The first implementation cycle targets the web application and only the shared Worker/database changes needed to support it. Mobile feature work follows once the corresponding web workflows are complete and verified. Existing uncommitted mobile work remains preserved.
 
 ### Read-only production audit
 
@@ -43,6 +45,8 @@ Three approaches were compared: one model for every task, task-specific model se
 The Worker should expose a single AI interface for parsing and rules, with a configurable model for each task. All financial requests should use `provider: { zdr: true, data_collection: 'deny' }` and a maximum token price. Filter providers at request time. DeepInfra, NovitaAI, and Relace are candidates, but verify each model/provider combination before enabling it. Do not pin a provider that may stop offering a model. Do not upload files to persistent provider storage; use private images transiently for vision requests.
 
 The target is **under US$10 per person per month**. An OpenRouter key limit provides another guardrail, but a multiuser product also needs its own per-user monthly counter. Record model, provider, tokens, actual cost returned by the API, task class, outcome, and an identifier that contains no financial content. Reserve budget before large jobs, block processing when estimated cost exceeds the remaining balance, and show estimated cost for OCR batches. Manual review should incur no AI cost.
+
+The app already has monthly `usage_tracking` rows and plan-specific request counts. The Worker checks the parse count on `/parse`; the web app displays counts and checks transaction import limits. This is a starting point for product quotas, not a dollar spending cap: active Pro users have unlimited AI parses, and the OpenRouter client currently returns token counts without recording cost. Add a server-side per-user USD ledger and reservation/enforcement path before production rollout. Keep request-count limits as separate product policy.
 
 Before changing production, create an anonymized evaluation set of SMS messages, Nequi transfers, other transfers, and informational messages. Compare the current Gemini integration with candidate models on amount/date/account accuracy, detection of non-transactions, category quality, false duplicates, latency, and cost. Validate structured JSON output. Invalid responses should go to review and never be saved automatically.
 
@@ -74,12 +78,13 @@ The current prompt contains static categories, while actual categories belong to
 
 ## Execution order
 
-1. **Stabilize the foundation:** Supabase credentials and connectivity; fix older Worker tests; check mobile synchronization, pagination, import schema, and balances. Take a backup before changing historical data.
-2. **Text AI:** common OpenRouter client, task-specific configuration, privacy and budget controls, evaluation set, and migration of parsing/rule generation. Deploy after comparing results.
-3. **Historical capture:** inbox and Shortcut, private JSON export, duplicate checks at confirmation, Nequi group review, and batch import.
-4. **OCR and reconciliation:** Storage, observations, multimodal extraction, review, reconciliation, and semantic search if it proves useful.
-5. **Web net worth:** investments, positions, and loans. Then mobile parity and synchronization tests.
-6. **Historical improvements:** full audit, description/category suggestions, and approved batch application.
+1. **Stabilize the web foundation:** verify web import, balances, and duplicate behavior; fix older Worker tests and required shared services. Take a backup before changing historical data.
+2. **Web text AI:** common OpenRouter client, task-specific configuration, privacy and per-user USD budget controls, evaluation set, and migration of parsing/rule generation. Deploy after comparing results.
+3. **Web historical capture:** inbox and Shortcut endpoint, private JSON export, duplicate checks at confirmation, Nequi group review, and batch import.
+4. **Web OCR and reconciliation:** Storage, observations, multimodal extraction, review, reconciliation, and semantic search if it proves useful.
+5. **Web net worth:** investments, positions, loans, movements, and valuations.
+6. **Web historical improvements:** full audit, description/category suggestions, and approved batch application.
+7. **Mobile parity:** adapt models, synchronization, import schema, screens, and tests after the matching web workflows are ready.
 
 ## Implementation workflow
 
@@ -89,7 +94,7 @@ Use the smallest capable model and the minimum repository context needed for eac
 
 - Supabase was paused at the start of this review. After it was resumed, read-only pagination worked and produced the aggregate audit above. The database has not been modified.
 - The local Worker migration uses OpenRouter for text parsing and rule generation. No `OPENROUTER_API_KEY` is configured, candidate models have not been compared on personal messages, and no API spending has occurred. The migration is not ready to deploy.
-- The user requested explicit approval before implementing the larger roadmap. The local OpenRouter migration and English documentation cleanup were already in progress when that boundary was set; no other roadmap phase has begun.
+- The user approved the roadmap direction on 2026-09-28 and specified web-first delivery. The local OpenRouter migration and English documentation cleanup preceded that approval; no other roadmap phase has begun.
 - Web: TypeScript and 490 tests pass. Backend: TypeScript and lint pass after explicitly setting module resolution; 174 tests pass and the same 12 baseline tests fail. Mobile: TypeScript and 26 tests pass after declaring missing Babel dependencies. The repository-wide backend Prettier check still reports pre-existing formatting differences.
 
 ## External references
