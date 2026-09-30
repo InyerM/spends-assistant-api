@@ -33,6 +33,14 @@ jobs:
       - name: Type check
         run: pnpm run type-check
 
+      - name: Configure OpenRouter secret
+        run: |
+          test -n "$OPENROUTER_API_KEY"
+          printf '%s' "$OPENROUTER_API_KEY" | pnpm exec wrangler secret put OPENROUTER_API_KEY
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
       - name: Deploy
         run: pnpm run deploy
         env:
