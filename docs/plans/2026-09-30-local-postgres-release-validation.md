@@ -1,6 +1,6 @@
 # Local PostgreSQL release validation — 2026-09-30
 
-Status: local validation complete for the checks below. No production migration, Worker deployment, web deployment, or financial backfill was performed.
+Status: this records the pre-release local validation only. Production migrations, deployments, and reviewed backfill were performed later on 2026-09-30; see `2026-09-29-web-release-manifest.md` for the current state.
 
 ## Recovery artifact
 
@@ -20,4 +20,4 @@ Status: local validation complete for the checks below. No production migration,
 
 The local tests do not verify remote grants, actual Supabase Storage object operations, deployed route compatibility, or a production rollback. A linked read-only check on 2026-09-30 found zero applied `20260929` migrations; `public.shortcut_inbox_items` and `public.documents` were absent. Recheck immediately before release. The release manifest's approval gate and deployment order remain in effect.
 
-The first historical financial batch remains ten owner-reviewed notices worth COP 1,748,113 in the private `backfill_first_wave_review` table. A live read-only recheck on 2026-09-30 found zero source-account/date/amount matches and zero exact raw-text matches for these ten notices. Results are in `/Users/inyermarin/Developer/personal/spends-assistant/backfill-private-2026-09-29/first-wave-live-candidate-recheck-2026-09-30.json`. Each still needs a final live candidate lookup after the inbox routes are deployed, followed by explicit reviewed creation or matching. Three January Mastercard duplicate groups remain quarantined because the relevant February card statement is unavailable; they must not block unrelated backfill.
+At this pre-release checkpoint, the first historical financial batch contained ten owner-reviewed notices worth COP 1,748,113 in the private `backfill_first_wave_review` table. A live read-only recheck on 2026-09-30 found zero source-account/date/amount matches and zero exact raw-text matches for these ten notices. Results are in `/Users/inyermarin/Developer/personal/spends-assistant/backfill-private-2026-09-29/first-wave-live-candidate-recheck-2026-09-30.json`. The ten notices were later created through the atomic review function. The February card statement was later supplied and resolved the three January Mastercard duplicate groups; see the release manifest for current results.
