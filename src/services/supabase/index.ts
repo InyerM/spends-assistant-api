@@ -6,6 +6,7 @@ import { ApiKeysService } from './api-keys.service';
 import { UsageService } from './usage.service';
 import { AiUsageService } from './ai-usage.service';
 import { SkippedMessagesService } from './skipped-messages.service';
+import { ShortcutInboxService } from './shortcut-inbox.service';
 
 export interface SupabaseServices {
   accounts: AccountsService;
@@ -16,6 +17,7 @@ export interface SupabaseServices {
   usage: UsageService;
   aiUsage: AiUsageService;
   skippedMessages: SkippedMessagesService;
+  shortcutInbox: ShortcutInboxService;
 }
 
 export function createSupabaseServices(url: string, serviceKey: string): SupabaseServices {
@@ -27,7 +29,8 @@ export function createSupabaseServices(url: string, serviceKey: string): Supabas
     apiKeys: new ApiKeysService(url, serviceKey),
     usage: new UsageService(url, serviceKey),
     aiUsage: new AiUsageService(url, serviceKey),
-    skippedMessages: new SkippedMessagesService(url, serviceKey)
+    skippedMessages: new SkippedMessagesService(url, serviceKey),
+    shortcutInbox: new ShortcutInboxService(url, serviceKey)
   };
 }
 
@@ -39,3 +42,4 @@ export { ApiKeysService } from './api-keys.service';
 export { UsageService } from './usage.service';
 export { AiUsageService } from './ai-usage.service';
 export { SkippedMessagesService } from './skipped-messages.service';
+export { ShortcutInboxService } from './shortcut-inbox.service';

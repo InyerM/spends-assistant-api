@@ -15,11 +15,19 @@ import {
   buildAutomationRulesPromptSection
 } from '../services/transfer-processor';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
+import { resolveShortcutReceiptAt } from '../utils/shortcut-receipt-time';
 
 interface TransactionRequest {
   text: string;
   source?: string;
+  received_at?: string;
 }
+
+const HELD_INCOMING_REASONS = new Set([
+  'incoming_payment_requires_review',
+  'incoming_transfer_requires_review',
+  'incoming_refund_requires_review'
+]);
 
 export async function handleTransaction(request: Request, env: Env): Promise<Response> {
   try {
@@ -29,7 +37,7 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
     if (!userId) return unauthorizedResponse();
 
     const body = (await request.json()) as TransactionRequest;
-    const { text, source = 'api' } = body;
+    const { text, source = 'api', received_at: receivedAt } = body;
 
     if (!text) {
       return new Response('Missing text', { status: 400 });
@@ -86,6 +94,17 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
         reason: expense.skip_reason ?? 'not_transaction',
         parsed_data: expense as unknown as Record<string, unknown>
       });
+      if (expense.skip_reason && HELD_INCOMING_REASONS.has(expense.skip_reason)) {
+        const originalReceiptAt = resolveShortcutReceiptAt(text, receivedAt);
+        if (originalReceiptAt) {
+          await services.shortcutInbox.createPending({
+            userId,
+            source: /^[a-z][a-z0-9_-]{1,39}$/u.test(source) ? source : 'api',
+            receivedAt: originalReceiptAt,
+            rawText: text
+          });
+        }
+      }
       return new Response(
         JSON.stringify({
           status: 'skipped',

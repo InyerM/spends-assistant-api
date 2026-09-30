@@ -1,0 +1,9 @@
+# Worker-held incoming notices in the Shortcut review inbox
+
+The legacy Worker `POST /transaction` route remains a transaction-creating endpoint for ordinary expenses. Its parser holds explicit incoming payment, transfer, and refund notices before cache or model use. Held notices still return the existing `{ "status": "skipped", "reason": "incoming_*_requires_review" }` response and enter `skipped_messages`.
+
+When an original SMS receipt instant is supplied, the Worker also inserts a pending `shortcut_inbox_items` row for review. It accepts `received_at` in the request body only as an ISO timestamp with a timezone, or the existing `[Recibido: DD/MM/YYYY HH:mm[:ss]]` prefix in the original text. If both are present, they must identify the same instant. The original text is stored without rewriting it. The authenticated owner ID, never a body-provided user ID, scopes the row. The idempotency fingerprint matches the web inbox's source, normalized text, and receipt-instant fallback key; a replay verifies the existing row without reopening a reviewed item. No held notice creates a transaction or changes an account balance.
+
+The bank's stated event time is **not** proof of SMS receipt time. A held notice without a valid original receipt instant remains only in `skipped_messages`, including old Bancolombia Scriptable messages that sent just the body. This preserves the documented historical backfill rule: export the original Shortcut message timestamp, then use the web inbox for bulk review. Updating an installed Scriptable sender to include `received_at` is optional for live use, but that sender is still unsuitable for unattended historical replay because `/transaction` can create other financial rows directly.
+
+Focused regression: `./node_modules/.bin/vitest run tests/handlers/held-incoming-inbox.test.ts tests/parsers/expense.test.ts` and `./node_modules/.bin/tsc --noEmit`. No schema or web change is required.
