@@ -151,4 +151,21 @@ The model suggested **155 possible financial notices**: 72 purchases, 71 outgoin
 
 `scripts/shortcut-candidate-review.mjs` performed another read-only comparison for those 155 possible financial notices. A conservative parser found an explicit amount in 147 and both an amount and a message-stated event date in 116. Across active ledger rows, only **one** notice had a same-amount candidate within three days, and that candidate lacked a verified same-account signal. The remaining 154 have no candidate under these narrow rules; this does not prove that they are missing from the ledger because statement posting dates, account mapping, unparsed wording, or prior edits can differ. The private item-level candidate report is `../backfill-private-2026-09-29/financial-candidates-2026-09-29.json`.
 
-Review order: confirm the model's non-posting labels, inspect conflicting `pagaste` versus transfer wording, compare dated amounts against bank statements and CSV rows, establish account balance baselines, then decide individually whether to link an existing row or create a missing one. Do not apply automation rules or financial writes from these AI suggestions alone. Recipient-level Nequi recurrence analysis is a separate follow-up after this first review.
+## Outgoing recipient recurrence review
+
+`scripts/shortcut-recipient-review.mjs` groups explicit destinations in outgoing Bancolombia transfer notices from the three dated exports. It reads the count-confirmed owner ledger and categories using GET requests only. Exact raw-text matches provide prior category evidence only when one existing expense row matches; duplicated raw-text matches are ambiguous. The report stays outside Git with owner-only permissions and assigns aliases such as `R001` for discussion. It neither creates transactions nor inserts automation rules.
+
+```sh
+node scripts/shortcut-recipient-review.mjs \
+  --input=Bancolombia-01.txt \
+  --input='Bancolombia mayo-2.txt' \
+  --input=Nequi-01.txt \
+  --out-private=/private/path/recipient-review.json \
+  --expected-count=1516
+```
+
+On September 29, 270 of the 1,111 deduplicated notices stated an outgoing transfer. The parser found an explicit destination in all 270, grouped into 124 identifiers. Fourteen groups appeared on at least three distinct event days across at least two months. A starred ten-digit destination beginning with `3` is treated as a complete probable Colombian phone identifier; other starred destinations, including eleven-digit values, remain weak account identifiers. The largest probable-phone groups contained 40 and 24 notices. The first had 31 uniquely matched rows already typed `transfer`, but account ownership remains unverified. The second had 18 uniquely matched expense rows all previously labeled `Restaurant, Fast-food`; another probable-phone group had four of four such rows. These two groups meet the threshold for **review suggestions**, not active rules: the prior labels may themselves need correction, and the owner has not confirmed either recipient. Zero rules were created. The private result is `../backfill-private-2026-09-29/recipient-review-2026-09-29-v4.json`; a shorter owner review table is `../backfill-private-2026-09-29/recurring-destinations-owner-review-2026-09-29.md`.
+
+Review the high-frequency aliases against bank receipts or account details before assigning a person, merchant, own account, or category. An outgoing transfer to the owner's account must be modeled as an internal transfer only after account ownership is verified. `match_phone` rules trigger the transfer processor's internal-transfer flow, so they must never be used to categorize an external Nequi recipient. After owner confirmation, a general rule may match the complete raw destination phrase and source, set a category, and remain inactive until verified on historical and synthetic examples. Time of day and frequency are supporting signals, not sufficient category evidence. The SMS body does not reliably identify the receiving institution, so this report calls them destinations rather than confirmed Nequi accounts.
+
+Review order: confirm the model's non-posting labels, inspect conflicting `pagaste` versus transfer wording, compare dated amounts against bank statements and CSV rows, establish account balance baselines, then decide individually whether to link an existing row or create a missing one. Review the recurrent destination aliases with the owner before drafting any rules. Do not apply automation rules or financial writes from these suggestions alone.
