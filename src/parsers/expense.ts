@@ -14,6 +14,36 @@ export interface ParseExpenseOptions {
   telemetry?: { userId: string; service: AiUsageService };
 }
 
+function incomingBankReview(text: string): ParsedExpense | null {
+  const received = text.match(
+    /^(?:\[[^\]]+\]\s*)?(?:(?:SMS from\s+)?(Bancolombia|Nequi)\s*:\s*)?(?:[\p{L}]+,\s*)?recibiste\s+(?:un(?:a)?|la)\s+(pago|transferencia|devoluci[oó]n)\b/iu
+  );
+  if (!received) return null;
+
+  const kind = received[2]
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  const skipReason =
+    kind === 'transferencia'
+      ? 'incoming_transfer_requires_review'
+      : kind === 'devolucion'
+        ? 'incoming_refund_requires_review'
+        : 'incoming_payment_requires_review';
+
+  return {
+    is_transaction: false,
+    skip_reason: skipReason,
+    amount: 0,
+    description: '',
+    category: 'missing',
+    bank: received[1]?.toLowerCase() ?? 'other',
+    payment_type: 'unknown',
+    source: 'manual',
+    confidence: 100
+  };
+}
+
 async function parseExpenseCore(
   text: string,
   apiKey: string,
@@ -21,6 +51,9 @@ async function parseExpenseCore(
   options?: ParseExpenseOptions,
   meter?: AiUsageMeter
 ): Promise<ParsedExpense> {
+  const incoming = incomingBankReview(text);
+  if (incoming) return incoming;
+
   const model = options?.model ?? 'deepseek/deepseek-v4.1-flash';
   const { date, time } = getCurrentColombiaTimes();
   const system = [

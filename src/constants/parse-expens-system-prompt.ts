@@ -49,7 +49,9 @@ Examples of NON-transactions:
 - "Activa tu tarjeta de credito Bancolombia" → is_transaction=false, skip_reason="promotional"
 - "Recuerda pagar tu factura antes del 15" → is_transaction=false, skip_reason="informational"
 
-If it IS a real transaction (purchase, payment, withdrawal, transfer), set is_transaction=true and skip_reason=null.
+Received money requires a separate review before it can enter the ledger. For "Recibiste un pago de Nomina", "recibiste una transferencia", or "Recibiste la devolucion" (including a credit card refund), set is_transaction=false and skip_reason="incoming_transaction_requires_review". These are real money movements, but the expense-only ingestion path cannot safely assign their transaction type or account. Never represent them as expenses. Do not infer that an incoming transfer is earned income or that a refund is a new purchase.
+
+For a supported outgoing transaction (purchase, payment, withdrawal, sent transfer), set is_transaction=true and skip_reason=null.
 
 OUTPUT (strict JSON without markdown):
 {

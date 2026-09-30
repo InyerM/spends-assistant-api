@@ -33,6 +33,56 @@ describe('parseExpense', () => {
     vi.stubGlobal('clearTimeout', vi.fn());
   });
 
+  it.each([
+    [
+      'Bancolombia: Recibiste un pago de Nomina por $3.100.000 en tu cuenta AHORROS',
+      'incoming_payment_requires_review'
+    ],
+    [
+      'Bancolombia: CLIENTE, recibiste una transferencia por $50.000 en tu cuenta AHORROS',
+      'incoming_transfer_requires_review'
+    ],
+    [
+      'Bancolombia: Recibiste un pago por $130.000 a tu cuenta AHORROS',
+      'incoming_payment_requires_review'
+    ],
+    [
+      'Bancolombia: Recibiste la devolucion de $24.000 en tu tarjeta de credito',
+      'incoming_refund_requires_review'
+    ]
+  ])('holds a received bank notification for review: %s', async (text, reason) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const cache = {
+      hashKey: vi.fn().mockReturnValue('stale'),
+      get: vi.fn().mockResolvedValue(JSON.stringify(validExpense)),
+      set: vi.fn()
+    } as unknown as CacheService;
+
+    const result = await parseExpense(text, API_KEY, cache);
+
+    expect(result.is_transaction).toBe(false);
+    expect(result.skip_reason).toBe(reason);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(cache.get).not.toHaveBeenCalled();
+  });
+
+  it('does not hold a sent transfer for incoming review', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(createOpenRouterResponse(validExpense)), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await parseExpense(
+      'Bancolombia: Enviaste una transferencia por $50.000',
+      API_KEY
+    );
+
+    expect(result.is_transaction).toBe(true);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it('parses valid response', async () => {
     vi.stubGlobal(
       'fetch',

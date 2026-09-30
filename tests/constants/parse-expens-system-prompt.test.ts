@@ -18,6 +18,13 @@ describe('parse expense system prompt', () => {
     expect(prompt).not.toContain('- Nequi → "transfer"');
   });
 
+  it('keeps received bank money out of the expense flow', () => {
+    expect(prompt).toContain('Recibiste un pago de Nomina');
+    expect(prompt).toContain('recibiste una transferencia');
+    expect(prompt).toContain('Recibiste la devolucion');
+    expect(prompt).toContain('incoming_transaction_requires_review');
+  });
+
   it('does not force a specific category when the text provides no evidence', () => {
     expect(prompt).toContain('If the evidence is insufficient, choose "missing"');
     expect(prompt).not.toContain('If unsure between categories, choose the more specific one');
