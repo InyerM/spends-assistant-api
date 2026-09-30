@@ -15,7 +15,7 @@ const accountOther = '20000000-0000-4000-8000-000000000002';
 const categoryA = '30000000-0000-4000-8000-000000000001';
 const categoryOther = '30000000-0000-4000-8000-000000000002';
 
-async function database(): Promise<PGlite> {
+async function database(withEventTime = false): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(`
     CREATE ROLE authenticated;
@@ -74,6 +74,10 @@ async function database(): Promise<PGlite> {
   `);
   await db.exec(migration('20260929000080_shortcut_match_ack'));
   await db.exec(migration('20260929000110_shortcut_create_transaction'));
+  if (withEventTime) {
+    await db.exec(migration('20260929000120_shortcut_match_reversal'));
+    await db.exec(migration('20260929000180_shortcut_reviewed_event_time'));
+  }
   return db;
 }
 
@@ -97,6 +101,127 @@ const create = (
   `SELECT public.confirm_shortcut_transaction('${item}',${reviewedPayload},'${reviewHash}',${confirmDistinct}) AS result`;
 
 describe('reviewed Shortcut transaction creation', () => {
+  it('stores the reviewed purchase time separately from a notice received 20 minutes later', async () => {
+    const db = await database(true);
+    try {
+      const reviewed = payload(
+        ',"event_at":"2026-09-28T04:40:00-05:00","event_time_confirmed":true'
+      );
+      const first = (await asUser(db, owner, create(inboxA, '', false, reviewed)))[0] as {
+        result: { transaction_id: string; replayed: boolean };
+      };
+      expect(first.result.replayed).toBe(false);
+      const rows = (
+        await db.query(`SELECT t.date::text AS date, t.time::text AS time,
+          t.parsed_data->>'shortcut_event_at' AS event_at,
+          t.parsed_data->>'shortcut_received_at' AS received_at,
+          d.transaction_snapshot->>'event_at' AS snapshot_event_at,
+          d.reviewed_payload->>'event_time_confirmed' AS confirmed
+          FROM public.transactions t JOIN public.shortcut_inbox_match_decisions d
+            ON d.transaction_id = t.id WHERE t.id = '${first.result.transaction_id}'`)
+      ).rows;
+      expect(rows).toMatchObject([
+        {
+          date: '2026-09-28',
+          time: '04:40:00',
+          event_at: '2026-09-28T04:40:00-05:00',
+          snapshot_event_at: '2026-09-28T04:40:00-05:00',
+          confirmed: 'true'
+        }
+      ]);
+      expect(new Date((rows[0] as { received_at: string }).received_at).toISOString()).toBe(
+        '2026-09-28T10:00:00.000Z'
+      );
+      expect(await asUser(db, owner, create(inboxA, '', false, reviewed))).toMatchObject([
+        { result: { transaction_id: first.result.transaction_id, replayed: true } }
+      ]);
+      await expect(asUser(db, owner, create())).rejects.toThrow(
+        'Inbox item already has another decision'
+      );
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('allows a reviewed event on the previous local calendar day', async () => {
+    const db = await database(true);
+    try {
+      const reviewed = payload(
+        ',"date":"2026-09-27","event_at":"2026-09-27T23:50:00-05:00","event_time_confirmed":true'
+      );
+      const result = (await asUser(db, owner, create(inboxB, '', false, reviewed)))[0] as {
+        result: { transaction_id: string };
+      };
+      expect(
+        (
+          await db.query(
+            `SELECT date::text AS date,time::text AS time FROM public.transactions WHERE id='${result.result.transaction_id}'`
+          )
+        ).rows
+      ).toEqual([{ date: '2026-09-27', time: '23:50:00' }]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('keeps receipt-based creation compatible when no event time was reviewed', async () => {
+    const db = await database(true);
+    try {
+      const result = (await asUser(db, owner, create()))[0] as {
+        result: { transaction_id: string };
+      };
+      expect(
+        (
+          await db.query(`SELECT date::text AS date,time::text AS time,
+            parsed_data ? 'shortcut_event_at' AS has_event
+            FROM public.transactions WHERE id='${result.result.transaction_id}'`)
+        ).rows
+      ).toEqual([{ date: '2026-09-28', time: '05:00:00', has_event: false }]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('rejects unconfirmed, mismatched, future, or too-old event timestamps without writes', async () => {
+    const db = await database(true);
+    try {
+      const invalid = [
+        ',"event_at":"2026-09-28T04:40:00-05:00"',
+        ',"event_time_confirmed":true',
+        ',"event_at":"2026-09-28T04:40:00-05:00","event_time_confirmed":false',
+        ',"event_at":"2026-09-27T23:50:00-05:00","event_time_confirmed":true',
+        ',"event_at":"2026-09-28T06:00:00-05:00","event_time_confirmed":true',
+        ',"date":"2026-08-01","event_at":"2026-08-01T04:40:00-05:00","event_time_confirmed":true',
+        ',"event_at":"2026-02-30T04:40:00-05:00","event_time_confirmed":true',
+        ',"event_at":"2026-09-28T04:40:00","event_time_confirmed":true'
+      ];
+      for (const extra of invalid) {
+        await expect(
+          asUser(db, owner, create(inboxA, '', false, payload(extra)))
+        ).rejects.toThrow();
+      }
+      await expect(
+        asUser(
+          db,
+          owner,
+          create(
+            inboxOther,
+            '',
+            false,
+            payload(',"event_at":"2026-09-28T04:40:00-05:00","event_time_confirmed":true')
+          )
+        )
+      ).rejects.toThrow('Inbox item not found');
+      expect(
+        (await db.query('SELECT count(*)::int AS count FROM public.transactions')).rows
+      ).toEqual([{ count: 0 }]);
+      expect(
+        (await db.query(`SELECT balance FROM public.accounts WHERE id='${accountA}'`)).rows
+      ).toEqual([{ balance: '10000.00' }]);
+    } finally {
+      await db.close();
+    }
+  });
   it('creates one owned transaction, balance change, quota count and immutable decision; retry replays', async () => {
     const db = await database();
     try {
