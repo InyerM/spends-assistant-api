@@ -23,6 +23,15 @@ describe('parse expense system prompt', () => {
     expect(prompt).not.toContain('If unsure between categories, choose the more specific one');
   });
 
+  it('uses optical merchant evidence without inventing a merchant from a QR key', () => {
+    const userPrompt = buildSystemPrompt('2026-09-28', '10:30', [
+      { slug: 'health-care', name: 'Health Care, Doctor', type: 'expense' },
+      { slug: 'missing', name: 'Uncategorized', type: 'expense' }
+    ]);
+    expect(userPrompt).toContain('optician or eyeglasses');
+    expect(userPrompt).toContain('A numeric QR key alone does not identify a merchant');
+  });
+
   it('uses only the active user catalog when it is supplied', () => {
     const userPrompt = buildSystemPrompt('2026-09-28', '10:30', [
       { slug: 'custom-lunch', name: 'Lunch at work', type: 'expense' }

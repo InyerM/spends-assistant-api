@@ -184,6 +184,10 @@ CATEGORIZATION RULES:
 
 PARSING RULES:
 
+Merchant evidence:
+- When a statement, receipt, or transaction text explicitly identifies an optician or eyeglasses (for example, an "Optica" merchant), use health-care if it is in the active category catalog; otherwise choose the closest active vision/medical category.
+- A numeric QR key alone does not identify a merchant or purchase purpose. Use missing unless a matching owner automation rule or reconciled source supplies that evidence.
+
 Amounts:
 - Remove: $, dots (.), commas (,)
 - "k" or "mil" = ×1000 (e.g., "20k" → 20000, "50mil" → 50000)
