@@ -163,12 +163,12 @@ BEGIN
 
   -- Capture the amount and original event date/time from the immutable SMS.
   v_notice_parts := regexp_match(v_notice,
-    '^Bancolombia:[[:space:]]+Recibiste[[:space:]]+un[[:space:]]+pago[[:space:]]+de[[:space:]]+N[oó]mina[[:space:]]+de[[:space:]]+.+[[:space:]]+por[[:space:]]+[$]([0-9]{1,3}(,[0-9]{3})*[.][0-9]{2})[[:space:]]+en[[:space:]]+tu[[:space:]]+cuenta[[:space:]]+de[[:space:]]+Ahorros[[:space:]]+el[[:space:]]+([0-9]{2}/[0-9]{2}/[0-9]{4})[[:space:]]+a[[:space:]]+las[[:space:]]+([0-9]{2}:[0-9]{2})[.]',
+    '^Bancolombia:[[:space:]]+Recibiste[[:space:]]+un[[:space:]]+pago[[:space:]]+de[[:space:]]+N[oó]mina[[:space:]]+de[[:space:]]+.+[[:space:]]+por[[:space:]]+[$]([0-9]{1,3}(?:,[0-9]{3})*[.][0-9]{2})[[:space:]]+en[[:space:]]+tu[[:space:]]+cuenta[[:space:]]+de[[:space:]]+Ahorros[[:space:]]+el[[:space:]]+([0-9]{2}/[0-9]{2}/[0-9]{4})[[:space:]]+a[[:space:]]+las[[:space:]]+([0-9]{2}:[0-9]{2})[.]',
     'i');
   IF v_notice_parts IS NULL
     OR replace(v_notice_parts[1], ',', '')::numeric IS DISTINCT FROM v_locked.amount
-    OR v_notice_parts[3] IS DISTINCT FROM to_char(v_locked.date, 'DD/MM/YYYY')
-    OR v_notice_parts[4] IS DISTINCT FROM to_char(v_locked.time, 'HH24:MI') THEN
+    OR v_notice_parts[2] IS DISTINCT FROM to_char(v_locked.date, 'DD/MM/YYYY')
+    OR v_notice_parts[3] IS DISTINCT FROM to_char(v_locked.time, 'HH24:MI') THEN
     RAISE EXCEPTION 'Shortcut notice does not prove matching incoming payroll'
       USING ERRCODE = '23514';
   END IF;

@@ -20,7 +20,7 @@ const inbox = '88888888-8888-4888-8888-888888888888';
 const decision = '99999999-9999-4999-8999-999999999999';
 const request = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const notice =
-  'Bancolombia: Recibiste un pago de Nomina de CINCINNATI ASSO por $12,459,470.00 en tu cuenta de Ahorros el 28/04/2026 a las 17:21. Si tienes dudas, llamanos al 018000931987.';
+  'Bancolombia: Recibiste un pago de Nomina de CINCINNATI ASSO por $12,459,470.00 en tu cuenta de Ahorros el 28/04/2026 a las 17:21. Si tienes dudas, llamanos al 018000931987. A tu lado siempre.';
 
 async function database(): Promise<PGlite> {
   const db = new PGlite();
