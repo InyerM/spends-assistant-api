@@ -1,6 +1,6 @@
 # Web-first local release manifest
 
-Status: **review draft; nothing published**. This records the current local backend `main` and web `main` release unit. It is not evidence that the resumed Supabase project has these migrations, secrets, or code. The mobile repository is outside this release.
+Status: **database migrations applied on 2026-09-30; Worker and web application deployment pending**. This records the backend and web release unit. The mobile repository is outside this release.
 
 ## Release unit
 
@@ -18,22 +18,23 @@ Apply the new database migrations in filename order: `20260929000000`, `00010`, 
 
 ## Evidence available now
 
-- The complete integrated backend suite passed **382 tests in 43 files**; `tsc --noEmit`, ESLint, and `wrangler deploy --dry-run` passed on 2026-09-29. The Worker was bundled, not deployed.
-- The complete integrated web suite passed **707 tests in 77 files**; `tsc --noEmit`, ESLint with zero errors, and `next build --webpack` with synthetic environment values passed on 2026-09-29. ESLint reported one React Hook Form compiler warning in `components/transactions/transaction-form.tsx:166`.
+- The integrated backend suite passed **383 tests in 43 files** on 2026-09-30 with a 15-second test timeout. The default 5-second timeout intermittently failed on PGlite-heavy tests under concurrent local load; the focused real PostgreSQL checks passed. `tsc --noEmit`, ESLint, and `wrangler deploy --dry-run` passed. The Worker was bundled, not deployed.
+- The integrated web suite passed **707 tests in 77 files**; `tsc --noEmit`, ESLint with zero errors, and `next build` passed on 2026-09-30. ESLint reported one React Hook Form compiler warning in `components/transactions/transaction-form.tsx:166`.
 - PGlite tests cover owner isolation, replay, direct-role denial, reviewed-document erasure, Shortcut duplicate rechecks, balance/quota updates, account deletion guards, and request reservations. These are synthetic local database tests; they do not prove multi-connection PostgreSQL locking or the current remote grants. `docker info` could not connect to the Docker daemon on 2026-09-29.
 - The read-only audit of the confirmed **1,516-transaction** profile and private 72-signal proposal file are documented in `docs/audits/2026-09-28-transaction-quality-audit.md`. No historical transaction was edited.
 - The five-page invented PDF passed local rendering but failed repeatable model quality: focused Qwen 30B runs scored **15/21, 18/21, 21/21, and 16/21** exact rows. One clean run does not satisfy the two-run gate. See `docs/evaluations/2026-09-29-pdf-synthetic-focused-live.md`.
 - An eight-case invented BGE-M3 benchmark improved the held-out correct first suggestion from **1/4 to 3/4**, but the no-match case still received a false suggestion. No real document embeddings or pgvector schema were created. See `docs/evaluations/2026-09-29-document-vector-synthetic.md`.
-- A read-only `supabase migration list --linked` check on 2026-09-29 showed the linked database ends at migration `20241125000019`; none of the local `20260929` migrations has been applied remotely. This check does not verify table grants, a backup, or application readiness.
+- A linked read-only check before release found no `20260929` migrations. `supabase db push --linked` then applied all 16 on 2026-09-30. A direct read-only check found 16 migration records, the expected inbox/document/investment tables, and 1,516 active transactions in the owner's profile. This does not verify hosted table grants, application compatibility, or financial backfill.
 - The existing mobile offline sync upserts transactions and accounts directly as an authenticated user (`spends-assistant-mobile/src/database/sync.ts`). Migration `00130` keeps transaction INSERT privileges to preserve compatibility, so the new transaction RPC guarantees apply to the web route, not every client. Migration `00160` guards deleted/inactive account references and revokes direct account/transaction hard DELETE; it does not close direct financial inserts or updates. See `docs/plans/2026-09-29-atomic-transaction-edit.md` and issue WEB-17 in `docs/plans/2026-09-29-web-issue-drafts.md`.
 - The 1,516-row audit lacks opening balances or a complete reconciled statement interval. Historical transaction creation will affect stored account balances; obtain reviewed account baselines before financial backfill. See issue WEB-16 in `docs/plans/2026-09-29-web-issue-drafts.md`.
 - On 2026-09-30, a verified custom-format logical database archive was created and all 16 migrations applied to an isolated PostgreSQL 17 database built from the linked `public` schema. Concurrent synthetic quota and Shortcut calls, owner document and Storage policy checks, direct hard-delete denial, and an account deletion guard passed. The Storage and Auth dependencies were local stubs, so their hosted behavior remains unverified. See `docs/plans/2026-09-30-local-postgres-release-validation.md`.
+- Backend `main` at `8b80a0c` was pushed after the database migration. GitHub Actions run [36766196661](https://github.com/InyerM/spends-assistant-api/actions/runs/36766196661) passed install, lint, and type check, then failed at `wrangler secret put` with Cloudflare authentication error `10000` on `/memberships`; the deploy step was skipped. The new OpenRouter key exists in the repository's GitHub Actions secrets. No Worker or web application deployment has been confirmed.
 
-## Approval and release sequence
+## Release sequence
 
-1. Make a verified backup of the linked Supabase project. Confirm a staging path with real PostgreSQL sessions and test multi-connection quota/Shortcut/transaction/account races, RLS grants, hard-delete behavior, and image Storage policies. Do not use personal documents for these checks.
-2. Obtain explicit production release approval. The release approval should name database migrations, the OpenRouter Worker secret, Worker deployment, and web deployment; a local commit or dry run is not a release approval.
-3. Apply migrations in order. Deploy the Worker only after `00100` exists; deploy the web app only after document/Shortcut/wealth RPCs exist. Coordinate `00070` with the new web extraction route because an old web route cannot complete OCR after that migration. A short maintenance window may be needed.
+1. Completed: verified logical database backup and isolated PostgreSQL validation with synthetic users and no personal documents.
+2. Completed: the owner approved the database migrations, OpenRouter Worker secret, Worker deployment, and web deployment on 2026-09-30.
+3. In progress: all migrations applied in order. Restore Cloudflare deployment authentication, deploy the Worker with the OpenRouter secret, then deploy the web app. Migration `00070` revokes the old browser extraction completion route, so the existing web release cannot complete OCR until the new app is deployed.
 4. Smoke test with a separate synthetic user: text quota, image draft and audited match/rejection, Shortcut replay/match/new distinct payment, CSV replay and transfer rejection, transaction edit/delete, account deletion guard, investment/loan journals, and cross-owner denials. Verify no unintended transaction or balance write from OCR alone.
 5. Compare returned provider costs to the planning estimate of USD 10 per person per month without enforcing a dollar cap. Ask for manually labeled real samples before claims about category quality, screenshot coverage, PDF statements, semantic search, or automated historical rewrites.
 
