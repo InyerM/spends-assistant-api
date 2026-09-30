@@ -73,10 +73,11 @@ async function request(url, key, path, options = {}) {
   return await response.json();
 }
 
-async function getRows(url, key, table, query) {
+export async function getRows(url, key, table, query) {
   const output = [];
   for (let offset = 0; ; offset += 500) {
-    const page = await request(url, key, `${table}?${query}&limit=500&offset=${offset}`);
+    const page = await request(url, key,
+      `${table}?${query}&order=id.asc&limit=500&offset=${offset}`);
     output.push(...page);
     if (page.length < 500) return output;
   }

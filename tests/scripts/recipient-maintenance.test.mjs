@@ -68,3 +68,31 @@ test('amount, account, and description restrictions prevent unrelated matches', 
   assert.equal(matchesPlannedRule(rule, { ...candidate, account_id: 'bank-2' }), false);
   assert.equal(matchesPlannedRule(rule, { ...candidate, description: 'Groceries' }), false);
 });
+
+test('paged reads keep every row when unordered pages would overlap', async () => {
+  const { getRows } = await import('../../scripts/recipient-maintenance.mjs');
+  assert.equal(typeof getRows, 'function');
+  const records = Array.from({ length: 601 }, (_, index) => ({
+    id: `row-${String(index).padStart(3, '0')}`
+  }));
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (endpoint) => {
+    const url = new URL(endpoint);
+    requests.push(url);
+    const offset = Number(url.searchParams.get('offset'));
+    const page = offset === 500 && url.searchParams.get('order') !== 'id.asc'
+      ? records.slice(400, 501)
+      : records.slice(offset, offset + 500);
+    return { ok: true, json: async () => page };
+  };
+  try {
+    const rows = await getRows('https://example.supabase.co', 'test-key',
+      'transactions', 'select=*&user_id=eq.owner');
+    assert.equal(rows.length, 601);
+    assert.equal(new Set(rows.map((row) => row.id)).size, 601);
+    assert.ok(requests.every((request) => request.searchParams.get('order') === 'id.asc'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
