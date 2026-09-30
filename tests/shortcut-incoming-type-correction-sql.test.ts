@@ -59,8 +59,8 @@ async function database(): Promise<PGlite> {
     CREATE TABLE public.document_observation_decisions(user_id uuid NOT NULL,
       transaction_id uuid NOT NULL);
     INSERT INTO public.accounts VALUES
-      ('${account}','${owner}',900000,'savings','Bancolombia','2651',true,NULL),
-      ('${foreignAccount}','${other}',500000,'savings','Bancolombia','2651',true,NULL);
+      ('${account}','${owner}',900000,'savings','Bancolombia','7799',true,NULL),
+      ('${foreignAccount}','${other}',500000,'savings','Bancolombia','7799',true,NULL);
     INSERT INTO public.transactions(id,user_id,account_id,category_id,amount,date,time,type)
       VALUES ('${transaction}','${owner}','${account}',NULL,100000,
         '2026-05-19','08:38','expense');
@@ -71,6 +71,8 @@ async function database(): Promise<PGlite> {
       '{"account_id":"${account}","amount":100000,"type":"expense"}');
   `);
   await db.exec(migration);
+  await db.exec(`UPDATE public.accounts SET bank_account_last_four='2651'
+    WHERE id IN ('${account}', '${foreignAccount}');`);
   return db;
 }
 
@@ -201,6 +203,19 @@ describe('audited Shortcut incoming transfer correction', () => {
         ]);
         await expect(correct(db)).rejects.toThrow(/notice|incoming/i);
       }
+      expect(((await state(db)) as { corrections: { count: number } }).corrections.count).toBe(0);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('does not treat a debit card suffix as proof of the bank account suffix', async () => {
+    const db = await database();
+    try {
+      await db.exec(
+        `UPDATE public.accounts SET bank_account_last_four=NULL WHERE id='${account}';`
+      );
+      await expect(correct(db)).rejects.toThrow(/notice|incoming/i);
       expect(((await state(db)) as { corrections: { count: number } }).corrections.count).toBe(0);
     } finally {
       await db.close();

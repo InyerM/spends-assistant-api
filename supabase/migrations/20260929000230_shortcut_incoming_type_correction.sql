@@ -1,6 +1,13 @@
 -- Repair a reviewed incoming bank transfer that a historical parser stored as an expense.
 -- The immutable matched SMS proves the cash direction, while the owner-reviewed role
 -- distinguishes principal repayment, sale proceeds, and restricted donations.
+-- A debit-card suffix and its underlying bank-account suffix are different identifiers.
+ALTER TABLE public.accounts ADD COLUMN bank_account_last_four varchar(4)
+  CHECK (bank_account_last_four ~ '^[0-9]{4}$');
+CREATE UNIQUE INDEX accounts_owner_bank_account_suffix_idx
+  ON public.accounts (user_id, lower(institution), bank_account_last_four)
+  WHERE bank_account_last_four IS NOT NULL AND deleted_at IS NULL;
+
 CREATE TYPE public.shortcut_incoming_flow_role AS ENUM (
   'receivable_principal_repayment',
   'personal_sale_proceeds',
@@ -174,7 +181,8 @@ BEGIN
     'i');
   IF v_notice_parts IS NULL
     OR replace(v_notice_parts[1], ',', '')::numeric IS DISTINCT FROM v_locked.amount
-    OR v_notice_parts[2] IS DISTINCT FROM v_account.last_four
+    OR v_notice_parts[2] IS DISTINCT FROM
+      coalesce(v_account.bank_account_last_four, v_account.last_four)
     OR v_notice_parts[3] IS DISTINCT FROM to_char(v_locked.date, 'DD/MM/YY')
     OR v_notice_parts[4] IS DISTINCT FROM to_char(v_locked.time, 'HH24:MI') THEN
     RAISE EXCEPTION 'Shortcut notice does not prove matching incoming transfer'
