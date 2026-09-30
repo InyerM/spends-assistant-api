@@ -2,6 +2,13 @@
 
 Status: **released on 2026-09-30; historical inbox reconciliation in progress**. The initial 16 migrations and three later audited review/correction migrations, the OpenRouter Worker, and the web application are live. The mobile repository is outside this release.
 
+## September 30 follow-up release
+
+- Migrations `20260929000210`, `00220`, and `00230` were applied after a private custom-format backup with 858 archive entries and SHA-256 `c54af11902537fa7a4605336f79cb86814a0a66de3824b541fb453346ed4afe2`; archive ACL entries were omitted, and Storage bytes remain outside the archive. Backend commit `7fa9794` passed deployment run `36790408456`. PostgREST returned HTTP 200 for the new journals and the incoming correction relationship.
+- Web commit `eea767d` added `/receivables`, `/relief-funds`, reviewed role labels, and separate personal-income, personal-expense, and cash-flow reporting. The integrated web suite passed 732 tests in 84 files and a webpack production build. Vercel deployment `dpl_5q3fdMwdzXMTKxjPNm3nbVzPnLP3` reached Ready with the production aliases. A later web correction excludes a personal sale with unknown cost basis from personal income; verify its deployment before relying on that total.
+- Ten owner-confirmed incoming bank notices totaling COP 3,486,000 were corrected without new transaction rows; the account balance increased by COP 6,972,000 because each former expense was reversed and its income direction applied. One real two-session correction test committed once and rejected the competing request. The sibling receivable has COP 700,000 provisional principal; four relief donations total COP 510,000, while actual relief spending and remainder remain unknown. The four Kevin repayments are recorded as principal receipts, but his reported cash settlement has no dated cash source and no receivable journal. Private journals and the review SQLite hold transaction-level evidence.
+- The COP 57 million Lulo-funded inflow, COP 89,991 credit-card refund, and COP 70,000 owned transfer still require distinct reconciliation flows; they must not be converted by the savings-transfer correction RPC. The backend full suite passed 437 of 438 tests under a 15-second timeout; one PDF tile test timed out under parallel load and passed all seven tests in 2.9 seconds when rerun alone.
+
 ## Release unit
 
 | Area                    | Local contract                                                                                                                | Required pairing                                                                                                                                    |

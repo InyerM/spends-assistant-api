@@ -32,8 +32,11 @@ it explicitly says the actual remainder is unknown. The review form requires
 the user to inspect an entry before saving it.
 
 This journal is a source-aware allocation record. It does not create or
-reclassify transactions, adjust accounts, increase income, change spending
-reports, or infer that the COP 90,500 Dollarcity charge was relief spending.
+reclassify transactions, adjust accounts, increase income, or infer that the
+COP 90,500 Dollarcity charge was relief spending. When a verified outlay is
+linked to a ledger transaction, the web dashboard excludes it from personal
+expenses while retaining it in cash flow. An unlinked recollection does not
+alter any spending report.
 The four donation receipts should be entered only after the corresponding
 ledger movements are correctly classified and reviewed. A cash outlay needs
 an exact amount from evidence; otherwise record an `unknown_spend` note.
