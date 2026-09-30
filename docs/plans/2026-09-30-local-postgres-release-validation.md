@@ -1,0 +1,23 @@
+# Local PostgreSQL release validation — 2026-09-30
+
+Status: local validation complete for the checks below. No production migration, Worker deployment, web deployment, or financial backfill was performed.
+
+## Recovery artifact
+
+- A `pg_dump` custom-format archive of the linked Supabase database was created at `/Users/inyermarin/Developer/personal/spends-assistant/backfill-private-2026-09-29/supabase-pre-release-2026-09-30.dump` (mode `0600`, 635,069 bytes). SHA-256: `4a0e01c160836bdd0d583f801143414c5bf811f9a80abca9ec2239804c8375ee`.
+- `pg_restore --list` read 613 archive entries, including `public.transactions`, `public.accounts`, `public.categories`, `public.automation_rules`, and `auth.users` table data. The adjacent private manifest records the command outcome. This is a logical database archive; Storage object bytes need a separate backup if release rollback must preserve them.
+
+## Isolated database check
+
+- PostgreSQL 17.11 ran locally with a private Unix socket and no TCP listener. Its base `public` schema was restored from the linked database archive. Minimal local `auth` and `storage` stubs supplied dependencies that the public schema and new migrations reference. No personal rows were restored to this test database.
+- All 16 `20260929` migrations listed in the release manifest applied in filename order, with each file run in its own transaction. This checks SQL compatibility against the live public schema, but the stubs do not reproduce the complete Supabase Auth or Storage services.
+- Eight simultaneous connections called `reserve_ai_parse` for one synthetic free-plan user with a limit of two. Exactly two returned `allowed=true`; the final counter was two. Two simultaneous `confirm_shortcut_transaction` calls for one synthetic inbox item returned one creation and one replay; the database had one transaction, one decision, one quota increment, and the account balance changed once from 10,000.00 to 8,799.50. Raw results: `/Users/inyermarin/Developer/personal/spends-assistant/backfill-private-2026-09-29/pg17-concurrency-smoke-results.json`.
+- Under the local `authenticated` role, a synthetic second user saw zero owner documents and inbox items; a cross-owner document insert failed row-level security. A Storage policy accepted the owner's path and rejected the second user's path after row-level security was enabled on the local stub. Direct transaction hard delete was denied. A soft-delete attempt on an account with an active transaction failed. Raw results: `/Users/inyermarin/Developer/personal/spends-assistant/backfill-private-2026-09-29/pg17-access-smoke-results.json` and the local `psql` account guard result.
+- Two simultaneous document extraction claims for one synthetic document returned exactly one token. Raw results: `/Users/inyermarin/Developer/personal/spends-assistant/backfill-private-2026-09-29/pg17-document-claim-results.json`.
+- The account/transaction race was exercised in both orders. An in-flight transaction insert committed first and the waiting account delete failed, leaving one transaction and an active account. In the reverse order, account soft deletion committed and the waiting transaction insert failed, leaving no transaction. Raw results: `/Users/inyermarin/Developer/personal/spends-assistant/backfill-private-2026-09-29/pg17-account-race-results.json` and `/Users/inyermarin/Developer/personal/spends-assistant/backfill-private-2026-09-29/pg17-account-reverse-race-results.json`.
+
+## Remaining release checks
+
+The local tests do not verify remote grants, actual Supabase Storage object operations, deployed route compatibility, or a production rollback. A linked read-only check on 2026-09-30 found zero applied `20260929` migrations; `public.shortcut_inbox_items` and `public.documents` were absent. Recheck immediately before release. The release manifest's approval gate and deployment order remain in effect.
+
+The first historical financial batch remains ten owner-reviewed notices worth COP 1,748,113 in the private `backfill_first_wave_review` table. A live read-only recheck on 2026-09-30 found zero source-account/date/amount matches and zero exact raw-text matches for these ten notices. Results are in `/Users/inyermarin/Developer/personal/spends-assistant/backfill-private-2026-09-29/first-wave-live-candidate-recheck-2026-09-30.json`. Each still needs a final live candidate lookup after the inbox routes are deployed, followed by explicit reviewed creation or matching. Three January Mastercard duplicate groups remain quarantined because the relevant February card statement is unavailable; they must not block unrelated backfill.
