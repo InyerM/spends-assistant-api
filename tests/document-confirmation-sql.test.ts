@@ -11,6 +11,14 @@ const inboxMigration = readFileSync(
   join(process.cwd(), 'supabase/migrations/20260929000010_document_inbox.sql'),
   'utf8'
 );
+const signedMigrationPath = join(
+  process.cwd(),
+  'supabase/migrations/20261001000000_signed_document_observations.sql'
+);
+const signedDecisionPath = join(
+  process.cwd(),
+  'supabase/migrations/20261001000010_signed_document_reconciliation.sql'
+);
 const userA = '00000000-0000-4000-8000-000000000001';
 const userB = '00000000-0000-4000-8000-000000000002';
 const documentA = '10000000-0000-4000-8000-000000000001';
@@ -43,10 +51,11 @@ async function database(): Promise<PGlite> {
     $$;
     CREATE TABLE public.transactions (
       id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES auth.users(id), amount numeric(15,2) NOT NULL,
-      date date NOT NULL, description text NOT NULL, deleted_at timestamptz
+      date date NOT NULL, description text NOT NULL, deleted_at timestamptz,
+      type text NOT NULL DEFAULT 'expense'
     );
     INSERT INTO auth.users VALUES ('${userA}'), ('${userB}');
-    INSERT INTO public.transactions VALUES
+    INSERT INTO public.transactions(id, user_id, amount, date, description, deleted_at) VALUES
       ('${transactionA}', '${userA}', 1200, '2026-09-29', 'Shop A', NULL),
       ('${transactionB}', '${userB}', 1200, '2026-09-29', 'Shop B', NULL);
   `);
@@ -75,6 +84,51 @@ async function asUser(db: PGlite, userId: string, sql: string): Promise<unknown[
 }
 
 describe('document confirmation migration', () => {
+  it('confirms a negative bank debit against a positive expense without changing the observation sign', async () => {
+    const db = await database();
+    const signedObservation = '20000000-0000-4000-8000-000000000003';
+    try {
+      await db.exec(readFileSync(signedMigrationPath, 'utf8'));
+      await db.exec(readFileSync(signedDecisionPath, 'utf8'));
+      await db.exec(`
+        INSERT INTO public.document_observations
+          (id, document_id, user_id, ordinal, amount, occurred_at_text, description, source_excerpt, confidence)
+        VALUES ('${signedObservation}', '${documentA}', '${userA}', 2, -1200, '2026-09-29',
+          'Bank debit', 'Bank debit', 0.9)
+      `);
+      await asUser(
+        db,
+        userA,
+        `SELECT public.decide_document_observation('${signedObservation}', 'accept', '${transactionA}', gen_random_uuid())`
+      );
+      expect(
+        (
+          await db.query(
+            `SELECT amount, status FROM document_observations WHERE id = '${signedObservation}'`
+          )
+        ).rows
+      ).toEqual([{ amount: '-1200.00', status: 'confirmed' }]);
+      const incomeId = '30000000-0000-4000-8000-000000000003';
+      const secondObservation = '20000000-0000-4000-8000-000000000004';
+      await db.exec(`
+        INSERT INTO public.transactions(id, user_id, amount, date, description, type)
+          VALUES ('${incomeId}', '${userA}', 1200, '2026-09-29', 'Incoming transfer', 'income');
+        INSERT INTO public.document_observations
+          (id, document_id, user_id, ordinal, amount, occurred_at_text, description, source_excerpt, confidence)
+          VALUES ('${secondObservation}', '${documentA}', '${userA}', 3, -1200, '2026-09-29',
+            'Bank debit', 'Bank debit', 0.9);
+      `);
+      await expect(
+        asUser(
+          db,
+          userA,
+          `SELECT public.decide_document_observation('${secondObservation}', 'accept', '${incomeId}', gen_random_uuid())`
+        )
+      ).rejects.toThrow(/Signed bank debit cannot match an income/);
+    } finally {
+      await db.close();
+    }
+  });
   it('accepts once, returns the same decision for a retry, and leaves the transaction untouched', async () => {
     const db = await database();
     try {
