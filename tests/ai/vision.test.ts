@@ -158,6 +158,22 @@ describe('extractImageObservations', () => {
     expect(result.draft.observations[0].amount).toBe(-12000);
   });
 
+  it('allows slow vision responses while staying below the web extraction timeout', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response(extracted))
+    );
+
+    await extractImageObservations({ apiKey: 'key', imageDataUrl });
+
+    expect(timeout).toHaveBeenCalledWith(expect.any(Number));
+    const milliseconds = timeout.mock.calls[0][0];
+    expect(milliseconds).toBeGreaterThanOrEqual(60_000);
+    expect(milliseconds).toBeLessThan(90_000);
+    timeout.mockRestore();
+  });
+
   it('uses the larger model only on explicit escalation', async () => {
     const fetchMock = vi.fn(async () => response(extracted));
     vi.stubGlobal('fetch', fetchMock);

@@ -181,7 +181,7 @@ export async function extractImageObservations(input: ExtractionInput): Promise<
           max_price: { prompt: 0.4, completion: input.escalate ? 1.6 : 1 }
         }
       }),
-      signal: AbortSignal.timeout(input.escalate ? 60_000 : 30_000)
+      signal: AbortSignal.timeout(input.escalate ? 75_000 : 70_000)
     });
   } catch {
     input.meter?.record(null);
