@@ -1,0 +1,7 @@
+# Lulo email Shortcut creation guard
+
+Lulo credit-card email notices enter the reviewed Shortcut inbox with `source = 'lulo-email-backfill'`. The web interface can list them, show existing-transaction candidates, and let the owner acknowledge a verified match or mark a notice as non-transactional. Creating a new financial row from this source remains disabled until the Lulo account, statement posting dates, and card-payment mapping are reconciled.
+
+Migration `20260929000250_lulo_shortcut_create_guard.sql` rejects a `created` decision for that exact source with a `BEFORE INSERT` trigger on `shortcut_inbox_match_decisions`. This protects the database even if a client calls `confirm_shortcut_transaction` directly. The RPC inserts the transaction and adjusts balance and usage before inserting the decision; a trigger exception aborts the entire SQL statement, rolling all of those writes back. Matched decisions and every other inbox source keep their existing behavior. The original inbox source is immutable, and the trigger checks both inbox ID and owner ID.
+
+The guard is deliberately source-specific. A notice intentionally submitted under another source is outside this restriction and still requires the normal reviewed creation safeguards. Focused PGlite tests cover the blocked RPC and direct decision insert, rollback of finances and quota, non-Lulo creation and replay, owner isolation, and Lulo matching and non-transactional review.
