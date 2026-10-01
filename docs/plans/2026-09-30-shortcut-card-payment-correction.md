@@ -10,8 +10,14 @@ Migration `20260929000260` provides an owner-scoped RPC that converts the existi
 
 Replacing the expense with a new transfer would orphan its existing Shortcut decision. A direct table update would lack the financial audit and replay check. The narrow RPC handles both historical layouts: an expense on the card restores the former card debit before adding the transfer legs; an expense already on savings retains that debit and adds the card credit.
 
-The database validates the evidence fields and their stated date and amount; it cannot inspect the PDF bytes. The caller must verify the file hash and posting before invoking the RPC. The other historical card-payment expenses need their own matching statements. In particular, extra August and September SMS amounts were not found in the available matching card PDFs, so this correction is restricted to the confirmed posting above.
+The database validates the evidence fields and their stated date and amount; it cannot inspect the PDF bytes. The caller must verify the file hash and posting before invoking the RPC. Each additional historical card-payment expense needs its own matching statement. Extra August and September SMS amounts were not found in the available matching card PDFs, so those rows remain unchanged.
 
 ## Verification
 
 Seven PGlite tests cover both balance layouts, idempotency, owner isolation, stale state, altered notices, incomplete or mismatched statement evidence, reversed matches, document-reviewed transactions, rollback, and append-only audit behavior. A rollback-only run of the migration and real August 3 correction against the linked PostgreSQL database succeeded, then confirmed the original expense and absent migration table remained unchanged.
+
+## Published corrections
+
+The migration was applied to the linked database on September 30 after a 953-entry logical backup (SHA-256 `b0cff929080fd9346b9149bcb03ef788509830b8757abe73ff3407b9705df647`). The August 3 Amex posting was corrected first and verified against its immutable match and both account deltas. A second 968-entry backup (SHA-256 `2244a5cbed9f2cf1a6243e8156eb1955b60911e379cc892133b6dc609d2aca4d`) preceded 11 further exact statement matches from January through March. In total, 12 existing expenses worth COP 24,943,071 became transfers without adding or deleting ledger rows; each has one audited correction and retains its matched Shortcut decision. The owner still has 1,659 active transactions. Private journals `amex-card-payment-correction-2026-09-30.json` and `statement-backed-card-payment-corrections-2026-09-30.json` record exact transaction and posting references.
+
+The post-correction audit found 11 remaining active 2026 expense rows with explicit card-payment SMS text. Ten lack an exact posting in the available card statements. The eleventh, COP 421,924 on September 1 to card `*3971`, matches posting `045714` in `3971_SEP2026.pdf`, but no owned credit-card account currently carries that suffix. Its card identity must be established before changing its financial accounts. The 2025 manually described card payments also remain outside this SMS-backed correction scope.
