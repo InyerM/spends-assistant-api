@@ -103,9 +103,7 @@ function validateDraft(value: unknown): ImageExtractionDraft {
     const observation = item as Partial<ImageObservation>;
     if (
       (observation.amount !== null &&
-        (typeof observation.amount !== 'number' ||
-          !Number.isFinite(observation.amount) ||
-          observation.amount === 0)) ||
+        (typeof observation.amount !== 'number' || !Number.isFinite(observation.amount))) ||
       !isNullableString(observation.currency) ||
       !isNullableString(observation.occurred_at) ||
       typeof observation.description !== 'string' ||
@@ -121,7 +119,11 @@ function validateDraft(value: unknown): ImageExtractionDraft {
     }
   }
 
-  return draft as ImageExtractionDraft;
+  // Zero-value balance lines are not transactions and should not invalidate other observations.
+  return {
+    ...(draft as ImageExtractionDraft),
+    observations: (draft.observations as ImageObservation[]).filter((item) => item.amount !== 0)
+  };
 }
 
 export async function extractImageObservations(input: ExtractionInput): Promise<{

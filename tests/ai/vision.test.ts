@@ -139,6 +139,25 @@ describe('extractImageObservations', () => {
     expect(result.draft.observations[0].source_excerpt).toBe('Purchase -12,000');
   });
 
+  it('ignores zero-value balance lines without losing other movements', async () => {
+    const bankScreenshot = {
+      document_type: 'bank_screenshot',
+      observations: [
+        { ...extracted.observations[0], amount: -12000 },
+        { ...extracted.observations[1], amount: 0 }
+      ]
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response(bankScreenshot))
+    );
+
+    const result = await extractImageObservations({ apiKey: 'key', imageDataUrl });
+
+    expect(result.draft.observations).toHaveLength(1);
+    expect(result.draft.observations[0].amount).toBe(-12000);
+  });
+
   it('uses the larger model only on explicit escalation', async () => {
     const fetchMock = vi.fn(async () => response(extracted));
     vi.stubGlobal('fetch', fetchMock);
