@@ -117,6 +117,28 @@ describe('extractImageObservations', () => {
     });
   });
 
+  it('preserves signed card movement amounts for review instead of rejecting the extraction', async () => {
+    const signed = {
+      document_type: 'bank_screenshot',
+      observations: [
+        {
+          ...extracted.observations[0],
+          amount: -12000,
+          source_excerpt: 'Purchase -12,000'
+        }
+      ]
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response(signed))
+    );
+
+    const result = await extractImageObservations({ apiKey: 'key', imageDataUrl });
+
+    expect(result.draft.observations[0].amount).toBe(-12000);
+    expect(result.draft.observations[0].source_excerpt).toBe('Purchase -12,000');
+  });
+
   it('uses the larger model only on explicit escalation', async () => {
     const fetchMock = vi.fn(async () => response(extracted));
     vi.stubGlobal('fetch', fetchMock);

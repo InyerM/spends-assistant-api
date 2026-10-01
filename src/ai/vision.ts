@@ -105,7 +105,7 @@ function validateDraft(value: unknown): ImageExtractionDraft {
       (observation.amount !== null &&
         (typeof observation.amount !== 'number' ||
           !Number.isFinite(observation.amount) ||
-          observation.amount <= 0)) ||
+          observation.amount === 0)) ||
       !isNullableString(observation.currency) ||
       !isNullableString(observation.occurred_at) ||
       typeof observation.description !== 'string' ||

@@ -83,6 +83,24 @@ function completion(token: string, ownerId = owner): string {
 }
 
 describe('server-only document extraction persistence', () => {
+  it('persists signed movements while still rejecting zero-value observations', async () => {
+    const db = await database();
+    try {
+      await db.exec(migration('20261001000000_signed_document_observations.sql'));
+      const token = await claim(db);
+      const signed = observation.replace('"amount":1200', '"amount":-1200');
+      const sql = `SELECT complete_document_extraction_server('${documentId}','${owner}','${token}','bank_screenshot','qwen','${signed}'::jsonb) AS count`;
+      expect(await asRole(db, 'service_role', owner, sql)).toEqual([{ count: 1 }]);
+      expect((await db.query('SELECT amount FROM document_observations')).rows).toEqual([
+        { amount: '-1200.00' }
+      ]);
+      await expect(
+        db.exec(`UPDATE document_observations SET amount = 0 WHERE document_id = '${documentId}'`)
+      ).rejects.toThrow();
+    } finally {
+      await db.close();
+    }
+  });
   it('denies authenticated callers both old completion and server completion', async () => {
     const db = await database();
     try {
