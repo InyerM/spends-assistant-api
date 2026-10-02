@@ -5,9 +5,9 @@ compatibility_date = "2024-11-23"
 
 [vars]
 ENVIRONMENT = "production"
-# Set EMAIL_FORWARDING_DOMAIN to the enabled Email Routing subdomain.
-# Enable subaddressing and route the literal capture@<domain> address to this Worker.
-# The Worker receives capture+<random-token>@<domain> in message.to.
+EMAIL_FORWARDING_DOMAIN = "receipts.inyerm.com"
+# Enable Email Routing and subaddressing for this subdomain, then route
+# capture@receipts.inyerm.com to this Worker. The full plus address arrives in message.to.
 
 [observability]
 enabled = true
