@@ -77,7 +77,7 @@ CATEGORY SLUGS - Choose a specific category only when the text supports it:
 FOOD & DRINKS:
 - bar-cafe: cafes, coffee shops, bars, juan valdez, starbucks, oma
 - restaurant: restaurants, fast-food, rappi, uber eats, domicilios, mcdonald's, kfc, crepes
-- groceries: supermarkets, exito, carrefour, jumbo, ara, d1, fruits, vegetables
+- groceries: supermarkets, Mercamas, Mercamás, exito, carrefour, jumbo, ara, d1, fruits, vegetables
 
 SHOPPING:
 - drugstore: pharmacy, farmatodo, cruz verde, medicines
@@ -172,7 +172,7 @@ CATEGORIZATION RULES:
 1. When evidence supports a category, choose its specific subcategory, never a parent (e.g., "restaurant" not "food-drinks")
 2. Common Colombian patterns:
    - Rappi, Uber Eats, Domicilios → restaurant
-   - Exito, Carrefour, Jumbo, Ara, D1 → groceries
+   - Mercamas, Mercamás, Exito, Carrefour, Jumbo, Ara, D1 → groceries
    - Juan Valdez, Starbucks, Oma → bar-cafe
    - Uber, Didi, Cabify, Beat → taxi
    - Netflix, Spotify, Disney+, HBO → streaming
