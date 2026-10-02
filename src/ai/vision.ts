@@ -122,7 +122,18 @@ function validateDraft(value: unknown): ImageExtractionDraft {
   // Zero-value balance lines are not transactions and should not invalidate other observations.
   return {
     ...(draft as ImageExtractionDraft),
-    observations: (draft.observations as ImageObservation[]).filter((item) => item.amount !== 0)
+    observations: (draft.observations as ImageObservation[])
+      .filter((item) => item.amount !== 0)
+      .map((item) => ({
+        ...item,
+        // The currency symbol is shared by COP and USD. Keep uncertain USD rows
+        // available for human review instead of posting an unsupported currency.
+        currency:
+          item.currency?.toUpperCase() === 'USD' &&
+          !/\b(?:USD|USDT|DOLLARS?|D[OÓ]LAR(?:ES)?)\b|US\$/i.test(item.source_excerpt)
+            ? null
+            : item.currency
+      }))
   };
 }
 
@@ -152,7 +163,7 @@ export async function extractImageObservations(input: ExtractionInput): Promise<
           {
             role: 'system',
             content:
-              'Extract only visible financial facts from the image. Return one observation per distinct movement, including multiple receipts in one image. Never invent missing fields. If there is no movement, return an empty observations array.'
+              'Extract only visible financial facts from the image. Return one observation per distinct movement, including multiple receipts in one image. A dollar sign alone does not mean USD. Use an explicit currency code or clear bank and country context; Colombian bank and Nequi amounts are COP unless the image explicitly says otherwise. If currency remains ambiguous, return null. Never invent missing fields. If there is no movement, return an empty observations array.'
           },
           {
             role: 'user',

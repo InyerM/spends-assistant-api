@@ -65,6 +65,7 @@ describe('extractImageObservations', () => {
       type: 'image_url',
       image_url: { url: imageDataUrl }
     });
+    expect(body.messages[0].content).toContain('A dollar sign alone does not mean USD');
   });
 
   it('meters provider cost and tokens without retaining image content', async () => {
@@ -137,6 +138,30 @@ describe('extractImageObservations', () => {
 
     expect(result.draft.observations[0].amount).toBe(-12000);
     expect(result.draft.observations[0].source_excerpt).toBe('Purchase -12,000');
+  });
+
+  it('does not treat an ambiguous dollar sign as proof of USD', async () => {
+    const bankScreenshot = {
+      document_type: 'bank_screenshot',
+      observations: [
+        {
+          ...extracted.observations[0],
+          currency: 'USD',
+          source_excerpt: 'Bancolombia compra $12.000'
+        },
+        { ...extracted.observations[1], currency: 'USD', source_excerpt: 'Purchase USD 5.00' },
+        { ...extracted.observations[1], currency: 'USD', source_excerpt: 'Compra de un dólar' }
+      ]
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response(bankScreenshot))
+    );
+
+    const result = await extractImageObservations({ apiKey: 'key', imageDataUrl });
+    expect(result.draft.observations[0].currency).toBeNull();
+    expect(result.draft.observations[1].currency).toBe('USD');
+    expect(result.draft.observations[2].currency).toBe('USD');
   });
 
   it('ignores zero-value balance lines without losing other movements', async () => {
