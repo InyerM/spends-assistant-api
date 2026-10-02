@@ -1,5 +1,6 @@
 import { handleTelegram } from './handlers/telegram';
 import { handleEmail } from './handlers/email';
+import { handleEmailForwardingRoute, handleForwardedEmail } from './handlers/email-forwarding';
 import { handleTransaction } from './handlers/transaction';
 import { handleParse } from './handlers/parse';
 import { handleVisionExtract } from './handlers/vision-extract';
@@ -66,6 +67,10 @@ export default {
       return handleEmail(request, env);
     }
 
+    if (url.pathname === '/email-forwarding-route') {
+      return handleEmailForwardingRoute(request, env);
+    }
+
     // Parse API (parse only, no save)
     if (url.pathname === '/parse' && request.method === 'POST') {
       return handleParse(request, env);
@@ -86,6 +91,10 @@ export default {
     }
 
     return new Response('Not Found', { status: 404 });
+  },
+
+  async email(message: ForwardableEmailMessage, env: Env, _ctx: ExecutionContext): Promise<void> {
+    await handleForwardedEmail(message, env);
   },
 
   async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {

@@ -7,6 +7,10 @@ export interface CreateShortcutInboxItemInput {
   rawText: string;
 }
 
+export interface CreateForwardedInboxItemInput extends CreateShortcutInboxItemInput {
+  externalId: string;
+}
+
 interface InboxItem {
   id: string;
   idempotency_key: string;
@@ -29,6 +33,49 @@ async function fingerprint(source: string, text: string, receivedAt: string): Pr
 }
 
 export class ShortcutInboxService extends BaseService {
+  async createForwardedPending(input: CreateForwardedInboxItemInput): Promise<void> {
+    if (
+      input.source !== 'forwarded_email' ||
+      !/^[a-f0-9]{64}$/u.test(input.externalId) ||
+      input.rawText.length > 4096 ||
+      normalizeText(input.rawText).length === 0
+    ) {
+      throw new Error('Invalid forwarded inbox item');
+    }
+    const key = await fingerprint(input.source, input.externalId, '');
+    const row = {
+      user_id: input.userId,
+      source: input.source,
+      external_id: input.externalId,
+      received_at: new Date(input.receivedAt).toISOString(),
+      raw_text: input.rawText,
+      idempotency_key: key,
+      status: 'pending'
+    };
+    const response = await fetch(`${this.url}/rest/v1/shortcut_inbox_items`, {
+      method: 'POST',
+      headers: this.headers,
+      body: JSON.stringify(row)
+    });
+    if (response.ok) return;
+    if (response.status !== 409) throw new Error('Forwarded inbox write failed');
+
+    const existing = await this.fetch<InboxItem[]>(
+      `/rest/v1/shortcut_inbox_items?select=id,user_id,source,external_id,received_at,raw_text,idempotency_key,status&user_id=eq.${encodeURIComponent(input.userId)}&source=eq.forwarded_email&external_id=eq.${input.externalId}&limit=1`
+    );
+    const match = existing[0];
+    if (
+      !match ||
+      match.user_id !== input.userId ||
+      match.source !== input.source ||
+      match.external_id !== input.externalId ||
+      match.idempotency_key !== key ||
+      normalizeText(match.raw_text) !== normalizeText(input.rawText)
+    ) {
+      throw new Error('Forwarded inbox identity conflict');
+    }
+  }
+
   async createPending(input: CreateShortcutInboxItemInput): Promise<void> {
     if (
       !/^[a-z][a-z0-9_-]{1,39}$/u.test(input.source) ||

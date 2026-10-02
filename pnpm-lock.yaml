@@ -14,6 +14,9 @@ importers:
       ioredis:
         specifier: ^5.8.2
         version: 5.8.2(supports-color@7.2.0)
+      postal-mime:
+        specifier: ^4.0.2
+        version: 4.0.2
       telegraf:
         specifier: ^4.16.3
         version: 4.16.3(supports-color@7.2.0)
@@ -1448,6 +1451,10 @@ packages:
     resolution: {integrity: sha512-eG2dWTVw5bzqGRztnHExczNxt5VGsE6OwTeCG3fdUf9KBsZzO3R5OIIIzWR+iZA0NtZ+RDVdaoE2dK1cn6jH4g==}
     engines: {node: '>=0.10'}
     hasBin: true
+
+  postal-mime@4.0.2:
+    resolution: {integrity: sha512-b/FqJGdS+Y+leh30r2ord1gWZNPfYcTiFBR1BIPvZYvQrKJjYYqGeECh9sQ5BpkWtcjSj39ngIAiE2w6XNfMjA==}
+    engines: {node: '>=20'}
 
   postcss@8.5.6:
     resolution: {integrity: sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==}
@@ -2984,6 +2991,8 @@ snapshots:
   picomatch@4.0.3: {}
 
   pidtree@0.6.0: {}
+
+  postal-mime@4.0.2: {}
 
   postcss@8.5.6:
     dependencies:

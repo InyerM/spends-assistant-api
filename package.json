@@ -33,6 +33,7 @@
   "dependencies": {
     "csv-parse": "^5.6.0",
     "ioredis": "^5.8.2",
+    "postal-mime": "^4.0.2",
     "telegraf": "^4.16.3"
   },
   "devDependencies": {

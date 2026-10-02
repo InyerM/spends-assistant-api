@@ -16,6 +16,9 @@ export interface Env {
   // Default user for Telegram/Email (until per-user mapping is implemented)
   DEFAULT_USER_ID: string;
 
+  // Domain routed by Cloudflare Email Routing to this Worker.
+  EMAIL_FORWARDING_DOMAIN?: string;
+
   // Optional
   APP_URL?: string;
   REDIS_URL?: string;

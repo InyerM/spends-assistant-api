@@ -46,7 +46,8 @@ async function database(): Promise<PGlite> {
     '20260929000060_document_confirmation.sql',
     '20261001000010_signed_document_reconciliation.sql',
     '20261001000040_document_observation_review.sql',
-    '20261002000000_document_review_lifecycle.sql'
+    '20261002000000_document_review_lifecycle.sql',
+    '20261002000010_document_rejection_reason_detail.sql'
   ])
     await db.exec(migration(name));
   return db;
@@ -62,6 +63,56 @@ async function asUser(db: PGlite, userId: string, sql: string): Promise<unknown[
 }
 
 describe('document review lifecycle', () => {
+  it('records bounded other detail once and rejects a conflicting replay', async () => {
+    const db = await database();
+    const key = '30000000-0000-4000-8000-000000000001';
+    try {
+      await asUser(
+        db,
+        owner,
+        `SELECT decide_document_observation_with_reason('${observationId}', 'reject_observation', NULL, '${key}', 'other', 'Wrong merchant')`
+      );
+      expect(
+        (await db.query('SELECT reason, reason_detail FROM document_observation_rejection_reasons'))
+          .rows
+      ).toEqual([{ reason: 'other', reason_detail: 'Wrong merchant' }]);
+      await asUser(
+        db,
+        owner,
+        `SELECT decide_document_observation_with_reason('${observationId}', 'reject_observation', NULL, '${key}', 'other', 'Wrong merchant')`
+      );
+      await expect(
+        asUser(
+          db,
+          owner,
+          `SELECT decide_document_observation_with_reason('${observationId}', 'reject_observation', NULL, '${key}', 'other', 'Different detail')`
+        )
+      ).rejects.toThrow(/different reason detail/i);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('rejects other detail for preset reasons and rejects blank or oversized detail', async () => {
+    const db = await database();
+    try {
+      for (const [reason, detail] of [
+        ['already_recorded', 'extra'],
+        ['other', '   '],
+        ['other', 'x'.repeat(501)]
+      ]) {
+        await expect(
+          asUser(
+            db,
+            owner,
+            `SELECT decide_document_observation_with_reason('${observationId}', 'reject_observation', NULL, gen_random_uuid(), '${reason}', '${detail}')`
+          )
+        ).rejects.toThrow(/reason detail/i);
+      }
+    } finally {
+      await db.close();
+    }
+  });
   it('records a preset rejection reason and restores the draft with an audit event', async () => {
     const db = await database();
     try {
