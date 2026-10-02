@@ -25,7 +25,11 @@ vi.mock('../../src/utils/auth', () => ({
   unauthorizedResponse: () => new Response('Unauthorized', { status: 401 })
 }));
 
-const env = { ...createMockEnv(), EMAIL_FORWARDING_DOMAIN: 'mail.example.com' };
+const env = {
+  ...createMockEnv(),
+  EMAIL_FORWARDING_DOMAIN: 'mail.example.com',
+  EMAIL_FORWARDING_READY: 'true'
+};
 const address = `capture+${'a'.repeat(64)}@mail.example.com`;
 
 function email(raw: string, to = address, from = 'forwarding-noreply@google.com') {
@@ -79,6 +83,23 @@ describe('email forwarding', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ status: 'active', address });
     expect(routes.getForUser).toHaveBeenCalledWith('owner-id');
+  });
+
+  it('does not offer an undeliverable address before routing is ready', async () => {
+    routes.getForUser.mockResolvedValue(null);
+    const disabled = { ...env, EMAIL_FORWARDING_READY: undefined };
+    const status = await handleEmailForwardingRoute(
+      new Request('https://api.test/email-forwarding-route'),
+      disabled
+    );
+    expect(await status.json()).toEqual({ status: 'unavailable' });
+
+    const create = await handleEmailForwardingRoute(
+      new Request('https://api.test/email-forwarding-route', { method: 'POST' }),
+      disabled
+    );
+    expect(create.status).toBe(503);
+    expect(routes.createForUser).not.toHaveBeenCalled();
   });
 
   it('creates and revokes a route only for the authenticated owner', async () => {

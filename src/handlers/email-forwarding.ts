@@ -22,7 +22,13 @@ export async function handleEmailForwardingRoute(request: Request, env: Env): Pr
   try {
     if (request.method === 'GET') {
       const route = await services.forwardingRoutes.getForUser(userId);
-      if (!route) return json({ status: 'unconfigured' });
+      if (!route)
+        return json({
+          status:
+            env.EMAIL_FORWARDING_READY === 'true' && validDomain(env.EMAIL_FORWARDING_DOMAIN)
+              ? 'unconfigured'
+              : 'unavailable'
+        });
       return json({
         status: 'active',
         address: route.address,
@@ -32,7 +38,7 @@ export async function handleEmailForwardingRoute(request: Request, env: Env): Pr
       });
     }
     if (request.method === 'POST') {
-      if (!validDomain(env.EMAIL_FORWARDING_DOMAIN))
+      if (env.EMAIL_FORWARDING_READY !== 'true' || !validDomain(env.EMAIL_FORWARDING_DOMAIN))
         return json({ error: 'Email routing unavailable' }, 503);
       const route = await services.forwardingRoutes.createForUser(
         userId,
