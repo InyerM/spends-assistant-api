@@ -4,7 +4,7 @@ import { ShortcutInboxService } from '../../../src/services/supabase/shortcut-in
 
 const route = {
   user_id: 'owner-id',
-  address: `f-${'a'.repeat(64)}@mail.example.com`,
+  address: `capture+${'a'.repeat(64)}@mail.example.com`,
   created_at: '2026-10-01T00:00:00Z',
   confirmation_received_at: null,
   verification_text: null
@@ -29,7 +29,7 @@ describe('email forwarding Supabase services', () => {
     expect(insert).toBeDefined();
     expect(JSON.parse(String(insert?.options?.body))).toMatchObject({ user_id: 'owner-id' });
     expect(JSON.parse(String(insert?.options?.body)).address).toMatch(
-      /^f-[a-f0-9]{64}@mail\.example\.com$/u
+      /^capture\+[a-f0-9]{64}@mail\.example\.com$/u
     );
     expect(requests[0].url).toContain('user_id=eq.owner-id');
 
@@ -39,6 +39,18 @@ describe('email forwarding Supabase services', () => {
     );
     expect(await service.createForUser('owner-id', 'mail.example.com')).toEqual(route);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('looks up the full plus address without losing its token', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json([route]))
+    );
+    const service = new EmailForwardingRoutesService('https://db.test', 'service-key');
+    expect(await service.getByAddress(route.address)).toEqual(route);
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain(
+      `address=eq.capture%2B${'a'.repeat(64)}%40mail.example.com`
+    );
   });
 
   it('accepts an exact duplicate email delivery without changing reviewed inbox state', async () => {

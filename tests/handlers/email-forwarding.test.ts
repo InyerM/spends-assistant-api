@@ -26,7 +26,7 @@ vi.mock('../../src/utils/auth', () => ({
 }));
 
 const env = { ...createMockEnv(), EMAIL_FORWARDING_DOMAIN: 'mail.example.com' };
-const address = 'f-abc123@mail.example.com';
+const address = `capture+${'a'.repeat(64)}@mail.example.com`;
 
 function email(raw: string, to = address, from = 'forwarding-noreply@google.com') {
   let rejected = false;
@@ -108,6 +108,18 @@ describe('email forwarding', () => {
     await handleForwardedEmail(message, env);
     expect(message.rejected).toBe(true);
     expect(inbox.createForwardedPending).not.toHaveBeenCalled();
+  });
+
+  it('rejects the bare routing address and resolves the complete plus address', async () => {
+    routes.getByAddress.mockResolvedValueOnce(null);
+    const bare = email('Subject: Notice\r\n\r\nBank notice', 'capture@mail.example.com');
+    await handleForwardedEmail(bare, env);
+    expect(bare.rejected).toBe(true);
+
+    const routed = email('Subject: Notice\r\n\r\nBank notice');
+    await handleForwardedEmail(routed, env);
+    expect(routed.rejected).toBe(false);
+    expect(routes.getByAddress).toHaveBeenLastCalledWith(address);
   });
 
   it('stores a MIME decoded notice as pending evidence without posting a transaction', async () => {

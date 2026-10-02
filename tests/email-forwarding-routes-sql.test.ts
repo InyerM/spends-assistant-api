@@ -5,7 +5,8 @@ import { PGlite } from '@electric-sql/pglite';
 
 const owner = '00000000-0000-4000-8000-000000000001';
 const stranger = '00000000-0000-4000-8000-000000000002';
-const address = `f-${'a'.repeat(64)}@mail.example.com`;
+const legacyAddress = `f-${'a'.repeat(64)}@mail.example.com`;
+const address = `capture+${'b'.repeat(64)}@mail.example.com`;
 
 describe('email forwarding route migration', () => {
   it('exposes only the owner address and prevents user-managed route insertion', async () => {
@@ -29,19 +30,36 @@ describe('email forwarding route migration', () => {
         )
       );
       await db.exec(
-        `INSERT INTO email_forwarding_routes(user_id,address) VALUES ('${owner}','${address}')`
+        readFileSync(
+          join(
+            process.cwd(),
+            'supabase/migrations/20261002000030_email_forwarding_subaddresses.sql'
+          ),
+          'utf8'
+        )
+      );
+      await db.exec(
+        `INSERT INTO email_forwarding_routes(user_id,address) VALUES ('${owner}','${legacyAddress}'), ('${stranger}','${address}')`
       );
       await db.exec(`SET request.jwt.claim.sub = '${owner}'; SET ROLE authenticated;`);
       expect((await db.query('SELECT address FROM email_forwarding_routes')).rows).toEqual([
-        { address }
+        { address: legacyAddress }
       ]);
       await db.exec(
         `RESET ROLE; SET request.jwt.claim.sub = '${stranger}'; SET ROLE authenticated;`
       );
-      expect((await db.query('SELECT address FROM email_forwarding_routes')).rows).toEqual([]);
+      expect((await db.query('SELECT address FROM email_forwarding_routes')).rows).toEqual([
+        { address }
+      ]);
       await expect(
         db.query(
-          `INSERT INTO email_forwarding_routes(user_id,address) VALUES ('${stranger}','f-${'b'.repeat(64)}@mail.example.com')`
+          `UPDATE email_forwarding_routes SET address='capture+${'c'.repeat(64)}@mail.example.com' WHERE user_id='${stranger}'`
+        )
+      ).rejects.toThrow();
+      await db.exec('RESET ROLE;');
+      await expect(
+        db.query(
+          `UPDATE email_forwarding_routes SET address='capture@mail.example.com' WHERE user_id='${stranger}'`
         )
       ).rejects.toThrow();
     } finally {

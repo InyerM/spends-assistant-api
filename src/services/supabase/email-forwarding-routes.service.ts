@@ -14,7 +14,7 @@ function newAddress(domain: string): string {
   const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) =>
     byte.toString(16).padStart(2, '0')
   ).join('');
-  return `f-${token}@${domain}`;
+  return `capture+${token}@${domain}`;
 }
 
 export class EmailForwardingRoutesService extends BaseService {
