@@ -15,3 +15,14 @@ node_modules
 
 # Tests
 coverage
+
+# Local financial evidence used for manual reconciliation
+/01-09-26-tyba.jpeg
+/Bancolombia mayo-2.txt
+/Bancolombia-01.txt
+/Gmail - Compra realizada.pdf
+/Nequi-01.txt
+/binance-p2p.jpeg
+/extractos/
+/receipts/
+/shortcuts/
