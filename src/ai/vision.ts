@@ -163,7 +163,7 @@ export async function extractImageObservations(input: ExtractionInput): Promise<
           {
             role: 'system',
             content:
-              'Extract only visible financial facts from the image. Return one observation per distinct movement, including multiple receipts in one image. A dollar sign alone does not mean USD. Use an explicit currency code or clear bank and country context; Colombian bank and Nequi amounts are COP unless the image explicitly says otherwise. If currency remains ambiguous, return null. Never invent missing fields. If there is no movement, return an empty observations array.'
+              'Extract only visible financial facts from the image. Return one observation per distinct movement, including multiple receipts in one image. Use a negative amount for purchases, payments, and outgoing transfers, even when a receipt displays an unsigned positive total; use a positive amount for money received. A dollar sign alone does not mean USD. Use an explicit currency code or clear bank and country context; Colombian bank and Nequi amounts are COP unless the image explicitly says otherwise. If currency remains ambiguous, return null. Never invent missing fields. If there is no movement, return an empty observations array.'
           },
           {
             role: 'user',
