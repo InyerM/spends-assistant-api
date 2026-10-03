@@ -6,9 +6,11 @@ export interface EmailForwardingRoute {
   created_at: string;
   confirmation_received_at: string | null;
   verification_text: string | null;
+  user_confirmed_at: string | null;
 }
 
-const fields = 'user_id,address,created_at,confirmation_received_at,verification_text';
+const fields =
+  'user_id,address,created_at,confirmation_received_at,verification_text,user_confirmed_at';
 
 function newAddress(domain: string): string {
   const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), (byte) =>
@@ -70,5 +72,20 @@ export class EmailForwardingRoutesService extends BaseService {
         })
       }
     );
+  }
+
+  async acknowledgeVerification(userId: string): Promise<EmailForwardingRoute | null> {
+    const route = await this.getForUser(userId);
+    if (!route?.confirmation_received_at) return null;
+    if (route.user_confirmed_at) return route;
+
+    const rows = await this.fetch<EmailForwardingRoute[]>(
+      `/rest/v1/email_forwarding_routes?user_id=eq.${encodeURIComponent(userId)}&confirmation_received_at=not.is.null`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ user_confirmed_at: new Date().toISOString() })
+      }
+    );
+    return rows[0] ?? null;
   }
 }

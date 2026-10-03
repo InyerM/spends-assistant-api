@@ -34,7 +34,8 @@ export async function handleEmailForwardingRoute(request: Request, env: Env): Pr
         address: route.address,
         created_at: route.created_at,
         confirmation_received_at: route.confirmation_received_at,
-        verification_text: route.verification_text
+        verification_text: route.verification_text,
+        user_confirmed_at: route.user_confirmed_at
       });
     }
     if (request.method === 'POST') {
@@ -50,10 +51,23 @@ export async function handleEmailForwardingRoute(request: Request, env: Env): Pr
           address: route.address,
           created_at: route.created_at,
           confirmation_received_at: route.confirmation_received_at,
-          verification_text: route.verification_text
+          verification_text: route.verification_text,
+          user_confirmed_at: route.user_confirmed_at
         },
         201
       );
+    }
+    if (request.method === 'PATCH') {
+      const confirmed = await services.forwardingRoutes.acknowledgeVerification(userId);
+      if (!confirmed) return json({ error: 'Gmail confirmation message has not arrived' }, 409);
+      return json({
+        status: 'active',
+        address: confirmed.address,
+        created_at: confirmed.created_at,
+        confirmation_received_at: confirmed.confirmation_received_at,
+        verification_text: confirmed.verification_text,
+        user_confirmed_at: confirmed.user_confirmed_at
+      });
     }
     if (request.method === 'DELETE') {
       await services.forwardingRoutes.deleteForUser(userId);

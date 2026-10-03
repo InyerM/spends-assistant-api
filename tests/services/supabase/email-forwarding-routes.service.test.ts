@@ -56,6 +56,32 @@ describe('email forwarding Supabase services', () => {
     );
   });
 
+  it('persists owner acknowledgement only after a confirmation message exists', async () => {
+    const requests: Array<{ url: string; options?: RequestInit }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, options?: RequestInit) => {
+        requests.push({ url, options });
+        if (options?.method === 'PATCH')
+          return Response.json([{ ...route, user_confirmed_at: '2026-10-03T17:00:00Z' }]);
+        return Response.json([{ ...route, confirmation_received_at: '2026-10-03T16:45:00Z' }]);
+      })
+    );
+    const service = new EmailForwardingRoutesService('https://db.test', 'service-key');
+    const confirmed = await service.acknowledgeVerification('owner-id');
+    expect(confirmed?.user_confirmed_at).toBe('2026-10-03T17:00:00Z');
+    expect(requests.find(({ options }) => options?.method === 'PATCH')?.url).toContain(
+      'user_id=eq.owner-id'
+    );
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json([route]))
+    );
+    expect(await service.acknowledgeVerification('owner-id')).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('accepts an exact duplicate email delivery without changing reviewed inbox state', async () => {
     const rows: Record<string, unknown>[] = [];
     vi.stubGlobal(

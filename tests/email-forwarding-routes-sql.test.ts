@@ -9,6 +9,50 @@ const legacyAddress = `f-${'a'.repeat(64)}@mail.example.com`;
 const address = `capture+${'b'.repeat(64)}@mail.example.com`;
 
 describe('email forwarding route migration', () => {
+  it('stores a user confirmation only after Gmail confirmation mail is received', async () => {
+    const db = new PGlite();
+    try {
+      await db.exec(`
+        CREATE ROLE authenticated;
+        CREATE ROLE service_role;
+        CREATE ROLE anon;
+        CREATE SCHEMA auth;
+        CREATE TABLE auth.users (id uuid PRIMARY KEY);
+        CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
+          SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+        $$;
+        INSERT INTO auth.users VALUES ('${owner}');
+      `);
+      for (const name of [
+        '20261002000020_email_forwarding_routes.sql',
+        '20261002000030_email_forwarding_subaddresses.sql',
+        '20261003000000_email_forwarding_smtp_addresses.sql',
+        '20261003000010_email_forwarding_user_confirmation.sql'
+      ]) {
+        await db.exec(readFileSync(join(process.cwd(), 'supabase/migrations', name), 'utf8'));
+      }
+      await db.exec(
+        `INSERT INTO email_forwarding_routes(user_id,address) VALUES ('${owner}','capture+${'b'.repeat(48)}@mail.example.com')`
+      );
+      await expect(
+        db.exec(
+          `UPDATE email_forwarding_routes SET user_confirmed_at=now() WHERE user_id='${owner}'`
+        )
+      ).rejects.toThrow();
+      await db.exec(
+        `UPDATE email_forwarding_routes SET confirmation_received_at=now() WHERE user_id='${owner}'`
+      );
+      await db.exec(
+        `UPDATE email_forwarding_routes SET user_confirmed_at=now() WHERE user_id='${owner}'`
+      );
+      const { rows } = await db.query<{ user_confirmed_at: string | null }>(
+        'SELECT user_confirmed_at FROM email_forwarding_routes'
+      );
+      expect(rows[0].user_confirmed_at).not.toBeNull();
+    } finally {
+      await db.close();
+    }
+  });
   it('replaces undeliverable addresses and enforces the SMTP local-part limit', async () => {
     const db = new PGlite();
     try {

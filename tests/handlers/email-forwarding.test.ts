@@ -11,7 +11,8 @@ const { routes, inbox, resolveUserId } = vi.hoisted(() => ({
     createForUser: vi.fn(),
     deleteForUser: vi.fn(),
     getByAddress: vi.fn(),
-    recordConfirmation: vi.fn()
+    recordConfirmation: vi.fn(),
+    acknowledgeVerification: vi.fn()
   },
   inbox: { createForwardedPending: vi.fn() },
   resolveUserId: vi.fn()
@@ -121,6 +122,34 @@ describe('email forwarding', () => {
     );
     expect(removed.status).toBe(204);
     expect(routes.deleteForUser).toHaveBeenCalledWith('owner-id');
+  });
+
+  it('lets the owner acknowledge a received Gmail confirmation but not a missing one', async () => {
+    routes.acknowledgeVerification.mockResolvedValueOnce(null);
+    const missing = await handleEmailForwardingRoute(
+      new Request('https://api.test/email-forwarding-route', { method: 'PATCH' }),
+      env
+    );
+    expect(missing.status).toBe(409);
+    expect(routes.acknowledgeVerification).toHaveBeenCalledWith('owner-id');
+
+    routes.acknowledgeVerification.mockResolvedValueOnce({
+      address,
+      created_at: '2026-10-01T00:00:00Z',
+      confirmation_received_at: '2026-10-03T16:45:00Z',
+      verification_text: 'Confirmation message',
+      user_confirmed_at: '2026-10-03T17:00:00Z'
+    });
+    const confirmed = await handleEmailForwardingRoute(
+      new Request('https://api.test/email-forwarding-route', { method: 'PATCH' }),
+      env
+    );
+    expect(confirmed.status).toBe(200);
+    expect(await confirmed.json()).toMatchObject({
+      status: 'active',
+      user_confirmed_at: '2026-10-03T17:00:00Z'
+    });
+    expect(routes.acknowledgeVerification).toHaveBeenCalledWith('owner-id');
   });
 
   it('rejects unknown recipients without looking up an email sender', async () => {
