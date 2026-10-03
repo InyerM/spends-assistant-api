@@ -5,7 +5,7 @@ import {
 } from '../../src/handlers/email-forwarding';
 import { createMockEnv } from '../__test-helpers__/factories';
 
-const { routes, inbox, resolveUserId } = vi.hoisted(() => ({
+const { routes, inbox, aiUsage, completeJson, resolveUserId } = vi.hoisted(() => ({
   routes: {
     getForUser: vi.fn(),
     createForUser: vi.fn(),
@@ -15,12 +15,20 @@ const { routes, inbox, resolveUserId } = vi.hoisted(() => ({
     acknowledgeVerification: vi.fn()
   },
   inbox: { createForwardedPending: vi.fn() },
+  aiUsage: { track: vi.fn() },
+  completeJson: vi.fn(),
   resolveUserId: vi.fn()
 }));
 
 vi.mock('../../src/services/supabase', () => ({
-  createSupabaseServices: () => ({ forwardingRoutes: routes, shortcutInbox: inbox, apiKeys: {} })
+  createSupabaseServices: () => ({
+    forwardingRoutes: routes,
+    shortcutInbox: inbox,
+    aiUsage,
+    apiKeys: {}
+  })
 }));
+vi.mock('../../src/ai/openrouter', () => ({ completeJson }));
 vi.mock('../../src/utils/auth', () => ({
   resolveUserId,
   unauthorizedResponse: () => new Response('Unauthorized', { status: 401 })
@@ -60,6 +68,8 @@ describe('email forwarding', () => {
     vi.clearAllMocks();
     resolveUserId.mockResolvedValue('owner-id');
     routes.getByAddress.mockResolvedValue({ user_id: 'owner-id', address });
+    aiUsage.track.mockImplementation(async (_params, task) => task({ record: vi.fn() }));
+    completeJson.mockResolvedValue({ data: { kind: 'uncertain', confidence: 0.5 } });
   });
 
   it('requires auth and returns the owner route without exposing another route', async () => {
@@ -189,6 +199,147 @@ describe('email forwarding', () => {
     );
     expect(inbox.createForwardedPending.mock.calls[0][0].externalId).toMatch(/^[a-f0-9]{64}$/u);
     expect(routes.recordConfirmation).not.toHaveBeenCalled();
+  });
+
+  it('shows a previously unseen sender and auto-classifies an obvious promotion', async () => {
+    const message = email(
+      'From: Bancolombia Ofertas <new-alert@bancolombia.example>\r\nSubject: Aprovecha esta oferta especial\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nConoce nuestros descuentos de este mes.',
+      address,
+      'new-alert@bancolombia.example'
+    );
+    await handleForwardedEmail(message, env);
+    expect(inbox.createForwardedPending).toHaveBeenCalledWith(
+      expect.objectContaining({
+        triageStatus: 'non_transaction',
+        rawText: expect.stringContaining('new-alert@bancolombia.example')
+      })
+    );
+    expect(completeJson).not.toHaveBeenCalled();
+  });
+
+  it('omits security codes from storage and never sends them to a model', async () => {
+    const message = email(
+      'From: Bancolombia <security@bancolombia.example>\r\nSubject: Tu código de seguridad\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nTu código de seguridad es 123456.',
+      address,
+      'security@bancolombia.example'
+    );
+    await handleForwardedEmail(message, env);
+    const input = inbox.createForwardedPending.mock.calls[0][0];
+    expect(input.triageStatus).toBe('non_transaction');
+    expect(input.rawText).toContain('security@bancolombia.example');
+    expect(input.rawText).toContain('[security_notice]');
+    expect(input.rawText).not.toContain('123456');
+    expect(completeJson).not.toHaveBeenCalled();
+  });
+
+  it('treats a generic one-time code as sensitive before AI triage', async () => {
+    const message = email(
+      'From: Bancolombia <new@bancolombia.example>\r\nSubject: Código\r\n\r\nTu código es 481927.',
+      address,
+      'new@bancolombia.example'
+    );
+    await handleForwardedEmail(message, env);
+    expect(inbox.createForwardedPending.mock.calls[0][0].rawText).not.toContain('481927');
+    expect(completeJson).not.toHaveBeenCalled();
+  });
+
+  it('omits an English verification code before saving or calling AI', async () => {
+    await handleForwardedEmail(
+      email('Subject: Your verification code\r\n\r\nUse 472916 to sign in.'),
+      env
+    );
+    expect(inbox.createForwardedPending.mock.calls[0][0].rawText).toContain('[security_notice]');
+    expect(inbox.createForwardedPending.mock.calls[0][0].rawText).not.toContain('472916');
+    expect(completeJson).not.toHaveBeenCalled();
+  });
+
+  it('keeps a purchase with a security footer pending while removing its code', async () => {
+    const message = email(
+      'Subject: Compra realizada\r\n\r\nCompraste $50.000 en Mercamas. Tu código de seguridad es 481927.'
+    );
+    await handleForwardedEmail(message, env);
+    const input = inbox.createForwardedPending.mock.calls[0][0];
+    expect(input.triageStatus).toBe('pending');
+    expect(input.rawText).toContain('Mercamas');
+    expect(input.rawText).not.toContain('481927');
+    expect(completeJson).not.toHaveBeenCalled();
+  });
+
+  it('keeps an amount-bearing debit pending when its body also mentions a code', async () => {
+    await handleForwardedEmail(
+      email('Subject: Débito automático\r\n\r\nCargo COP 120000. Tu código es 481927.'),
+      env
+    );
+    const input = inbox.createForwardedPending.mock.calls[0][0];
+    expect(input.triageStatus).toBe('pending');
+    expect(input.rawText).not.toContain('481927');
+  });
+
+  it('recognizes a peso amount without a currency symbol before filtering security footers', async () => {
+    await handleForwardedEmail(
+      email('Subject: Pago realizado\r\n\r\nPagaste 50.000 pesos. Tu código es 481927.'),
+      env
+    );
+    const input = inbox.createForwardedPending.mock.calls[0][0];
+    expect(input.triageStatus).toBe('pending');
+    expect(input.rawText).not.toContain('481927');
+  });
+
+  it('uses metered AI only for unclear mail and auto-classifies high-confidence non-transactions', async () => {
+    completeJson.mockResolvedValueOnce({ data: { kind: 'promotion', confidence: 0.98 } });
+    const message = email(
+      'From: Novedades <new-bank@bancolombia.example>\r\nSubject: Noticias para ti\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nTenemos novedades para nuestros clientes.',
+      address,
+      'new-bank@bancolombia.example'
+    );
+    await handleForwardedEmail(message, env);
+    expect(aiUsage.track).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'owner-id', operation: 'triage_forwarded_email' }),
+      expect.any(Function)
+    );
+    expect(inbox.createForwardedPending).toHaveBeenCalledWith(
+      expect.objectContaining({ triageStatus: 'non_transaction' })
+    );
+  });
+
+  it('keeps low-confidence AI non-transaction labels pending for review', async () => {
+    completeJson.mockResolvedValueOnce({ data: { kind: 'promotion', confidence: 0.8 } });
+    await handleForwardedEmail(email('Subject: Novedades\r\n\r\nUn mensaje para ti.'), env);
+    expect(inbox.createForwardedPending).toHaveBeenCalledWith(
+      expect.objectContaining({ triageStatus: 'pending' })
+    );
+  });
+
+  it('keeps an email with a monetary amount pending despite a non-transaction model label', async () => {
+    completeJson.mockResolvedValueOnce({ data: { kind: 'other', confidence: 0.99 } });
+    await handleForwardedEmail(
+      email('Subject: Débito automático\r\n\r\nCargo COP 120000 en tu cuenta.'),
+      env
+    );
+    expect(inbox.createForwardedPending).toHaveBeenCalledWith(
+      expect.objectContaining({ triageStatus: 'pending' })
+    );
+  });
+
+  it('redacts long numeric sequences from ambiguous mail before AI classification', async () => {
+    await handleForwardedEmail(
+      email('Subject: Aviso\r\n\r\nReferencia 481927 para tu consulta.'),
+      env
+    );
+    expect(completeJson).toHaveBeenCalledWith(
+      expect.objectContaining({ user: expect.not.stringContaining('481927') })
+    );
+    expect(inbox.createForwardedPending.mock.calls[0][0].rawText).not.toContain('481927');
+  });
+
+  it('keeps uncertain mail pending when the classifier fails', async () => {
+    completeJson.mockRejectedValueOnce(new Error('Unavailable'));
+    const message = email('Subject: Aviso Bancolombia\r\n\r\nRevisa tu cuenta.', address);
+    await handleForwardedEmail(message, env);
+    expect(message.rejected).toBe(false);
+    expect(inbox.createForwardedPending).toHaveBeenCalledWith(
+      expect.objectContaining({ triageStatus: 'pending' })
+    );
   });
 
   it('records Gmail confirmation content for the owner without creating an inbox item', async () => {

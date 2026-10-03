@@ -9,6 +9,7 @@ export interface CreateShortcutInboxItemInput {
 
 export interface CreateForwardedInboxItemInput extends CreateShortcutInboxItemInput {
   externalId: string;
+  triageStatus?: 'pending' | 'non_transaction';
 }
 
 interface InboxItem {
@@ -50,7 +51,7 @@ export class ShortcutInboxService extends BaseService {
       received_at: new Date(input.receivedAt).toISOString(),
       raw_text: input.rawText,
       idempotency_key: key,
-      status: 'pending'
+      status: input.triageStatus ?? 'pending'
     };
     const response = await fetch(`${this.url}/rest/v1/shortcut_inbox_items`, {
       method: 'POST',

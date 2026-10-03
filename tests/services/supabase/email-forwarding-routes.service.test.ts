@@ -82,7 +82,7 @@ describe('email forwarding Supabase services', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('accepts an exact duplicate email delivery without changing reviewed inbox state', async () => {
+  it('persists email triage and accepts duplicate delivery without changing reviewed inbox state', async () => {
     const rows: Record<string, unknown>[] = [];
     vi.stubGlobal(
       'fetch',
@@ -104,12 +104,13 @@ describe('email forwarding Supabase services', () => {
       source: 'forwarded_email',
       externalId: 'a'.repeat(64),
       rawText: 'Purchase alert\n\nCompraste $50,000',
+      triageStatus: 'non_transaction' as const,
       receivedAt: '2026-10-01T00:00:00Z'
     };
     await service.createForwardedPending(input);
     await service.createForwardedPending({ ...input, receivedAt: '2026-10-02T00:00:00Z' });
     expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe('pending');
+    expect(rows[0].status).toBe('non_transaction');
   });
 
   it('rejects a reused message identity with different content', async () => {

@@ -1,6 +1,7 @@
 import PostalMime from 'postal-mime';
 
 export interface ParsedForwardedEmail {
+  sender: string | null;
   subject: string;
   text: string;
   messageId: string | null;
@@ -52,6 +53,7 @@ export async function parseForwardedEmail(raw: ArrayBuffer): Promise<ParsedForwa
     maxHeadersSize: 16 * 1024
   });
   return {
+    sender: cleanText(email.from?.address ?? '').slice(0, 254) || null,
     subject: cleanText(email.subject ?? '').slice(0, 300),
     text: cleanText(email.text || plainFromHtml(email.html ?? '')),
     messageId: email.messageId?.trim().slice(0, 256) || null,
@@ -71,6 +73,8 @@ export async function emailFingerprint(email: ParsedForwardedEmail): Promise<str
 }
 
 export function inboxText(email: ParsedForwardedEmail): string {
-  const full = [email.subject, email.text].filter(Boolean).join('\n\n');
+  const full = [email.sender ? `From (unverified): ${email.sender}` : '', email.subject, email.text]
+    .filter(Boolean)
+    .join('\n\n');
   return full.length <= 4096 ? full : `${full.slice(0, 4076)}\n[Content truncated]`;
 }

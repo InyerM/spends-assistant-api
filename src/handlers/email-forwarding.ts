@@ -1,7 +1,8 @@
 import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
-import { emailFingerprint, inboxText, parseForwardedEmail } from '../utils/email-mime';
+import { emailFingerprint, parseForwardedEmail } from '../utils/email-mime';
+import { triageForwardedEmail } from '../ai/email-triage';
 
 type IncomingEmail = Pick<ForwardableEmailMessage, 'from' | 'to' | 'raw' | 'rawSize' | 'setReject'>;
 const MAX_MIME_BYTES = 512 * 1024;
@@ -122,11 +123,19 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
     return;
   }
 
+  const triage = await triageForwardedEmail(
+    parsed,
+    env.OPENROUTER_API_KEY,
+    env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
+    route.user_id,
+    services.aiUsage
+  );
   await services.shortcutInbox.createForwardedPending({
     userId: route.user_id,
     source: 'forwarded_email',
     externalId: await emailFingerprint(parsed),
     receivedAt: new Date().toISOString(),
-    rawText: inboxText(parsed)
+    rawText: triage.rawText,
+    triageStatus: triage.triageStatus
   });
 }
