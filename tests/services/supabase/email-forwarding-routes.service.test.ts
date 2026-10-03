@@ -4,7 +4,7 @@ import { ShortcutInboxService } from '../../../src/services/supabase/shortcut-in
 
 const route = {
   user_id: 'owner-id',
-  address: `capture+${'a'.repeat(64)}@mail.example.com`,
+  address: `capture+${'a'.repeat(48)}@mail.example.com`,
   created_at: '2026-10-01T00:00:00Z',
   confirmation_received_at: null,
   verification_text: null
@@ -29,8 +29,11 @@ describe('email forwarding Supabase services', () => {
     expect(insert).toBeDefined();
     expect(JSON.parse(String(insert?.options?.body))).toMatchObject({ user_id: 'owner-id' });
     expect(JSON.parse(String(insert?.options?.body)).address).toMatch(
-      /^capture\+[a-f0-9]{64}@mail\.example\.com$/u
+      /^capture\+[a-f0-9]{48}@mail\.example\.com$/u
     );
+    expect(
+      JSON.parse(String(insert?.options?.body)).address.split('@')[0].length
+    ).toBeLessThanOrEqual(64);
     expect(requests[0].url).toContain('user_id=eq.owner-id');
 
     vi.stubGlobal(
@@ -49,7 +52,7 @@ describe('email forwarding Supabase services', () => {
     const service = new EmailForwardingRoutesService('https://db.test', 'service-key');
     expect(await service.getByAddress(route.address)).toEqual(route);
     expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain(
-      `address=eq.capture%2B${'a'.repeat(64)}%40mail.example.com`
+      `address=eq.capture%2B${'a'.repeat(48)}%40mail.example.com`
     );
   });
 

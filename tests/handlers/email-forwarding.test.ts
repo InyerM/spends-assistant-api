@@ -30,7 +30,7 @@ const env = {
   EMAIL_FORWARDING_DOMAIN: 'mail.example.com',
   EMAIL_FORWARDING_READY: 'true'
 };
-const address = `capture+${'a'.repeat(64)}@mail.example.com`;
+const address = `capture+${'a'.repeat(48)}@mail.example.com`;
 
 function email(raw: string, to = address, from = 'forwarding-noreply@google.com') {
   let rejected = false;

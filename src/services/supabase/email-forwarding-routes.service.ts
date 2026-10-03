@@ -11,7 +11,7 @@ export interface EmailForwardingRoute {
 const fields = 'user_id,address,created_at,confirmation_received_at,verification_text';
 
 function newAddress(domain: string): string {
-  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) =>
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), (byte) =>
     byte.toString(16).padStart(2, '0')
   ).join('');
   return `capture+${token}@${domain}`;
