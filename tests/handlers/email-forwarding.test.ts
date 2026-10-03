@@ -175,6 +175,30 @@ describe('email forwarding', () => {
     expect(inbox.createForwardedPending).not.toHaveBeenCalled();
   });
 
+  it('recognizes a Spanish Gmail forwarding confirmation', async () => {
+    const message = email(
+      'From: Gmail Team <forwarding-noreply@google.com>\r\nSubject: (Gmail Confirmaci\u00f3n de reenv\u00edo - Recibir correos de owner@example.com)\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nConfirma la solicitud en https://mail-settings.google.com/mail/verify-example'
+    );
+    await handleForwardedEmail(message, env);
+    expect(routes.recordConfirmation).toHaveBeenCalledWith(
+      'owner-id',
+      address,
+      expect.stringContaining('https://mail-settings.google.com/mail/verify-example')
+    );
+    expect(inbox.createForwardedPending).not.toHaveBeenCalled();
+  });
+
+  it('does not treat a forged Spanish confirmation as trusted Gmail mail', async () => {
+    const message = email(
+      'Subject: Gmail Confirmaci\u00f3n de reenv\u00edo\r\n\r\nFake verification',
+      address,
+      'attacker@example.com'
+    );
+    await handleForwardedEmail(message, env);
+    expect(routes.recordConfirmation).not.toHaveBeenCalled();
+    expect(inbox.createForwardedPending).toHaveBeenCalledOnce();
+  });
+
   it('rejects oversized raw MIME before reading it', async () => {
     const message = email('x');
     Object.defineProperty(message, 'rawSize', { value: 600_000 });

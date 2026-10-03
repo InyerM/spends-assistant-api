@@ -96,7 +96,9 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
 
   if (
     message.from.toLowerCase() === 'forwarding-noreply@google.com' &&
-    /gmail forwarding confirmation/iu.test(parsed.subject)
+    /gmail (?:forwarding confirmation|confirmaci[o\u00f3]n de reenv[i\u00ed]o)/iu.test(
+      parsed.subject
+    )
   ) {
     await services.forwardingRoutes.recordConfirmation(
       route.user_id,

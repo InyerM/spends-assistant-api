@@ -15,7 +15,8 @@ function plainFromHtml(html: string): string {
       (_match, href: string, label: string) => {
         try {
           const url = new URL(href.replace(/&amp;/giu, '&'));
-          return url.protocol === 'https:' && url.hostname === 'mail.google.com'
+          return url.protocol === 'https:' &&
+            (url.hostname === 'mail.google.com' || url.hostname === 'mail-settings.google.com')
             ? `${label} ${url.toString()}`
             : label;
         } catch {

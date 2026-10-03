@@ -16,7 +16,7 @@ The Email Worker receives new messages at a random address owned by one user and
 
 New addresses have the form `capture+<48 lowercase hex characters>@<subdomain>`. The local part has 56 characters, within the SMTP limit of 64. Migration `20261003000000_email_forwarding_smtp_addresses.sql` replaces older, undeliverable 64-character-token addresses and clears their confirmation state. Owners who attempted Gmail verification before the migration must copy the replacement address from the web settings and add it again in Gmail.
 
-The `confirmation_received_at` value means a Gmail confirmation message arrived; it does not mean the user clicked the link or enabled a filter. `verification_text` is bounded plain text from that message for the owner to complete Gmail's verification step. The Worker identifies this message by envelope sender and subject; it does not claim that visible email headers prove sender authenticity.
+The `confirmation_received_at` value means a Gmail confirmation message arrived; it does not mean the user clicked the link or enabled a filter. `verification_text` is bounded plain text from that message for the owner to complete Gmail's verification step. The Worker identifies this message by Google's envelope sender and the English or Spanish forwarding-confirmation subject. It retains `mail.google.com` and `mail-settings.google.com` verification links from HTML-only mail. It does not claim that visible email headers prove sender authenticity.
 
 ## User setup
 
