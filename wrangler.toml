@@ -7,6 +7,7 @@ compatibility_date = "2024-11-23"
 ENVIRONMENT = "production"
 EMAIL_FORWARDING_DOMAIN = "receipts.inyerm.com"
 EMAIL_FORWARDING_READY = "true"
+APP_URL = "https://anotto.app"
 
 [observability]
 enabled = true
