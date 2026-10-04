@@ -31,7 +31,7 @@ export async function handleTelegram(request: Request, env: Env): Promise<Respon
   });
 
   bot.command('start', async (ctx) => {
-    const welcomeMessage = `👋 Welcome to Expense Assistant!
+    const welcomeMessage = `👋 Welcome to Anotto!
 
 I help you track expenses automatically using AI.
 
@@ -48,7 +48,7 @@ Type /help for more info.`;
   });
 
   bot.command('help', async (ctx) => {
-    const helpMessage = `💡 **Expense Assistant Help**
+    const helpMessage = `💡 **Anotto Help**
 
 **Ways to add expenses:**
 
