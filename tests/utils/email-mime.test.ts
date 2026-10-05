@@ -46,4 +46,17 @@ describe('forwarded MIME parsing', () => {
     expect(result.text).toContain('Mercamas');
     expect(result.text).not.toContain('Ignore the bank notice');
   });
+
+  it('decodes HTML entities inside a plain-text bank notice', async () => {
+    const raw = [
+      'Subject: Compra realizada',
+      'Content-Type: text/plain; charset=UTF-8',
+      '',
+      'Origen tarjeta de cr&eacute;dito &#8226;8456',
+      'Bogot&aacute;, Colombia. &copy; 2026 Lulo bank.'
+    ].join('\r\n');
+    const result = await parseForwardedEmail(new TextEncoder().encode(raw).buffer);
+    expect(result.text).toContain('crédito •8456');
+    expect(result.text).toContain('Bogotá, Colombia. © 2026');
+  });
 });

@@ -1,5 +1,44 @@
 import PostalMime from 'postal-mime';
 
+const namedEntities: Record<string, string> = {
+  amp: '&',
+  apos: "'",
+  quot: '"',
+  lt: '<',
+  gt: '>',
+  nbsp: ' ',
+  copy: '©',
+  bull: '•',
+  ndash: '–',
+  mdash: '—',
+  hellip: '…',
+  aacute: 'á',
+  eacute: 'é',
+  iacute: 'í',
+  oacute: 'ó',
+  uacute: 'ú',
+  ntilde: 'ñ',
+  Aacute: 'Á',
+  Eacute: 'É',
+  Iacute: 'Í',
+  Oacute: 'Ó',
+  Uacute: 'Ú',
+  Ntilde: 'Ñ'
+};
+
+function decodeHtmlEntities(value: string): string {
+  return value.replace(/&(#(?:x[0-9a-f]+|[0-9]+)|[a-z][a-z0-9]+);/giu, (entity, code: string) => {
+    if (code[0] !== '#') return namedEntities[code] ?? entity;
+    const numeric =
+      code[1]?.toLowerCase() === 'x'
+        ? Number.parseInt(code.slice(2), 16)
+        : Number.parseInt(code.slice(1), 10);
+    return numeric > 0 && numeric <= 0x10ffff && !(numeric >= 0xd800 && numeric <= 0xdfff)
+      ? String.fromCodePoint(numeric)
+      : entity;
+  });
+}
+
 export interface ParsedForwardedEmail {
   sender: string | null;
   subject: string;
@@ -27,10 +66,7 @@ function plainFromHtml(html: string): string {
     )
     .replace(/<br\s*\/?\s*>|<\/p\s*>|<\/div\s*>/giu, '\n')
     .replace(/<[^>]+>/gu, ' ')
-    .replace(/&nbsp;/giu, ' ')
-    .replace(/&amp;/giu, '&')
-    .replace(/&lt;/giu, '<')
-    .replace(/&gt;/giu, '>');
+    .replace(/&nbsp;/giu, ' ');
 }
 
 function cleanText(value: string): string {
@@ -55,7 +91,7 @@ export async function parseForwardedEmail(raw: ArrayBuffer): Promise<ParsedForwa
   return {
     sender: cleanText(email.from?.address ?? '').slice(0, 254) || null,
     subject: cleanText(email.subject ?? '').slice(0, 300),
-    text: cleanText(email.text || plainFromHtml(email.html ?? '')),
+    text: cleanText(decodeHtmlEntities(email.text || plainFromHtml(email.html ?? ''))),
     messageId: email.messageId?.trim().slice(0, 256) || null,
     date: email.date?.trim().slice(0, 128) ?? ''
   };
