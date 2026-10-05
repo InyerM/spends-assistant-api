@@ -90,8 +90,8 @@ describe('email forwarding Supabase services', () => {
         if (options?.method === 'POST') {
           const row = JSON.parse(String(options.body)) as Record<string, unknown>;
           if (rows.length) return new Response('duplicate', { status: 409 });
-          rows.push(row);
-          return Response.json([row]);
+          rows.push({ ...row, id: 'inbox-id' });
+          return Response.json(rows);
         }
         expect(url).toContain('user_id=eq.owner-id');
         expect(url).toContain('external_id=eq.');
@@ -107,8 +107,18 @@ describe('email forwarding Supabase services', () => {
       triageStatus: 'non_transaction' as const,
       receivedAt: '2026-10-01T00:00:00Z'
     };
-    await service.createForwardedPending(input);
-    await service.createForwardedPending({ ...input, receivedAt: '2026-10-02T00:00:00Z' });
+    expect(await service.createForwardedPending(input)).toEqual({
+      id: 'inbox-id',
+      status: 'non_transaction',
+      created: true
+    });
+    expect(
+      await service.createForwardedPending({ ...input, receivedAt: '2026-10-02T00:00:00Z' })
+    ).toEqual({
+      id: 'inbox-id',
+      status: 'dismissed',
+      created: false
+    });
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe('non_transaction');
   });

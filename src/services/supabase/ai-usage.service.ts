@@ -7,7 +7,8 @@ export interface TrackAiUsageParams {
     | 'parse_expense'
     | 'generate_automation'
     | 'extract_document'
-    | 'triage_forwarded_email';
+    | 'triage_forwarded_email'
+    | 'classify_forwarded_purchase';
   model: string;
 }
 

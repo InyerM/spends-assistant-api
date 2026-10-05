@@ -5,25 +5,32 @@ import {
 } from '../../src/handlers/email-forwarding';
 import { createMockEnv } from '../__test-helpers__/factories';
 
-const { routes, inbox, aiUsage, completeJson, resolveUserId } = vi.hoisted(() => ({
-  routes: {
-    getForUser: vi.fn(),
-    createForUser: vi.fn(),
-    deleteForUser: vi.fn(),
-    getByAddress: vi.fn(),
-    recordConfirmation: vi.fn(),
-    acknowledgeVerification: vi.fn()
-  },
-  inbox: { createForwardedPending: vi.fn() },
-  aiUsage: { track: vi.fn() },
-  completeJson: vi.fn(),
-  resolveUserId: vi.fn()
-}));
+const { routes, inbox, aiUsage, completeJson, resolveUserId, accounts, categories, autoPost } =
+  vi.hoisted(() => ({
+    routes: {
+      getForUser: vi.fn(),
+      createForUser: vi.fn(),
+      deleteForUser: vi.fn(),
+      getByAddress: vi.fn(),
+      recordConfirmation: vi.fn(),
+      acknowledgeVerification: vi.fn()
+    },
+    inbox: { createForwardedPending: vi.fn() },
+    accounts: { getAccounts: vi.fn() },
+    categories: { getCategories: vi.fn() },
+    autoPost: { post: vi.fn() },
+    aiUsage: { track: vi.fn() },
+    completeJson: vi.fn(),
+    resolveUserId: vi.fn()
+  }));
 
 vi.mock('../../src/services/supabase', () => ({
   createSupabaseServices: () => ({
     forwardingRoutes: routes,
     shortcutInbox: inbox,
+    accounts,
+    categories,
+    forwardedEmailAutoPost: autoPost,
     aiUsage,
     apiKeys: {}
   })
@@ -67,9 +74,139 @@ describe('email forwarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resolveUserId.mockResolvedValue('owner-id');
-    routes.getByAddress.mockResolvedValue({ user_id: 'owner-id', address });
     aiUsage.track.mockImplementation(async (_params, task) => task({ record: vi.fn() }));
     completeJson.mockResolvedValue({ data: { kind: 'uncertain', confidence: 0.5 } });
+    routes.getByAddress.mockResolvedValue({
+      user_id: 'owner-id',
+      address,
+      user_confirmed_at: null
+    });
+  });
+
+  it('automatically posts a verified, unique, categorized Lulo card purchase', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-05T18:00:00Z'));
+    try {
+      routes.getByAddress.mockResolvedValue({
+        user_id: 'owner-id',
+        address,
+        confirmation_received_at: '2026-10-03T16:45:00Z',
+        user_confirmed_at: '2026-10-03T17:00:00Z'
+      });
+      inbox.createForwardedPending.mockResolvedValue({
+        id: 'inbox-id',
+        status: 'pending',
+        created: true
+      });
+      accounts.getAccounts.mockResolvedValue([
+        {
+          id: 'account-id',
+          institution: 'lulobank',
+          type: 'credit_card',
+          last_four: '8456',
+          currency: 'COP',
+          is_active: true
+        }
+      ]);
+      categories.getCategories.mockResolvedValue([
+        {
+          id: 'category-id',
+          slug: 'clothing',
+          name: 'Clothing',
+          type: 'expense',
+          is_active: true
+        }
+      ]);
+      completeJson.mockResolvedValue({ data: { category_slug: 'clothing', confidence: 0.98 } });
+      autoPost.post.mockResolvedValue({ status: 'created', transaction_id: 'transaction-id' });
+      const message = email(
+        'From: Lulo Bank <notificaciones@lulobank.com>\r\nSubject: Compra realizada\r\nMessage-ID: <purchase-1@lulobank.com>\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nRealizaste una compra en SHEIN.COM por $188,165.52\nOrigen tarjeta de crédito •8456\nFecha 5 de octubre de 2026\nHora 12:24 p.m.',
+        address,
+        'notificaciones@lulobank.com'
+      );
+      await handleForwardedEmail(message, { ...env, EMAIL_AUTO_POST_READY: 'true' });
+      expect(autoPost.post).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'owner-id',
+          inboxItemId: 'inbox-id',
+          accountId: 'account-id',
+          categoryId: 'category-id',
+          amount: '188165.52',
+          cardLastFour: '8456'
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a Lulo purchase pending when forwarding is unverified', async () => {
+    inbox.createForwardedPending.mockResolvedValue({
+      id: 'inbox-id',
+      status: 'pending',
+      created: true
+    });
+    await handleForwardedEmail(
+      email(
+        'From: Lulo Bank <notificaciones@lulobank.com>\r\nSubject: Compra realizada\r\n\r\nRealizaste una compra en SHEIN.COM por $188,165.52\nOrigen tarjeta de crédito •8456\nFecha 5 de octubre de 2026\nHora 12:24 p.m.',
+        address,
+        'notificaciones@lulobank.com'
+      ),
+      env
+    );
+    expect(autoPost.post).not.toHaveBeenCalled();
+  });
+
+  it('keeps automatic posting disabled until explicitly enabled', async () => {
+    routes.getByAddress.mockResolvedValue({
+      user_id: 'owner-id',
+      address,
+      confirmation_received_at: '2026-10-03T16:45:00Z',
+      user_confirmed_at: '2026-10-03T17:00:00Z'
+    });
+    inbox.createForwardedPending.mockResolvedValue({
+      id: 'inbox-id',
+      status: 'pending',
+      created: true
+    });
+    await handleForwardedEmail(
+      email(
+        'From: Lulo Bank <notificaciones@lulobank.com>\r\nSubject: Compra realizada\r\n\r\nRealizaste una compra en SHEIN.COM por $188,165.52\nOrigen tarjeta de crédito •8456\nFecha 5 de octubre de 2026\nHora 12:24 p.m.',
+        address,
+        'notificaciones@lulobank.com'
+      ),
+      env
+    );
+    expect(accounts.getAccounts).not.toHaveBeenCalled();
+    expect(autoPost.post).not.toHaveBeenCalled();
+  });
+
+  it('keeps a rewritten forwarding envelope pending even when auto posting is enabled', async () => {
+    routes.getByAddress.mockResolvedValue({
+      user_id: 'owner-id',
+      address,
+      confirmation_received_at: '2026-10-03T16:45:00Z',
+      user_confirmed_at: '2026-10-03T17:00:00Z'
+    });
+    inbox.createForwardedPending.mockResolvedValue({
+      id: 'inbox-id',
+      status: 'pending',
+      created: true
+    });
+    await handleForwardedEmail(
+      email(
+        'From: Lulo Bank <notificaciones@lulobank.com>\r\nSubject: Compra realizada\r\n\r\nRealizaste una compra en SHEIN.COM por $188,165.52\nOrigen tarjeta de crédito •8456\nFecha 5 de octubre de 2026\nHora 12:24 p.m.',
+        address,
+        'SRS0=example=notificaciones=lulobank.com@forwarder.example'
+      ),
+      { ...env, EMAIL_AUTO_POST_READY: 'true' }
+    );
+    expect(autoPost.post).not.toHaveBeenCalled();
+    expect(inbox.createForwardedPending).toHaveBeenCalledWith(
+      expect.objectContaining({
+        triageStatus: 'pending'
+      })
+    );
   });
 
   it('requires auth and returns the owner route without exposing another route', async () => {

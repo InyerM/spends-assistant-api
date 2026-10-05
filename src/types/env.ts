@@ -19,6 +19,7 @@ export interface Env {
   // Domain routed by Cloudflare Email Routing to this Worker.
   EMAIL_FORWARDING_DOMAIN?: string;
   EMAIL_FORWARDING_READY?: string;
+  EMAIL_AUTO_POST_READY?: string;
 
   // Optional
   APP_URL?: string;

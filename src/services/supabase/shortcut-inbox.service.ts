@@ -12,6 +12,12 @@ export interface CreateForwardedInboxItemInput extends CreateShortcutInboxItemIn
   triageStatus?: 'pending' | 'non_transaction';
 }
 
+export interface ForwardedInboxWrite {
+  id: string;
+  status: string;
+  created: boolean;
+}
+
 interface InboxItem {
   id: string;
   idempotency_key: string;
@@ -34,7 +40,7 @@ async function fingerprint(source: string, text: string, receivedAt: string): Pr
 }
 
 export class ShortcutInboxService extends BaseService {
-  async createForwardedPending(input: CreateForwardedInboxItemInput): Promise<void> {
+  async createForwardedPending(input: CreateForwardedInboxItemInput): Promise<ForwardedInboxWrite> {
     if (
       input.source !== 'forwarded_email' ||
       !/^[a-f0-9]{64}$/u.test(input.externalId) ||
@@ -58,7 +64,11 @@ export class ShortcutInboxService extends BaseService {
       headers: this.headers,
       body: JSON.stringify(row)
     });
-    if (response.ok) return;
+    if (response.ok) {
+      const rows = (await response.json()) as InboxItem[];
+      if (!rows[0]?.id) throw new Error('Forwarded inbox write returned no item');
+      return { id: rows[0].id, status: rows[0].status, created: true };
+    }
     if (response.status !== 409) throw new Error('Forwarded inbox write failed');
 
     const existing = await this.fetch<InboxItem[]>(
@@ -75,6 +85,7 @@ export class ShortcutInboxService extends BaseService {
     ) {
       throw new Error('Forwarded inbox identity conflict');
     }
+    return { id: match.id, status: match.status, created: false };
   }
 
   async createPending(input: CreateShortcutInboxItemInput): Promise<void> {

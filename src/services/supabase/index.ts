@@ -8,6 +8,7 @@ import { AiUsageService } from './ai-usage.service';
 import { SkippedMessagesService } from './skipped-messages.service';
 import { ShortcutInboxService } from './shortcut-inbox.service';
 import { EmailForwardingRoutesService } from './email-forwarding-routes.service';
+import { ForwardedEmailAutoPostService } from './forwarded-email-auto-post.service';
 
 export interface SupabaseServices {
   accounts: AccountsService;
@@ -20,6 +21,7 @@ export interface SupabaseServices {
   skippedMessages: SkippedMessagesService;
   shortcutInbox: ShortcutInboxService;
   forwardingRoutes: EmailForwardingRoutesService;
+  forwardedEmailAutoPost: ForwardedEmailAutoPostService;
 }
 
 export function createSupabaseServices(url: string, serviceKey: string): SupabaseServices {
@@ -33,7 +35,8 @@ export function createSupabaseServices(url: string, serviceKey: string): Supabas
     aiUsage: new AiUsageService(url, serviceKey),
     skippedMessages: new SkippedMessagesService(url, serviceKey),
     shortcutInbox: new ShortcutInboxService(url, serviceKey),
-    forwardingRoutes: new EmailForwardingRoutesService(url, serviceKey)
+    forwardingRoutes: new EmailForwardingRoutesService(url, serviceKey),
+    forwardedEmailAutoPost: new ForwardedEmailAutoPostService(url, serviceKey)
   };
 }
 
@@ -47,3 +50,4 @@ export { AiUsageService } from './ai-usage.service';
 export { SkippedMessagesService } from './skipped-messages.service';
 export { ShortcutInboxService } from './shortcut-inbox.service';
 export { EmailForwardingRoutesService } from './email-forwarding-routes.service';
+export { ForwardedEmailAutoPostService } from './forwarded-email-auto-post.service';
