@@ -6,12 +6,14 @@ import type { AiUsageMeter } from '../ai/usage-meter';
 import { buildSystemPrompt } from '../constants/parse-expens-system-prompt';
 import type { PromptCategory } from '../constants/parse-expens-system-prompt';
 import { getCurrentColombiaTimes } from '../utils/date';
+import { AiConsentUnavailableError } from '../services/supabase/ai-consent.service';
 
 export interface ParseExpenseOptions {
   dynamicPrompts?: string[];
   categoryCatalog?: PromptCategory[];
   model?: string;
   telemetry?: { userId: string; service: AiUsageService };
+  beforeExternalCall?: () => Promise<void>;
 }
 
 function incomingBankReview(text: string): ParsedExpense | null {
@@ -68,6 +70,10 @@ async function parseExpenseCore(
     const cached = await cache.get(cacheKey);
     if (cached) return JSON.parse(cached) as ParsedExpense;
   }
+
+  if (!options?.telemetry) throw new AiConsentUnavailableError();
+  await options.telemetry.service.requireConsent(options.telemetry.userId, 'financial_text');
+  await options?.beforeExternalCall?.();
 
   const { data: expense } = await completeJson<ParsedExpense>({
     apiKey,

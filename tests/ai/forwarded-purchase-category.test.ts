@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { classifyForwardedPurchase } from '../../src/ai/forwarded-purchase-category';
+import { AiConsentRequiredError } from '../../src/services/supabase/ai-consent.service';
+import { ConsentGatedAiUsageService } from '../../src/services/supabase/consent-gated-ai-usage.service';
 import type { Category } from '../../src/types/category';
 
 const { completeJson } = vi.hoisted(() => ({ completeJson: vi.fn() }));
@@ -22,6 +24,46 @@ const categories = [
 const usage = { track: vi.fn(async (_params, task) => task({ record: vi.fn() })) };
 
 describe('forwarded purchase category', () => {
+  it('never calls OpenRouter after forwarded-email consent is revoked', async () => {
+    completeJson.mockClear();
+    const service = new ConsentGatedAiUsageService('https://test.supabase.co', 'key', {
+      require: async (_userId, scope) => {
+        if (scope === 'forwarded_email') throw new AiConsentRequiredError(scope);
+      }
+    });
+    await expect(
+      classifyForwardedPurchase(
+        'UNKNOWN MERCHANT',
+        categories,
+        'key',
+        'model',
+        'owner',
+        service,
+        true,
+        0.95,
+        'forwarded_email'
+      )
+    ).rejects.toBeInstanceOf(AiConsentRequiredError);
+    expect(completeJson).not.toHaveBeenCalled();
+  });
+  it('propagates missing consent so callers can distinguish it from provider failure', async () => {
+    const denied = {
+      track: vi.fn(async () => {
+        throw new AiConsentRequiredError('financial_text');
+      })
+    };
+    await expect(
+      classifyForwardedPurchase(
+        'UNKNOWN MERCHANT',
+        categories,
+        'key',
+        'model',
+        'owner',
+        denied as never
+      )
+    ).rejects.toBeInstanceOf(AiConsentRequiredError);
+    expect(completeJson).not.toHaveBeenCalled();
+  });
   it('recognizes a verified driving school identity as education without an AI call', async () => {
     const education = {
       id: 'education-id',

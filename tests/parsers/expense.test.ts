@@ -1,8 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { parseExpense } from '../../src/parsers/expense';
+import { parseExpense as parseExpenseWithConsent } from '../../src/parsers/expense';
 import type { CacheService } from '../../src/services/cache.service';
+import type { AiUsageService } from '../../src/services/supabase/ai-usage.service';
+import { AiUsageMeter } from '../../src/ai/usage-meter';
+import { ConsentGatedAiUsageService } from '../../src/services/supabase/consent-gated-ai-usage.service';
+import {
+  AiConsentRequiredError,
+  AiConsentUnavailableError
+} from '../../src/services/supabase/ai-consent.service';
 
 const API_KEY = 'test-openrouter-key';
+const approvedService = {
+  requireConsent: async () => undefined,
+  track: async <T>(_params: unknown, task: (meter: AiUsageMeter) => Promise<T>): Promise<T> =>
+    task(new AiUsageMeter())
+} as AiUsageService;
+const parseExpense: typeof parseExpenseWithConsent = (text, apiKey, cache, options) =>
+  parseExpenseWithConsent(text, apiKey, cache, {
+    ...options,
+    telemetry: options?.telemetry ?? { userId: 'owner-1', service: approvedService }
+  });
 
 function createOpenRouterResponse(expense: Record<string, unknown>) {
   return {
@@ -31,6 +48,88 @@ describe('parseExpense', () => {
       })
     );
     vi.stubGlobal('clearTimeout', vi.fn());
+  });
+
+  it('never calls OpenRouter without owner-scoped consent telemetry', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(parseExpenseWithConsent('Compraste $50.000', API_KEY)).rejects.toBeInstanceOf(
+      AiConsentUnavailableError
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps incoming-transfer review local without AI consent', async () => {
+    const beforeExternalCall = vi.fn();
+    const requireConsent = vi.fn(async () => {
+      throw new AiConsentRequiredError('financial_text');
+    });
+    const service = new ConsentGatedAiUsageService('https://db.test', 'key', {
+      require: requireConsent
+    });
+    const fetchMock = vi.fn(async () => Response.json([]));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await parseExpense(
+      'Bancolombia: Recibiste una transferencia por $50.000',
+      API_KEY,
+      undefined,
+      { telemetry: { userId: 'owner-1', service }, beforeExternalCall }
+    );
+    expect(result.skip_reason).toBe('incoming_transfer_requires_review');
+    expect(requireConsent).not.toHaveBeenCalled();
+    expect(beforeExternalCall).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('openrouter.ai'))).toBe(false);
+  });
+
+  it('returns a cached parse without AI consent but denies a cache miss before OpenRouter', async () => {
+    const beforeExternalCall = vi.fn();
+    const requireConsent = vi.fn(async () => {
+      throw new AiConsentRequiredError('financial_text');
+    });
+    const service = new ConsentGatedAiUsageService('https://db.test', 'key', {
+      require: requireConsent
+    });
+    const fetchMock = vi.fn(async () => Response.json([]));
+    vi.stubGlobal('fetch', fetchMock);
+    const cache = {
+      hashKey: vi.fn().mockReturnValue('cache-key'),
+      get: vi.fn().mockResolvedValueOnce(JSON.stringify(validExpense)).mockResolvedValueOnce(null),
+      set: vi.fn()
+    } as unknown as CacheService;
+    const options = { telemetry: { userId: 'owner-1', service }, beforeExternalCall };
+    expect((await parseExpense('Compraste $50.000', API_KEY, cache, options)).amount).toBe(50000);
+    expect(requireConsent).not.toHaveBeenCalled();
+    await expect(parseExpense('Compraste $50.000', API_KEY, cache, options)).rejects.toBeInstanceOf(
+      AiConsentRequiredError
+    );
+    expect(requireConsent).toHaveBeenCalledWith('owner-1', 'financial_text');
+    expect(beforeExternalCall).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('openrouter.ai'))).toBe(false);
+  });
+
+  it('reserves quota only after consent and immediately before an external call', async () => {
+    const order: string[] = [];
+    const service = new ConsentGatedAiUsageService('https://db.test', 'key', {
+      require: async () => {
+        order.push('consent');
+      }
+    });
+    const beforeExternalCall = vi.fn(async () => {
+      order.push('quota');
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        order.push('provider');
+        return Response.json(createOpenRouterResponse(validExpense));
+      })
+    );
+    await parseExpense('Compraste $50.000', API_KEY, undefined, {
+      telemetry: { userId: 'owner-1', service },
+      beforeExternalCall
+    });
+    expect(order.slice(0, 3)).toEqual(['consent', 'quota', 'provider']);
+    expect(beforeExternalCall).toHaveBeenCalledOnce();
   });
 
   it.each([

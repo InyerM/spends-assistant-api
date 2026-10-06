@@ -3,6 +3,7 @@ import type { Env } from '../types/env';
 import { emailFingerprint } from '../utils/email-mime';
 import { extractForwardedPurchase } from '../ai/forwarded-purchase';
 import { classifyForwardedPurchase } from '../ai/forwarded-purchase-category';
+import { AiConsentRequiredError } from '../services/supabase/ai-consent.service';
 import type { ForwardedEmailJob } from '../types/forwarded-email-job';
 
 interface RoutingEvent {
@@ -200,7 +201,9 @@ async function postAuthenticatedEvent(
       model,
       route.user_id,
       services.aiUsage,
-      retryProviderFailures
+      retryProviderFailures,
+      0.95,
+      'forwarded_email'
     );
     if (!classification) return;
     await services.forwardedEmailAutoPost.post({
@@ -215,7 +218,8 @@ async function postAuthenticatedEvent(
       description: `Compra en ${purchase.merchant}`,
       model: classification.model
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof AiConsentRequiredError) return;
     console.error('[Email auto-post] Candidate processing failed');
     return false;
   }

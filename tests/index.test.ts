@@ -20,6 +20,9 @@ vi.mock('../src/handlers/vision-extract', () => ({
 vi.mock('../src/handlers/merchant-suggest', () => ({
   handleMerchantSuggest: vi.fn(async () => new Response('merchant ok'))
 }));
+vi.mock('../src/handlers/ai-consent', () => ({
+  handleAiConsent: vi.fn(async () => new Response('consent ok'))
+}));
 vi.mock('../src/handlers/balance', () => ({
   handleBalance: vi.fn(async () => new Response('balance ok'))
 }));
@@ -110,6 +113,14 @@ describe('Worker routing', () => {
     const request = new Request('http://localhost/parse', { method: 'POST' });
     await worker.fetch(request, env, ctx);
     expect(handleParse).toHaveBeenCalled();
+  });
+
+  it.each(['GET', 'POST'])('routes /ai/consent %s to consent handling', async (method) => {
+    const { handleAiConsent } = await import('../src/handlers/ai-consent');
+    const request = new Request('http://localhost/ai/consent', { method });
+    const response = await worker.fetch(request, env, ctx);
+    expect(response.status).toBe(200);
+    expect(handleAiConsent).toHaveBeenCalledWith(request, env);
   });
 
   it('routes /vision/extract POST to handleVisionExtract', async () => {

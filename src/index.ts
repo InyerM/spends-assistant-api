@@ -11,6 +11,7 @@ import { handleVisionExtract } from './handlers/vision-extract';
 import { handleMerchantSuggest } from './handlers/merchant-suggest';
 import { handleBalance } from './handlers/balance';
 import { handleAutomationGenerate } from './handlers/automation-generate';
+import { handleAiConsent } from './handlers/ai-consent';
 import { createSupabaseServices } from './services/supabase';
 import { resolveUserId, unauthorizedResponse } from './utils/auth';
 import { Env } from './types/env';
@@ -75,6 +76,10 @@ export default {
 
     if (url.pathname === '/email-forwarding-route') {
       return handleEmailForwardingRoute(request, env);
+    }
+
+    if (url.pathname === '/ai/consent') {
+      return handleAiConsent(request, env);
     }
 
     // Parse API (parse only, no save)

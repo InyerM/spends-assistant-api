@@ -2,6 +2,7 @@ import { DEFAULT_VISION_MODEL, extractImageObservations } from '../ai/vision';
 import { createSupabaseServices } from '../services/supabase';
 import type { Env } from '../types/env';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
+import { aiConsentErrorResponse } from '../utils/ai-consent-response';
 
 const MAX_IMAGE_DATA_URL_LENGTH = 8_000_000;
 const IMAGE_DATA_URL = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
@@ -38,6 +39,21 @@ export async function handleVisionExtract(request: Request, env: Env): Promise<R
     return json({ error: 'Invalid image data' }, 400);
   }
 
+  try {
+    await services.aiConsent.require(userId, 'document_images');
+  } catch (error) {
+    return (
+      aiConsentErrorResponse(error) ??
+      json(
+        {
+          error: 'AI consent unavailable',
+          code: 'AI_CONSENT_UNAVAILABLE'
+        },
+        503
+      )
+    );
+  }
+
   const usageCheck = await services.usage.incrementAiParses(userId);
   if (!usageCheck.allowed) {
     return json(
@@ -63,7 +79,9 @@ export async function handleVisionExtract(request: Request, env: Env): Promise<R
         })
     );
     return json(result, 200);
-  } catch {
+  } catch (error) {
+    const consentResponse = aiConsentErrorResponse(error);
+    if (consentResponse) return consentResponse;
     // The upstream response can contain the private image; do not echo or log it.
     return json({ error: 'Vision extraction failed' }, 502);
   }

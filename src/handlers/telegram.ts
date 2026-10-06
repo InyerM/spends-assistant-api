@@ -2,6 +2,10 @@ import { Telegraf, Context } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { parseExpense } from '../parsers/expense';
 import { createSupabaseServices } from '../services/supabase';
+import {
+  AiConsentRequiredError,
+  AiConsentUnavailableError
+} from '../services/supabase/ai-consent.service';
 import { CacheService } from '../services/cache.service';
 import {
   getCurrentColombiaTimes,
@@ -308,6 +312,14 @@ async function processExpense(
 
     await ctx.reply(confirmationMessage);
   } catch (error: unknown) {
+    if (error instanceof AiConsentRequiredError) {
+      await ctx.reply('AI analysis is off. Review and enable AI data sharing in Anotto settings.');
+      return;
+    }
+    if (error instanceof AiConsentUnavailableError) {
+      await ctx.reply('AI consent could not be checked. Please try again later.');
+      return;
+    }
     console.error('Processing error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 

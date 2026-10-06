@@ -1,6 +1,7 @@
 import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
 import { completeJson } from '../ai/openrouter';
+import { aiConsentErrorResponse } from '../utils/ai-consent-response';
 import { automationGenerateSystemPrompt } from '../constants/automation-generate-system-prompt';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 import type {
@@ -117,6 +118,8 @@ ${JSON.stringify(existingRulesContext, null, 2)}
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error: unknown) {
+    const consentResponse = aiConsentErrorResponse(error);
+    if (consentResponse) return consentResponse;
     console.error('Automation Generate Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: errorMessage }), {

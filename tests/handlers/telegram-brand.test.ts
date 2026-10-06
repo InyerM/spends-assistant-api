@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockEnv } from '../__test-helpers__/factories';
 import { handleTelegram } from '../../src/handlers/telegram';
 import { parseExpense } from '../../src/parsers/expense';
+import { AiConsentRequiredError } from '../../src/services/supabase/ai-consent.service';
 
 const { reply } = vi.hoisted(() => ({ reply: vi.fn() }));
 
@@ -22,7 +23,12 @@ vi.mock('telegraf', () => ({
     }
 
     async handleUpdate(update: { message: { text: string } }): Promise<void> {
-      await this.commands.get(update.message.text.slice(1))?.({ reply });
+      const [command] = update.message.text.slice(1).split(' ');
+      await this.commands.get(command)?.({
+        reply,
+        message: update.message,
+        sendChatAction: vi.fn()
+      } as never);
     }
   }
 }));
@@ -55,4 +61,22 @@ describe('Telegram customer-facing brand', () => {
       expect(parseExpense).not.toHaveBeenCalled();
     }
   );
+
+  it('asks the user to enable consent without echoing a Telegram expense', async () => {
+    vi.mocked(parseExpense).mockRejectedValue(new AiConsentRequiredError('financial_text'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json([]))
+    );
+    await handleTelegram(
+      new Request('https://worker.test/telegram', {
+        method: 'POST',
+        body: JSON.stringify({ message: { text: '/gasto private purchase details' } })
+      }),
+      createMockEnv()
+    );
+    expect(reply).toHaveBeenCalledWith(expect.stringContaining('AI data sharing'));
+    expect(JSON.stringify(reply.mock.calls)).not.toContain('private purchase details');
+    vi.unstubAllGlobals();
+  });
 });

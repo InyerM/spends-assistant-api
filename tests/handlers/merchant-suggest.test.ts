@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockCategory, createMockEnv } from '../__test-helpers__/factories';
 import { handleMerchantSuggest } from '../../src/handlers/merchant-suggest';
+import { AiConsentRequiredError } from '../../src/services/supabase/ai-consent.service';
 
 const mocks = vi.hoisted(() => ({
   resolveUserId: vi.fn(),
@@ -82,5 +83,15 @@ describe('merchant suggestions', () => {
     const foreign = await handleMerchantSuggest(request('UNKNOWN SHOP'), createMockEnv());
     expect(await ambiguous.json()).toEqual({ category_id: null, source: null });
     expect(await foreign.json()).toEqual({ category_id: null, source: null });
+  });
+
+  it('distinguishes required consent from model failure', async () => {
+    mocks.classify.mockRejectedValueOnce(new AiConsentRequiredError('financial_text'));
+    const response = await handleMerchantSuggest(request('UNKNOWN SHOP'), createMockEnv());
+    expect(response.status).toBe(428);
+    expect(await response.json()).toMatchObject({
+      code: 'AI_CONSENT_REQUIRED',
+      scope: 'financial_text'
+    });
   });
 });

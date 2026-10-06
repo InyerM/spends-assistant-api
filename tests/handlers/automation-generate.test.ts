@@ -5,9 +5,39 @@ import { createMockEnv } from '../__test-helpers__/factories';
 describe('automation rule generation via OpenRouter', () => {
   beforeEach(() => vi.restoreAllMocks());
 
+  it('returns consent-required and sends no prompt to OpenRouter for a new user', async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn(async () => Response.json([]));
+    vi.stubGlobal('fetch', fetchMock);
+    const response = await handleAutomationGenerate(
+      new Request('http://localhost/automation/generate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'Private merchant name' })
+      }),
+      env
+    );
+    expect(response.status).toBe(428);
+    expect(await response.json()).toMatchObject({
+      code: 'AI_CONSENT_REQUIRED',
+      scope: 'financial_text'
+    });
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('openrouter.ai'))).toBe(false);
+  });
+
   it('returns generated rules with privacy restricted provider routing', async () => {
     const env = createMockEnv();
     const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('ai_consent_decisions')) {
+        return Response.json([
+          {
+            scope: 'financial_text',
+            version: 'external-ai-v1',
+            granted_at: '2026-10-06T00:00:00Z',
+            revoked_at: null
+          }
+        ]);
+      }
       if (url.includes('openrouter.ai')) {
         return new Response(
           JSON.stringify({
@@ -58,6 +88,16 @@ describe('automation rule generation via OpenRouter', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes('ai_consent_decisions')) {
+          return Response.json([
+            {
+              scope: 'financial_text',
+              version: 'external-ai-v1',
+              granted_at: '2026-10-06T00:00:00Z',
+              revoked_at: null
+            }
+          ]);
+        }
         if (url.includes('openrouter.ai'))
           return new Response(
             JSON.stringify({

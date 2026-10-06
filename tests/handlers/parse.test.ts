@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleParse } from '../../src/handlers/parse';
+import { AiConsentRequiredError } from '../../src/services/supabase/ai-consent.service';
 import {
   createMockEnv,
   createMockAccount,
@@ -102,13 +103,10 @@ describe('handleParse', () => {
           });
         }
         if (url.includes('/rpc/reserve_ai_parse')) {
-          return new Response(
-            JSON.stringify([{ allowed: true, used: 6, limit: 15 }]),
-            {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' }
-            }
-          );
+          return new Response(JSON.stringify([{ allowed: true, used: 6, limit: 15 }]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
         if (url.includes('automation_rules')) {
           return new Response(JSON.stringify([]), {
@@ -162,6 +160,11 @@ describe('handleParse', () => {
   });
 
   it('returns 429 when parse limit reached', async () => {
+    const { parseExpense } = await import('../../src/parsers/expense');
+    vi.mocked(parseExpense).mockImplementation(async (_text, _apiKey, _cache, options) => {
+      await options?.beforeExternalCall?.();
+      throw new Error('Quota callback should reject');
+    });
     // Mock: usage check returns not allowed
     vi.stubGlobal(
       'fetch',
@@ -173,13 +176,10 @@ describe('handleParse', () => {
           });
         }
         if (url.includes('/rpc/reserve_ai_parse')) {
-          return new Response(
-            JSON.stringify([{ allowed: false, used: 15, limit: 15 }]),
-            {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' }
-            }
-          );
+          return new Response(JSON.stringify([{ allowed: false, used: 15, limit: 15 }]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
         return new Response(JSON.stringify([]), {
           status: 200,
@@ -213,13 +213,10 @@ describe('handleParse', () => {
       'fetch',
       vi.fn(async (url: string) => {
         if (url.includes('/rpc/reserve_ai_parse')) {
-          return new Response(
-            JSON.stringify([{ allowed: true, used: 1, limit: 15 }]),
-            {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' }
-            }
-          );
+          return new Response(JSON.stringify([{ allowed: true, used: 1, limit: 15 }]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
         return new Response(JSON.stringify([]), {
           status: 200,
@@ -239,5 +236,38 @@ describe('handleParse', () => {
 
     const response = await handleParse(request, env);
     expect(response.status).toBe(500);
+  });
+
+  it('returns a structured consent requirement without exposing the message', async () => {
+    const { parseExpense } = await import('../../src/parsers/expense');
+    vi.mocked(parseExpense).mockRejectedValue(new AiConsentRequiredError('financial_text'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async (url: string) =>
+          new Response(
+            JSON.stringify(
+              url.includes('/rpc/reserve_ai_parse') ? [{ allowed: true, used: 1, limit: 15 }] : []
+            ),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+      )
+    );
+    const response = await handleParse(
+      new Request('http://localhost/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.API_KEY}` },
+        body: JSON.stringify({ text: 'private purchase details' })
+      }),
+      env
+    );
+    expect(response.status).toBe(428);
+    expect(await response.json()).toMatchObject({
+      code: 'AI_CONSENT_REQUIRED',
+      scope: 'financial_text'
+    });
+    expect(
+      vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/rpc/reserve_ai_parse'))
+    ).toBe(false);
   });
 });

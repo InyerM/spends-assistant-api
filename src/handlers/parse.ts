@@ -8,9 +8,19 @@ import {
   buildAutomationRulesPromptSection
 } from '../services/transfer-processor';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
+import { aiConsentErrorResponse } from '../utils/ai-consent-response';
 
 interface ParseRequest {
   text: string;
+}
+
+class AiParseQuotaExceededError extends Error {
+  constructor(
+    readonly used: number,
+    readonly limit: number
+  ) {
+    super('Parse limit reached');
+  }
 }
 
 export async function handleParse(request: Request, env: Env): Promise<Response> {
@@ -28,20 +38,6 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
-    }
-
-    // Check AI parse usage limit
-    const usageCheck = await services.usage.incrementAiParses(userId);
-    if (!usageCheck.allowed) {
-      return new Response(
-        JSON.stringify({
-          error: 'Parse limit reached',
-          code: 'PARSE_LIMIT_REACHED',
-          used: usageCheck.used,
-          limit: usageCheck.limit
-        }),
-        { status: 429, headers: { 'Content-Type': 'application/json' } }
-      );
     }
 
     const { parseExpense } = await import('../parsers/expense');
@@ -81,7 +77,13 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
       dynamicPrompts,
       categoryCatalog: categories.map(({ slug, name, type }) => ({ slug, name, type })),
       model: env.OPENROUTER_TEXT_MODEL,
-      telemetry: { userId, service: services.aiUsage }
+      telemetry: { userId, service: services.aiUsage },
+      beforeExternalCall: async () => {
+        const usageCheck = await services.usage.incrementAiParses(userId);
+        if (!usageCheck.allowed) {
+          throw new AiParseQuotaExceededError(usageCheck.used, usageCheck.limit);
+        }
+      }
     });
 
     // Handle non-transactional messages
@@ -155,6 +157,19 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
       }
     );
   } catch (error: unknown) {
+    const consentResponse = aiConsentErrorResponse(error);
+    if (consentResponse) return consentResponse;
+    if (error instanceof AiParseQuotaExceededError) {
+      return Response.json(
+        {
+          error: error.message,
+          code: 'PARSE_LIMIT_REACHED',
+          used: error.used,
+          limit: error.limit
+        },
+        { status: 429 }
+      );
+    }
     console.error('Parse API Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: errorMessage }), {

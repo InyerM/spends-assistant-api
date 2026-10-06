@@ -15,6 +15,7 @@ import {
   buildAutomationRulesPromptSection
 } from '../services/transfer-processor';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
+import { aiConsentErrorResponse } from '../utils/ai-consent-response';
 import { resolveShortcutReceiptAt } from '../utils/shortcut-receipt-time';
 
 interface TransactionRequest {
@@ -243,6 +244,8 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
       }
     );
   } catch (error: unknown) {
+    const consentResponse = aiConsentErrorResponse(error);
+    if (consentResponse) return consentResponse;
     console.error('Transaction API Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: errorMessage }), {

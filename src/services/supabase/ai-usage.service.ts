@@ -1,5 +1,7 @@
 import { BaseService } from './base.service';
 import { AiUsageMeter } from '../../ai/usage-meter';
+import type { AiConsentScope } from './ai-consent.service';
+import { AiConsentUnavailableError } from './ai-consent.service';
 
 export interface TrackAiUsageParams {
   userId: string;
@@ -39,7 +41,15 @@ function colombiaMonth(date = new Date()): string {
 
 /** Recording is best effort and never controls a user request. */
 export class AiUsageService extends BaseService {
-  async track<T>(params: TrackAiUsageParams, fn: (meter: AiUsageMeter) => Promise<T>): Promise<T> {
+  async requireConsent(_userId: string, _scope: AiConsentScope): Promise<void> {
+    throw new AiConsentUnavailableError();
+  }
+
+  async track<T>(
+    params: TrackAiUsageParams,
+    fn: (meter: AiUsageMeter) => Promise<T>,
+    _scope?: AiConsentScope
+  ): Promise<T> {
     const meter = new AiUsageMeter();
     try {
       const result = await fn(meter);

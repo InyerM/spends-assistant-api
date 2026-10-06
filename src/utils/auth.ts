@@ -13,7 +13,7 @@ export interface AuthResult {
 export async function resolveUserId(
   request: Request,
   env: Env,
-  apiKeysService: ApiKeysService,
+  apiKeysService: ApiKeysService
 ): Promise<string | null> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) return null;
@@ -28,16 +28,25 @@ export async function resolveUserId(
   if (token === env.API_KEY) return env.DEFAULT_USER_ID;
 
   // 3. Supabase JWT verification
+  return resolveSupabaseJwtUserId(request, env);
+}
+
+/** Consent changes require an interactive Supabase session, not a delegated API key. */
+export async function resolveSupabaseJwtUserId(request: Request, env: Env): Promise<string | null> {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7);
+  if (!token || token === env.API_KEY) return null;
   try {
     const userRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
       headers: {
         Authorization: `Bearer ${token}`,
-        apikey: env.SUPABASE_SERVICE_KEY,
-      },
+        apikey: env.SUPABASE_SERVICE_KEY
+      }
     });
     if (userRes.ok) {
-      const user = (await userRes.json()) as { id: string };
-      return user.id;
+      const user = (await userRes.json()) as { id?: unknown };
+      return typeof user.id === 'string' && user.id.length > 0 ? user.id : null;
     }
   } catch {
     // JWT verification failed
@@ -48,8 +57,8 @@ export async function resolveUserId(
 
 /** Returns a 401 JSON response. */
 export function unauthorizedResponse(): Response {
-  return new Response(
-    JSON.stringify({ error: 'Unauthorized' }),
-    { status: 401, headers: { 'Content-Type': 'application/json' } },
-  );
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' }
+  });
 }

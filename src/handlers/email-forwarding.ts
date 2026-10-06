@@ -129,7 +129,8 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
     env.OPENROUTER_API_KEY,
     env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
     route.user_id,
-    services.aiUsage
+    services.aiUsage,
+    !!route.confirmation_received_at && !!route.user_confirmed_at
   );
   const receivedAt = new Date().toISOString();
   const externalId = await emailFingerprint(parsed);

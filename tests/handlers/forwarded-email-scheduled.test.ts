@@ -5,6 +5,10 @@ import {
 } from '../../src/handlers/forwarded-email-scheduled';
 import { emailFingerprint } from '../../src/utils/email-mime';
 import { createMockEnv } from '../__test-helpers__/factories';
+import {
+  AiConsentRequiredError,
+  AiConsentUnavailableError
+} from '../../src/services/supabase/ai-consent.service';
 const mocks = vi.hoisted(() => ({
   route: vi.fn(),
   inbox: vi.fn(),
@@ -111,6 +115,17 @@ it('posts only after authenticated analytics correlation and owner-scoped lookup
   );
   expect(mocks.post).toHaveBeenCalledWith(
     expect.objectContaining({ userId: 'owner', inboxItemId: 'inbox', amount: '188165.52' })
+  );
+  expect(mocks.classify).toHaveBeenCalledWith(
+    'STORE',
+    expect.any(Array),
+    expect.any(String),
+    expect.any(String),
+    'owner',
+    expect.any(Object),
+    expect.any(Boolean),
+    0.95,
+    'forwarded_email'
   );
 });
 it.each([
@@ -409,6 +424,51 @@ it('retries a transient category-provider failure without posting', async () => 
     date: ''
   });
   mocks.classify.mockRejectedValueOnce(new Error('Provider unavailable'));
+  expect(
+    await handleQueuedForwardedEmail(
+      { externalId, recipient: event.to, receivedAt: event.datetime, messageId: event.messageId },
+      env,
+      now
+    )
+  ).toBe('retry');
+  expect(mocks.post).not.toHaveBeenCalled();
+});
+
+it('terminates a queued email after forwarded-email consent is revoked', async () => {
+  const externalId = await emailFingerprint({
+    messageId: event.messageId,
+    sender: null,
+    subject: '',
+    text: '',
+    date: ''
+  });
+  mocks.classify.mockRejectedValueOnce(new AiConsentRequiredError('forwarded_email'));
+  expect(
+    await handleQueuedForwardedEmail(
+      { externalId, recipient: event.to, receivedAt: event.datetime, messageId: event.messageId },
+      env,
+      now
+    )
+  ).toBe('done');
+  expect(mocks.post).not.toHaveBeenCalled();
+});
+
+it('leaves a scheduled email pending when forwarded-email consent is absent', async () => {
+  mocks.classify.mockRejectedValueOnce(new AiConsentRequiredError('forwarded_email'));
+  await handleScheduledForwardedEmails(env, now);
+  expect(mocks.post).not.toHaveBeenCalled();
+  expect(mocks.classify).toHaveBeenCalledTimes(1);
+});
+
+it('fails closed with bounded retry when consent storage is unavailable', async () => {
+  const externalId = await emailFingerprint({
+    messageId: event.messageId,
+    sender: null,
+    subject: '',
+    text: '',
+    date: ''
+  });
+  mocks.classify.mockRejectedValueOnce(new AiConsentUnavailableError());
   expect(
     await handleQueuedForwardedEmail(
       { externalId, recipient: event.to, receivedAt: event.datetime, messageId: event.messageId },

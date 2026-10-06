@@ -2,6 +2,7 @@ import { classifyForwardedPurchase } from '../ai/forwarded-purchase-category';
 import { createSupabaseServices } from '../services/supabase';
 import type { Env } from '../types/env';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
+import { aiConsentErrorResponse } from '../utils/ai-consent-response';
 
 export async function handleMerchantSuggest(request: Request, env: Env): Promise<Response> {
   const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
@@ -48,7 +49,9 @@ export async function handleMerchantSuggest(request: Request, env: Env): Promise
       category_id: category?.id ?? null,
       source: category ? (suggestion?.model === 'merchant-catalog-v1' ? 'catalog' : 'ai') : null
     });
-  } catch {
+  } catch (error) {
+    const consentResponse = aiConsentErrorResponse(error);
+    if (consentResponse) return consentResponse;
     return Response.json({ error: 'Merchant suggestion unavailable' }, { status: 503 });
   }
 }

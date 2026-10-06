@@ -29,7 +29,8 @@ export async function triageForwardedEmail(
   apiKey: string,
   model: string,
   userId: string,
-  usage: AiUsageService
+  usage: AiUsageService,
+  allowExternalAi = true
 ): Promise<TriageResult> {
   const fullText = `${email.subject}\n${email.text}`;
   const amountEvidence = AMOUNT.test(fullText);
@@ -67,6 +68,7 @@ export async function triageForwardedEmail(
     subject: redactLongNumbers(email.subject),
     text: redactLongNumbers(email.text)
   };
+  if (!allowExternalAi) return { triageStatus, rawText: inboxText(safeEmail) };
   try {
     const { data } = await usage.track(
       { userId, operation: 'triage_forwarded_email', model },

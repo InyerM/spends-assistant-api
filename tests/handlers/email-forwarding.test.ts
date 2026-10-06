@@ -227,6 +227,26 @@ describe('email forwarding', () => {
     expect(autoPost.post).not.toHaveBeenCalled();
   });
 
+  it('never sends an unverified forwarding address to external AI', async () => {
+    inbox.createForwardedPending.mockResolvedValue({
+      id: 'inbox-id',
+      status: 'pending',
+      created: true
+    });
+    await handleForwardedEmail(
+      email(
+        'From: Unknown Bank <notice@bank.test>\r\nSubject: Account information\r\n\r\nThere is an update to your account.',
+        address,
+        'notice@bank.test'
+      ),
+      env
+    );
+    expect(completeJson).not.toHaveBeenCalled();
+    expect(inbox.createForwardedPending).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'owner-id', triageStatus: 'pending' })
+    );
+  });
+
   it('keeps automatic posting disabled until explicitly enabled', async () => {
     routes.getByAddress.mockResolvedValue({
       user_id: 'owner-id',
@@ -530,6 +550,12 @@ describe('email forwarding', () => {
   });
 
   it('uses metered AI only for unclear mail and auto-classifies high-confidence non-transactions', async () => {
+    routes.getByAddress.mockResolvedValue({
+      user_id: 'owner-id',
+      address,
+      confirmation_received_at: '2026-10-03T16:45:00Z',
+      user_confirmed_at: '2026-10-03T17:00:00Z'
+    });
     completeJson.mockResolvedValueOnce({ data: { kind: 'promotion', confidence: 0.98 } });
     const message = email(
       'From: Novedades <new-bank@bancolombia.example>\r\nSubject: Noticias para ti\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nTenemos novedades para nuestros clientes.',
@@ -566,6 +592,12 @@ describe('email forwarding', () => {
   });
 
   it('redacts long numeric sequences from ambiguous mail before AI classification', async () => {
+    routes.getByAddress.mockResolvedValue({
+      user_id: 'owner-id',
+      address,
+      confirmation_received_at: '2026-10-03T16:45:00Z',
+      user_confirmed_at: '2026-10-03T17:00:00Z'
+    });
     await handleForwardedEmail(
       email('Subject: Aviso\r\n\r\nReferencia 481927 para tu consulta.'),
       env

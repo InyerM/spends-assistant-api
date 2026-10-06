@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleVisionExtract } from '../../src/handlers/vision-extract';
 import { extractImageObservations } from '../../src/ai/vision';
 import { createMockEnv } from '../__test-helpers__/factories';
+import { AiConsentRequiredError } from '../../src/services/supabase/ai-consent.service';
 
 const trackUsage = vi.hoisted(() => vi.fn());
 const incrementAiParses = vi.hoisted(() => vi.fn());
+const requireConsent = vi.hoisted(() => vi.fn());
 vi.mock('../../src/ai/vision', () => ({
   DEFAULT_VISION_MODEL: 'qwen/qwen3-vl-30b-a3b-instruct',
   extractImageObservations: vi.fn()
@@ -13,6 +15,7 @@ vi.mock('../../src/services/supabase', () => ({
   createSupabaseServices: () => ({
     apiKeys: {},
     aiUsage: { track: trackUsage },
+    aiConsent: { require: requireConsent },
     usage: { incrementAiParses }
   })
 }));
@@ -40,7 +43,27 @@ describe('handleVisionExtract', () => {
 
   beforeEach(() => {
     trackUsage.mockImplementation(async (_params, fn) => fn({ record: vi.fn() }));
+    requireConsent.mockResolvedValue(undefined);
     incrementAiParses.mockResolvedValue({ allowed: true, used: 1, limit: 15 });
+  });
+
+  it('does not consume the AI request count when image consent is missing', async () => {
+    requireConsent.mockRejectedValueOnce(new AiConsentRequiredError('document_images'));
+    const response = await handleVisionExtract(request({ image_data_url: imageDataUrl }), env);
+    expect(response.status).toBe(428);
+    expect(incrementAiParses).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('returns consent-required without invoking vision extraction', async () => {
+    trackUsage.mockRejectedValueOnce(new AiConsentRequiredError('document_images'));
+    const response = await handleVisionExtract(request({ image_data_url: imageDataUrl }), env);
+    expect(response.status).toBe(428);
+    expect(await response.json()).toMatchObject({
+      code: 'AI_CONSENT_REQUIRED',
+      scope: 'document_images'
+    });
+    expect(extractImageObservations).not.toHaveBeenCalled();
   });
 
   it('rejects an unauthenticated request before invoking the model', async () => {

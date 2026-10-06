@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleEmail } from '../../src/handlers/email';
+import { AiConsentRequiredError } from '../../src/services/supabase/ai-consent.service';
 import {
   createMockEnv,
   createMockAccount,
@@ -27,7 +28,10 @@ describe('handleEmail', () => {
   it('does not log the raw financial email body', async () => {
     const secret = 'Bancolombia private-account-98765';
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('[]', { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('[]', { status: 200 }))
+    );
     const request = authenticatedEmailRequest({
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.API_KEY}` },
@@ -381,5 +385,29 @@ describe('handleEmail', () => {
 
     const response = await handleEmail(request, env);
     expect(response.status).toBe(500);
+  });
+
+  it('returns a structured consent requirement for parsed email', async () => {
+    const { parseExpense } = await import('../../src/parsers/expense');
+    vi.mocked(parseExpense).mockRejectedValue(new AiConsentRequiredError('financial_text'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('[]', { status: 200 }))
+    );
+    const response = await handleEmail(
+      authenticatedEmailRequest({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          body: 'Bancolombia: Compraste $50,000 en restaurante con tu tarjeta *2651'
+        })
+      }),
+      env
+    );
+    expect(response.status).toBe(428);
+    expect(await response.json()).toMatchObject({
+      code: 'AI_CONSENT_REQUIRED',
+      scope: 'financial_text'
+    });
   });
 });

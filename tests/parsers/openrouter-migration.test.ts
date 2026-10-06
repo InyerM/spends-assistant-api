@@ -1,6 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseExpense } from '../../src/parsers/expense';
+import { parseExpense as parseExpenseWithConsent } from '../../src/parsers/expense';
 import type { CacheService } from '../../src/services/cache.service';
+import type { AiUsageService } from '../../src/services/supabase/ai-usage.service';
+import { AiUsageMeter } from '../../src/ai/usage-meter';
+
+const approvedService = {
+  requireConsent: async () => undefined,
+  track: async <T>(_params: unknown, task: (meter: AiUsageMeter) => Promise<T>): Promise<T> =>
+    task(new AiUsageMeter())
+} as AiUsageService;
+const parseExpense: typeof parseExpenseWithConsent = (text, apiKey, cache, options) =>
+  parseExpenseWithConsent(text, apiKey, cache, {
+    ...options,
+    telemetry: options?.telemetry ?? { userId: 'owner-1', service: approvedService }
+  });
 
 const validExpense = {
   is_transaction: true,
@@ -90,7 +103,9 @@ describe('expense parser OpenRouter migration', () => {
 });
 
 it('records OpenRouter text usage for a tracked parse without storing input text', async () => {
-  const { AiUsageService } = await import('../../src/services/supabase/ai-usage.service');
+  const { ConsentGatedAiUsageService } = await import(
+    '../../src/services/supabase/consent-gated-ai-usage.service'
+  );
   const calls: Array<{ url: string; body?: string }> = [];
   vi.stubGlobal(
     'fetch',
@@ -114,7 +129,12 @@ it('records OpenRouter text usage for a tracked parse without storing input text
   );
   await parseExpense('Private payment 12345', 'key', undefined, {
     model: 'example/model',
-    telemetry: { userId: 'user-1', service: new AiUsageService('https://db.test', 'key') }
+    telemetry: {
+      userId: 'user-1',
+      service: new ConsentGatedAiUsageService('https://db.test', 'key', {
+        require: async () => undefined
+      })
+    }
   });
   const event = calls.find((call) => call.url.includes('ai_usage_events'));
   expect(event).toBeDefined();

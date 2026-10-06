@@ -16,6 +16,7 @@ import {
   buildAutomationRulesPromptSection
 } from '../services/transfer-processor';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
+import { aiConsentErrorResponse } from '../utils/ai-consent-response';
 
 interface AppsScriptPayload {
   body?: string;
@@ -229,6 +230,8 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error: unknown) {
+    const consentResponse = aiConsentErrorResponse(error);
+    if (consentResponse) return consentResponse;
     console.error('[Email] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(

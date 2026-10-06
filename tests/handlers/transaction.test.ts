@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleTransaction } from '../../src/handlers/transaction';
+import { AiConsentRequiredError } from '../../src/services/supabase/ai-consent.service';
 import {
   createMockEnv,
   createMockAccount,
@@ -544,5 +545,24 @@ describe('handleTransaction', () => {
 
     const response = await handleTransaction(request, env);
     expect(response.status).toBe(500);
+  });
+
+  it('returns a structured consent requirement before posting a transaction', async () => {
+    const { parseExpense } = await import('../../src/parsers/expense');
+    vi.mocked(parseExpense).mockRejectedValue(new AiConsentRequiredError('financial_text'));
+    stubFetchDefault();
+    const response = await handleTransaction(
+      new Request('http://localhost/transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.API_KEY}` },
+        body: JSON.stringify({ text: 'private purchase details' })
+      }),
+      env
+    );
+    expect(response.status).toBe(428);
+    expect(await response.json()).toMatchObject({
+      code: 'AI_CONSENT_REQUIRED',
+      scope: 'financial_text'
+    });
   });
 });

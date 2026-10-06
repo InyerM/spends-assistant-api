@@ -5,6 +5,8 @@ import { AutomationRulesService } from './automation-rules.service';
 import { ApiKeysService } from './api-keys.service';
 import { UsageService } from './usage.service';
 import { AiUsageService } from './ai-usage.service';
+import { AiConsentService } from './ai-consent.service';
+import { ConsentGatedAiUsageService } from './consent-gated-ai-usage.service';
 import { SkippedMessagesService } from './skipped-messages.service';
 import { ShortcutInboxService } from './shortcut-inbox.service';
 import { EmailForwardingRoutesService } from './email-forwarding-routes.service';
@@ -18,6 +20,7 @@ export interface SupabaseServices {
   apiKeys: ApiKeysService;
   usage: UsageService;
   aiUsage: AiUsageService;
+  aiConsent: AiConsentService;
   skippedMessages: SkippedMessagesService;
   shortcutInbox: ShortcutInboxService;
   forwardingRoutes: EmailForwardingRoutesService;
@@ -25,6 +28,7 @@ export interface SupabaseServices {
 }
 
 export function createSupabaseServices(url: string, serviceKey: string): SupabaseServices {
+  const aiConsent = new AiConsentService(url, serviceKey);
   return {
     accounts: new AccountsService(url, serviceKey),
     categories: new CategoriesService(url, serviceKey),
@@ -32,7 +36,8 @@ export function createSupabaseServices(url: string, serviceKey: string): Supabas
     automationRules: new AutomationRulesService(url, serviceKey),
     apiKeys: new ApiKeysService(url, serviceKey),
     usage: new UsageService(url, serviceKey),
-    aiUsage: new AiUsageService(url, serviceKey),
+    aiUsage: new ConsentGatedAiUsageService(url, serviceKey, aiConsent),
+    aiConsent,
     skippedMessages: new SkippedMessagesService(url, serviceKey),
     shortcutInbox: new ShortcutInboxService(url, serviceKey),
     forwardingRoutes: new EmailForwardingRoutesService(url, serviceKey),
@@ -47,6 +52,7 @@ export { AutomationRulesService } from './automation-rules.service';
 export { ApiKeysService } from './api-keys.service';
 export { UsageService } from './usage.service';
 export { AiUsageService } from './ai-usage.service';
+export { AiConsentService } from './ai-consent.service';
 export { SkippedMessagesService } from './skipped-messages.service';
 export { ShortcutInboxService } from './shortcut-inbox.service';
 export { EmailForwardingRoutesService } from './email-forwarding-routes.service';
