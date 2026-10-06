@@ -8,6 +8,7 @@ import { handleEmailForwardingRoute, handleForwardedEmail } from './handlers/ema
 import { handleTransaction } from './handlers/transaction';
 import { handleParse } from './handlers/parse';
 import { handleVisionExtract } from './handlers/vision-extract';
+import { handleMerchantSuggest } from './handlers/merchant-suggest';
 import { handleBalance } from './handlers/balance';
 import { handleAutomationGenerate } from './handlers/automation-generate';
 import { createSupabaseServices } from './services/supabase';
@@ -83,6 +84,10 @@ export default {
 
     if (url.pathname === '/vision/extract' && request.method === 'POST') {
       return handleVisionExtract(request, env);
+    }
+
+    if (url.pathname === '/merchant/suggest' && request.method === 'POST') {
+      return handleMerchantSuggest(request, env);
     }
 
     // Transaction API

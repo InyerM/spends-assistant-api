@@ -17,6 +17,9 @@ vi.mock('../src/handlers/parse', () => ({
 vi.mock('../src/handlers/vision-extract', () => ({
   handleVisionExtract: vi.fn(async () => new Response('vision ok'))
 }));
+vi.mock('../src/handlers/merchant-suggest', () => ({
+  handleMerchantSuggest: vi.fn(async () => new Response('merchant ok'))
+}));
 vi.mock('../src/handlers/balance', () => ({
   handleBalance: vi.fn(async () => new Response('balance ok'))
 }));
@@ -115,6 +118,14 @@ describe('Worker routing', () => {
     const response = await worker.fetch(request, env, ctx);
     expect(response.status).toBe(200);
     expect(handleVisionExtract).toHaveBeenCalled();
+  });
+
+  it('routes /merchant/suggest POST to the owner-scoped suggestion handler', async () => {
+    const { handleMerchantSuggest } = await import('../src/handlers/merchant-suggest');
+    const request = new Request('http://localhost/merchant/suggest', { method: 'POST' });
+    const response = await worker.fetch(request, env, ctx);
+    expect(response.status).toBe(200);
+    expect(handleMerchantSuggest).toHaveBeenCalledWith(request, env);
   });
 
   it('routes /email POST to handleEmail', async () => {
