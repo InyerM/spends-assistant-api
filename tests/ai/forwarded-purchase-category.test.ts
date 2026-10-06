@@ -49,4 +49,19 @@ describe('forwarded purchase category', () => {
       )
     ).toBeNull();
   });
+
+  it('rethrows provider failures only for bounded queue retries', async () => {
+    completeJson.mockRejectedValueOnce(new Error('Provider unavailable'));
+    await expect(
+      classifyForwardedPurchase(
+        'SHEIN.COM',
+        categories,
+        'key',
+        'model',
+        'owner',
+        usage as never,
+        true
+      )
+    ).rejects.toThrow('Provider unavailable');
+  });
 });

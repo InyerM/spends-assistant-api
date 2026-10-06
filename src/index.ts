@@ -109,7 +109,12 @@ export default {
   ): Promise<void> {
     for (const message of batch.messages) {
       try {
-        const result = await handleQueuedForwardedEmail(message.body, env);
+        const result = await handleQueuedForwardedEmail(
+          message.body,
+          env,
+          new Date(),
+          message.attempts
+        );
         if (result === 'retry') message.retry({ delaySeconds: 60 });
         else message.ack();
       } catch {

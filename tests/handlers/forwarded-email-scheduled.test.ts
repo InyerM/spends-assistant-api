@@ -264,6 +264,31 @@ it('queries only the eligible window with a fixed event cap', async () => {
   expect(payload.query).toContain('limit: 100');
 });
 
+it('splits a saturated scheduled analytics window before discarding older events', async () => {
+  const saturated = Array.from({ length: 100 }, (_, index) => ({
+    ...event,
+    messageId: `<filler-${index}@example.com>`,
+    datetime: '2026-10-05T17:49:00Z'
+  }));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockImplementation(async (_url, init: RequestInit) => {
+      const { variables } = JSON.parse(init.body as string);
+      const rows =
+        variables.filter.datetime_geq === '2026-10-05T17:20:00.000Z' &&
+        variables.filter.datetime_leq === '2026-10-05T17:50:00.000Z'
+          ? saturated
+          : variables.filter.datetime_geq > '2026-10-05T17:30:00.000Z'
+            ? [event]
+            : [];
+      return Response.json({ data: { viewer: { zones: [{ emailRoutingAdaptive: rows }] } } });
+    })
+  );
+  await handleScheduledForwardedEmails(env, now);
+  expect(mocks.post).toHaveBeenCalledOnce();
+  expect(fetch).toHaveBeenCalledTimes(3);
+});
+
 it('posts a targeted authenticated notice before the scheduled age threshold', async () => {
   const recent = { ...event, datetime: '2026-10-05T17:59:00Z' };
   mocks.inbox.mockResolvedValue({
@@ -299,6 +324,7 @@ it('posts a targeted authenticated notice before the scheduled age threshold', a
         date: ''
       }),
       recipient: event.to,
+      messageId: event.messageId,
       receivedAt: recent.datetime
     },
     env,
@@ -306,6 +332,10 @@ it('posts a targeted authenticated notice before the scheduled age threshold', a
   );
   expect(result).toBe('done');
   expect(mocks.post).toHaveBeenCalledOnce();
+  const query = JSON.parse(vi.mocked(fetch).mock.calls[0][1]?.body as string);
+  expect(query.variables.filter).toEqual(
+    expect.objectContaining({ to: event.to, messageId: event.messageId })
+  );
 });
 
 it('retries only when the correlated analytics event is unavailable', async () => {
@@ -348,5 +378,86 @@ it('retries only when the correlated analytics event is unavailable', async () =
       now
     )
   ).toBe('done');
+  expect(mocks.post).not.toHaveBeenCalled();
+});
+
+it('retries a transient posting failure while leaving the financial record pending', async () => {
+  const externalId = await emailFingerprint({
+    messageId: event.messageId,
+    sender: null,
+    subject: '',
+    text: '',
+    date: ''
+  });
+  mocks.post.mockRejectedValueOnce(new Error('Temporary database outage'));
+  expect(
+    await handleQueuedForwardedEmail(
+      { externalId, recipient: event.to, receivedAt: event.datetime },
+      env,
+      now
+    )
+  ).toBe('retry');
+  expect(mocks.post).toHaveBeenCalledOnce();
+});
+
+it('retries a transient category-provider failure without posting', async () => {
+  const externalId = await emailFingerprint({
+    messageId: event.messageId,
+    sender: null,
+    subject: '',
+    text: '',
+    date: ''
+  });
+  mocks.classify.mockRejectedValueOnce(new Error('Provider unavailable'));
+  expect(
+    await handleQueuedForwardedEmail(
+      { externalId, recipient: event.to, receivedAt: event.datetime, messageId: event.messageId },
+      env,
+      now
+    )
+  ).toBe('retry');
+  expect(mocks.post).not.toHaveBeenCalled();
+});
+
+it('bounds retries after a persistent posting failure', async () => {
+  const externalId = await emailFingerprint({
+    messageId: event.messageId,
+    sender: null,
+    subject: '',
+    text: '',
+    date: ''
+  });
+  mocks.post.mockRejectedValueOnce(new Error('Database unavailable'));
+  expect(
+    await handleQueuedForwardedEmail(
+      { externalId, recipient: event.to, receivedAt: event.datetime },
+      env,
+      now,
+      4
+    )
+  ).toBe('done');
+});
+
+it('rejects a queued Message-ID that does not match its immutable fingerprint', async () => {
+  const externalId = await emailFingerprint({
+    messageId: event.messageId,
+    sender: null,
+    subject: '',
+    text: '',
+    date: ''
+  });
+  expect(
+    await handleQueuedForwardedEmail(
+      {
+        externalId,
+        recipient: event.to,
+        receivedAt: event.datetime,
+        messageId: '<different@example.com>'
+      },
+      env,
+      now
+    )
+  ).toBe('done');
+  expect(fetch).not.toHaveBeenCalled();
   expect(mocks.post).not.toHaveBeenCalled();
 });

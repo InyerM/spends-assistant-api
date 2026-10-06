@@ -156,7 +156,10 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
   )
     return;
   try {
-    await env.EMAIL_AUTH_QUEUE.send({ externalId, recipient, receivedAt }, { delaySeconds: 60 });
+    await env.EMAIL_AUTH_QUEUE.send(
+      { externalId, recipient, receivedAt, messageId: parsed.messageId },
+      { delaySeconds: 60 }
+    );
   } catch {
     console.error('[Email auto-post] Authentication queue unavailable');
   }

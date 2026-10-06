@@ -8,7 +8,8 @@ export async function classifyForwardedPurchase(
   apiKey: string,
   model: string,
   userId: string,
-  usage: AiUsageService
+  usage: AiUsageService,
+  rethrowProviderErrors = false
 ): Promise<string | null> {
   const choices = categories.filter(
     (category) => category.type === 'expense' && category.is_active && category.slug !== 'missing'
@@ -40,7 +41,8 @@ export async function classifyForwardedPurchase(
     )
       return null;
     return choices.find((category) => category.slug === result.category_slug)?.id ?? null;
-  } catch {
+  } catch (error) {
+    if (rethrowProviderErrors) throw error;
     return null;
   }
 }

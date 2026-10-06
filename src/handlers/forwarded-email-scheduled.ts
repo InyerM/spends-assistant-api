@@ -33,7 +33,8 @@ function activationCutoff(env: Env): number | null {
 async function routingEvents(
   env: Env,
   since: string,
-  until: string
+  until: string,
+  exact?: { to: string; messageId?: string }
 ): Promise<RoutingEvent[] | null> {
   const response = await fetch('https://api.cloudflare.com/client/v4/graphql', {
     method: 'POST',
@@ -48,7 +49,9 @@ async function routingEvents(
         zoneTag: env.CLOUDFLARE_EMAIL_ZONE_ID,
         filter: {
           datetime_geq: since,
-          datetime_leq: until
+          datetime_leq: until,
+          ...(exact ? { to: exact.to } : {}),
+          ...(exact?.messageId ? { messageId: exact.messageId } : {})
         }
       }
     })
@@ -68,13 +71,40 @@ async function routingEvents(
   return zones[0].emailRoutingAdaptive.slice(0, 100);
 }
 
+async function scheduledRoutingEvents(
+  env: Env,
+  since: string,
+  until: string,
+  depth = 0
+): Promise<RoutingEvent[] | null> {
+  const events = await routingEvents(env, since, until);
+  if (!events || events.length < 100) return events;
+  const start = Date.parse(since);
+  const end = Date.parse(until);
+  if (depth >= 6 || end - start <= 1_000) return null;
+  const midpoint = new Date(Math.floor((start + end) / 2)).toISOString();
+  const left = await scheduledRoutingEvents(env, since, midpoint, depth + 1);
+  if (!left) return null;
+  const right = await scheduledRoutingEvents(env, midpoint, until, depth + 1);
+  if (!right) return null;
+  return [
+    ...new Map(
+      [...left, ...right].map((event) => [
+        `${event.datetime}|${event.messageId}|${event.to}`,
+        event
+      ])
+    ).values()
+  ];
+}
+
 async function postAuthenticatedEvent(
   event: RoutingEvent,
   env: Env,
   cutoff: number,
   now: Date,
-  minimumAgeMs: number
-): Promise<void> {
+  minimumAgeMs: number,
+  retryProviderFailures = false
+): Promise<boolean | undefined> {
   const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
   const received = Date.parse(event.datetime);
   const sender =
@@ -169,7 +199,8 @@ async function postAuthenticatedEvent(
       env.OPENROUTER_API_KEY,
       model,
       route.user_id,
-      services.aiUsage
+      services.aiUsage,
+      retryProviderFailures
     );
     if (!categoryId) return;
     await services.forwardedEmailAutoPost.post({
@@ -186,6 +217,7 @@ async function postAuthenticatedEvent(
     });
   } catch {
     console.error('[Email auto-post] Candidate processing failed');
+    return false;
   }
 }
 
@@ -193,7 +225,7 @@ export async function handleScheduledForwardedEmails(env: Env, now = new Date())
   const cutoff = activationCutoff(env);
   if (cutoff === null || cutoff > now.getTime() - 10 * 60_000) return;
   const since = new Date(Math.max(cutoff, now.getTime() - 40 * 60_000)).toISOString();
-  const events = await routingEvents(
+  const events = await scheduledRoutingEvents(
     env,
     since,
     new Date(now.getTime() - 10 * 60_000).toISOString()
@@ -207,7 +239,8 @@ export async function handleScheduledForwardedEmails(env: Env, now = new Date())
 export async function handleQueuedForwardedEmail(
   job: ForwardedEmailJob,
   env: Env,
-  now = new Date()
+  now = new Date(),
+  attempt = 1
 ): Promise<'done' | 'retry'> {
   const cutoff = activationCutoff(env);
   const receivedAt = Date.parse(job.receivedAt);
@@ -224,11 +257,31 @@ export async function handleQueuedForwardedEmail(
   )
     return 'done';
 
+  if (job.messageId !== undefined) {
+    if (
+      typeof job.messageId !== 'string' ||
+      !job.messageId ||
+      job.messageId.length > 256 ||
+      job.messageId.trim() !== job.messageId ||
+      (await emailFingerprint({
+        messageId: job.messageId,
+        sender: null,
+        subject: '',
+        text: '',
+        date: ''
+      })) !== job.externalId
+    )
+      return 'done';
+  }
+
   const since = new Date(Math.max(cutoff, receivedAt - 5 * 60_000)).toISOString();
   const until = new Date(Math.min(now.getTime(), receivedAt + 5 * 60_000)).toISOString();
   let events: RoutingEvent[] | null;
   try {
-    events = await routingEvents(env, since, until);
+    events = await routingEvents(env, since, until, {
+      to: job.recipient,
+      messageId: job.messageId
+    });
   } catch {
     return 'retry';
   }
@@ -253,6 +306,6 @@ export async function handleQueuedForwardedEmail(
   }
   if (matching.length === 0) return 'retry';
   if (matching.length !== 1) return 'done';
-  await postAuthenticatedEvent(matching[0], env, cutoff, now, 0);
-  return 'done';
+  const processed = await postAuthenticatedEvent(matching[0], env, cutoff, now, 0, true);
+  return processed === false && attempt <= 3 ? 'retry' : 'done';
 }

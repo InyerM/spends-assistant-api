@@ -162,7 +162,11 @@ describe('email forwarding', () => {
         }
       );
       expect(send).toHaveBeenCalledWith(
-        expect.objectContaining({ recipient: address, receivedAt: '2026-10-06T02:00:00.000Z' }),
+        expect.objectContaining({
+          recipient: address,
+          receivedAt: '2026-10-06T02:00:00.000Z',
+          messageId: '<purchase-1@lulobank.com>'
+        }),
         { delaySeconds: 60 }
       );
       expect(autoPost.post).not.toHaveBeenCalled();
