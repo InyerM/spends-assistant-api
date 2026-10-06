@@ -27,6 +27,30 @@ describe('forwarded purchase extraction', () => {
     });
   });
 
+  it('extracts the indented large purchase seen in HTML-derived Lulo text', () => {
+    const received = '2026-10-06T20:42:35Z';
+    expect(
+      extractForwardedPurchase(
+        notice({
+          text: [
+            '                    Realizaste una compra en CEA PRACTICAR DEL EJE por $1,550,000',
+            'Origen tarjeta de crédito •8456',
+            'Fecha 6 de octubre de 2026',
+            'Hora 3:42 p.m.'
+          ].join('\n')
+        }),
+        received
+      )
+    ).toEqual({
+      amount: '1550000.00',
+      currency: 'COP',
+      date: '2026-10-06',
+      time: '15:42:00',
+      cardLastFour: '8456',
+      merchant: 'CEA PRACTICAR DEL EJE'
+    });
+  });
+
   it('holds a card payment or loan payment for review', () => {
     expect(
       extractForwardedPurchase(

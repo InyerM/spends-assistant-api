@@ -22,6 +22,42 @@ const categories = [
 const usage = { track: vi.fn(async (_params, task) => task({ record: vi.fn() })) };
 
 describe('forwarded purchase category', () => {
+  it('recognizes a verified driving school identity as education without an AI call', async () => {
+    const education = {
+      id: 'education-id',
+      slug: 'education',
+      name: 'Education',
+      type: 'expense',
+      is_active: true
+    } as Category;
+    const track = vi.fn();
+    const result = await classifyForwardedPurchase(
+      'CEA PRACTICAR DEL EJE',
+      [education],
+      'test-key',
+      'test-model',
+      'owner',
+      { track } as never
+    );
+    expect(result).toEqual({ categoryId: 'education-id', model: 'merchant-catalog-v1' });
+    expect(track).not.toHaveBeenCalled();
+  });
+
+  it('never invents the driving-school category when the owner has not enabled it', async () => {
+    completeJson.mockResolvedValue({
+      data: { category_slug: 'education', confidence: 1, merchant_type: 'specialist' }
+    });
+    expect(
+      await classifyForwardedPurchase(
+        'CEA PRACTICAR DEL EJE',
+        categories,
+        'test-key',
+        'test-model',
+        'owner',
+        usage as never
+      )
+    ).toBeNull();
+  });
   it('accepts only a high-confidence active expense category from the owner taxonomy', async () => {
     completeJson.mockResolvedValue({
       data: { category_slug: 'clothing', confidence: 0.98, merchant_type: 'specialist' }

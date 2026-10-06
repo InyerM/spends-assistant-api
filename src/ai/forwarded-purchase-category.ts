@@ -12,6 +12,8 @@ function knownMerchantCategory(merchant: string): string | null {
   if (/^(?:TIENDAS ARA|SUPERMERCADO MERCAMAS|MERCAMAS)(?: \d{1,4})?$/u.test(normalized))
     return 'groceries';
   if (/^(?:AMAZON COM|AMAZON MARKETPLACE|AMZN MKTP)$/u.test(normalized)) return 'shopping';
+  if (/^CEA PRACTICAR DEL EJE(?: (?:MANIZALES|DOSQUEBRADAS|CIRCUNVALAR))?$/u.test(normalized))
+    return 'education';
   return null;
 }
 
