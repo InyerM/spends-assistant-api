@@ -20,6 +20,9 @@ export interface Env {
   EMAIL_FORWARDING_DOMAIN?: string;
   EMAIL_FORWARDING_READY?: string;
   EMAIL_AUTO_POST_READY?: string;
+  EMAIL_AUTO_POST_AFTER?: string;
+  CLOUDFLARE_ANALYTICS_TOKEN?: string;
+  CLOUDFLARE_EMAIL_ZONE_ID?: string;
 
   // Optional
   APP_URL?: string;

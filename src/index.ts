@@ -1,3 +1,4 @@
+import { handleScheduledForwardedEmails } from './handlers/forwarded-email-scheduled';
 import { handleTelegram } from './handlers/telegram';
 import { handleEmail } from './handlers/email';
 import { handleEmailForwardingRoute, handleForwardedEmail } from './handlers/email-forwarding';
@@ -97,9 +98,12 @@ export default {
     await handleForwardedEmail(message, env);
   },
 
-  async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
-    const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
-    await services.usage.cleanupOldRecords();
-    await services.aiUsage.cleanupOldEvents();
+  async scheduled(event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
+    if (event.cron === '0 3 1 * *') {
+      const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
+      await Promise.all([services.usage.cleanupOldRecords(), services.aiUsage.cleanupOldEvents()]);
+    } else if (event.cron === '*/15 * * * *') {
+      await handleScheduledForwardedEmails(env, new Date(event.scheduledTime));
+    }
   }
 };

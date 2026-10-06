@@ -21,6 +21,21 @@ vi.mock('../src/handlers/balance', () => ({
   handleBalance: vi.fn(async () => new Response('balance ok'))
 }));
 
+const scheduledMocks = vi.hoisted(() => ({
+  cleanup: vi.fn(),
+  aiCleanup: vi.fn(),
+  forward: vi.fn()
+}));
+vi.mock('../src/handlers/forwarded-email-scheduled', () => ({
+  handleScheduledForwardedEmails: scheduledMocks.forward
+}));
+vi.mock('../src/services/supabase', () => ({
+  createSupabaseServices: () => ({
+    usage: { cleanupOldRecords: scheduledMocks.cleanup },
+    aiUsage: { cleanupOldEvents: scheduledMocks.aiCleanup }
+  })
+}));
+
 const env = {
   SUPABASE_URL: 'https://test.supabase.co',
   SUPABASE_SERVICE_KEY: 'test-key',
@@ -112,4 +127,21 @@ describe('Worker routing', () => {
     const response = await worker.fetch(request, env, ctx);
     expect(response.status).toBe(404);
   });
+});
+
+it('routes only the exact email cron to automatic posting', async () => {
+  vi.clearAllMocks();
+  for (const cron of ['*/15 * * * *', 'unknown']) {
+    await worker.scheduled({ cron, scheduledTime: 123 } as ScheduledEvent, env, ctx);
+  }
+  expect(scheduledMocks.forward).toHaveBeenCalledOnce();
+  expect(scheduledMocks.forward).toHaveBeenCalledWith(env, new Date(123));
+  expect(scheduledMocks.cleanup).not.toHaveBeenCalled();
+});
+it('routes the monthly cron exclusively to cleanup', async () => {
+  vi.clearAllMocks();
+  await worker.scheduled({ cron: '0 3 1 * *', scheduledTime: 123 } as ScheduledEvent, env, ctx);
+  expect(scheduledMocks.cleanup).toHaveBeenCalledOnce();
+  expect(scheduledMocks.aiCleanup).toHaveBeenCalledOnce();
+  expect(scheduledMocks.forward).not.toHaveBeenCalled();
 });

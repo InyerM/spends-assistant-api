@@ -3,8 +3,6 @@ import { Env } from '../types/env';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 import { emailFingerprint, parseForwardedEmail } from '../utils/email-mime';
 import { triageForwardedEmail } from '../ai/email-triage';
-import { extractForwardedPurchase } from '../ai/forwarded-purchase';
-import { classifyForwardedPurchase } from '../ai/forwarded-purchase-category';
 
 type IncomingEmail = Pick<ForwardableEmailMessage, 'from' | 'to' | 'raw' | 'rawSize' | 'setReject'>;
 const MAX_MIME_BYTES = 512 * 1024;
@@ -133,59 +131,12 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
     services.aiUsage
   );
   const receivedAt = new Date().toISOString();
-  const inbox = await services.shortcutInbox.createForwardedPending({
+  await services.shortcutInbox.createForwardedPending({
     userId: route.user_id,
     source: 'forwarded_email',
     externalId: await emailFingerprint(parsed),
     receivedAt,
     rawText: triage.rawText,
     triageStatus: triage.triageStatus
-  });
-  if (
-    env.EMAIL_AUTO_POST_READY !== 'true' ||
-    !route.confirmation_received_at ||
-    !route.user_confirmed_at ||
-    inbox.status !== 'pending' ||
-    triage.triageStatus !== 'pending' ||
-    message.from.toLowerCase() !== 'notificaciones@lulobank.com' ||
-    parsed.sender?.toLowerCase() !== 'notificaciones@lulobank.com'
-  )
-    return;
-
-  const purchase = extractForwardedPurchase(parsed, receivedAt);
-  if (!purchase || !triage.rawText.includes(purchase.cardLastFour)) return;
-  const accounts = await services.accounts.getAccounts(route.user_id);
-  const matchingAccounts = accounts.filter(
-    (account) =>
-      account.institution?.toLowerCase().includes('lulo') &&
-      account.type === 'credit_card' &&
-      account.last_four === purchase.cardLastFour &&
-      account.currency === purchase.currency &&
-      account.is_active
-  );
-  if (matchingAccounts.length !== 1) return;
-
-  const categories = await services.categories.getCategories(route.user_id);
-  const model = env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash';
-  const categoryId = await classifyForwardedPurchase(
-    purchase.merchant,
-    categories,
-    env.OPENROUTER_API_KEY,
-    model,
-    route.user_id,
-    services.aiUsage
-  );
-  if (!categoryId) return;
-  await services.forwardedEmailAutoPost.post({
-    userId: route.user_id,
-    inboxItemId: inbox.id,
-    accountId: matchingAccounts[0].id,
-    categoryId,
-    amount: purchase.amount,
-    date: purchase.date,
-    time: purchase.time,
-    cardLastFour: purchase.cardLastFour,
-    description: `Compra en ${purchase.merchant}`,
-    model
   });
 }

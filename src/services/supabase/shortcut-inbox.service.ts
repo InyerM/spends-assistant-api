@@ -18,7 +18,7 @@ export interface ForwardedInboxWrite {
   created: boolean;
 }
 
-interface InboxItem {
+export interface InboxItem {
   id: string;
   idempotency_key: string;
   external_id: string | null;
@@ -40,6 +40,18 @@ async function fingerprint(source: string, text: string, receivedAt: string): Pr
 }
 
 export class ShortcutInboxService extends BaseService {
+  async getPendingForwarded(
+    userId: string,
+    externalId: string,
+    after: string
+  ): Promise<InboxItem | null> {
+    if (!/^[a-f0-9]{64}$/u.test(externalId)) return null;
+    const rows = await this.fetch<InboxItem[]>(
+      `/rest/v1/shortcut_inbox_items?select=id,user_id,source,external_id,received_at,raw_text,status&idempotency_key=not.is.null&user_id=eq.${encodeURIComponent(userId)}&source=eq.forwarded_email&status=eq.pending&external_id=eq.${externalId}&received_at=gte.${encodeURIComponent(after)}&limit=1`
+    );
+    return rows[0] ?? null;
+  }
+
   async createForwardedPending(input: CreateForwardedInboxItemInput): Promise<ForwardedInboxWrite> {
     if (
       input.source !== 'forwarded_email' ||

@@ -83,7 +83,7 @@ describe('email forwarding', () => {
     });
   });
 
-  it('automatically posts a verified, unique, categorized Lulo card purchase', async () => {
+  it('keeps eligible purchases pending until scheduled authentication', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-05T18:00:00Z'));
     try {
@@ -125,16 +125,8 @@ describe('email forwarding', () => {
         'notificaciones@lulobank.com'
       );
       await handleForwardedEmail(message, { ...env, EMAIL_AUTO_POST_READY: 'true' });
-      expect(autoPost.post).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 'owner-id',
-          inboxItemId: 'inbox-id',
-          accountId: 'account-id',
-          categoryId: 'category-id',
-          amount: '188165.52',
-          cardLastFour: '8456'
-        })
-      );
+      expect(autoPost.post).not.toHaveBeenCalled();
+      expect(accounts.getAccounts).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
