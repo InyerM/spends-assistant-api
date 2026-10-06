@@ -30,6 +30,19 @@ describe('parse expense system prompt', () => {
     expect(prompt).not.toContain('If unsure between categories, choose the more specific one');
   });
 
+  it('uses business identity for any merchant or service and keeps marketplaces broad', () => {
+    const userPrompt = buildSystemPrompt('2026-09-28', '10:30', [
+      { slug: 'shopping', name: 'Shopping', type: 'expense' },
+      { slug: 'clothes', name: 'Clothing', type: 'expense' },
+      { slug: 'missing', name: 'Uncategorized', type: 'expense' }
+    ]);
+    expect(userPrompt).toContain('Recognize the named business, app, or service');
+    expect(userPrompt).toContain('Amazon.com');
+    expect(userPrompt).toContain('general marketplace');
+    expect(userPrompt).toContain('payment processor');
+    expect(userPrompt).toContain('shopping');
+  });
+
   it('uses optical merchant evidence without inventing a merchant from a QR key', () => {
     const userPrompt = buildSystemPrompt('2026-09-28', '10:30', [
       { slug: 'health-care', name: 'Health Care, Doctor', type: 'expense' },
@@ -48,6 +61,6 @@ describe('parse expense system prompt', () => {
     expect(userPrompt).not.toContain('CATEGORY SLUGS - Choose');
     expect(userPrompt).not.toContain('- restaurant: restaurants');
     expect(userPrompt).toContain('If none fits, use "missing"');
-    expect(userPrompt).toContain('Choose the most specific matching slug');
+    expect(userPrompt).toContain('Choose the most specific supported slug');
   });
 });
