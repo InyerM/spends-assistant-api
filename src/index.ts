@@ -1,4 +1,7 @@
-import { handleScheduledForwardedEmails } from './handlers/forwarded-email-scheduled';
+import {
+  handleQueuedForwardedEmail,
+  handleScheduledForwardedEmails
+} from './handlers/forwarded-email-scheduled';
 import { handleTelegram } from './handlers/telegram';
 import { handleEmail } from './handlers/email';
 import { handleEmailForwardingRoute, handleForwardedEmail } from './handlers/email-forwarding';
@@ -10,6 +13,7 @@ import { handleAutomationGenerate } from './handlers/automation-generate';
 import { createSupabaseServices } from './services/supabase';
 import { resolveUserId, unauthorizedResponse } from './utils/auth';
 import { Env } from './types/env';
+import type { ForwardedEmailJob } from './types/forwarded-email-job';
 
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
@@ -96,6 +100,23 @@ export default {
 
   async email(message: ForwardableEmailMessage, env: Env, _ctx: ExecutionContext): Promise<void> {
     await handleForwardedEmail(message, env);
+  },
+
+  async queue(
+    batch: MessageBatch<ForwardedEmailJob>,
+    env: Env,
+    _ctx: ExecutionContext
+  ): Promise<void> {
+    for (const message of batch.messages) {
+      try {
+        const result = await handleQueuedForwardedEmail(message.body, env);
+        if (result === 'retry') message.retry({ delaySeconds: 60 });
+        else message.ack();
+      } catch {
+        console.error('[Email auto-post] Queue processing failed');
+        message.retry({ delaySeconds: 60 });
+      }
+    }
   },
 
   async scheduled(event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {

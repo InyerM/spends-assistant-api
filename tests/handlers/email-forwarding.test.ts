@@ -132,6 +132,80 @@ describe('email forwarding', () => {
     }
   });
 
+  it('queues a new verified Lulo purchase for near-real-time authentication', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-06T02:00:00Z'));
+    const send = vi.fn().mockResolvedValue(undefined);
+    try {
+      routes.getByAddress.mockResolvedValue({
+        user_id: 'owner-id',
+        address,
+        confirmation_received_at: '2026-10-03T16:45:00Z',
+        user_confirmed_at: '2026-10-03T17:00:00Z'
+      });
+      inbox.createForwardedPending.mockResolvedValue({
+        id: 'inbox-id',
+        status: 'pending',
+        created: true
+      });
+      await handleForwardedEmail(
+        email(
+          'From: Lulo Bank <notificaciones@lulobank.com>\r\nSubject: Compra realizada\r\nMessage-ID: <purchase-1@lulobank.com>\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nRealizaste una compra en STORE por $18,000\nOrigen tarjeta de crédito •8456\nFecha 5 de octubre de 2026\nHora 8:59 p.m.',
+          address,
+          'SRS0=example=notificaciones=lulobank.com@forwarder.example'
+        ),
+        {
+          ...env,
+          EMAIL_AUTO_POST_READY: 'true',
+          EMAIL_AUTO_POST_AFTER: '2026-10-06T01:45:00Z',
+          EMAIL_AUTH_QUEUE: { send } as unknown as Queue
+        }
+      );
+      expect(send).toHaveBeenCalledWith(
+        expect.objectContaining({ recipient: address, receivedAt: '2026-10-06T02:00:00.000Z' }),
+        { delaySeconds: 60 }
+      );
+      expect(autoPost.post).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not enqueue an already captured purchase again', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-06T02:00:00Z'));
+    const send = vi.fn();
+    try {
+      routes.getByAddress.mockResolvedValue({
+        user_id: 'owner-id',
+        address,
+        confirmation_received_at: '2026-10-03T16:45:00Z',
+        user_confirmed_at: '2026-10-03T17:00:00Z'
+      });
+      inbox.createForwardedPending.mockResolvedValue({
+        id: 'inbox-id',
+        status: 'pending',
+        created: false
+      });
+      await handleForwardedEmail(
+        email(
+          'From: Lulo Bank <notificaciones@lulobank.com>\r\nSubject: Compra realizada\r\nMessage-ID: <purchase-1@lulobank.com>\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nRealizaste una compra en STORE por $18,000\nOrigen tarjeta de crédito •8456\nFecha 5 de octubre de 2026\nHora 8:59 p.m.',
+          address,
+          'SRS0=example=notificaciones=lulobank.com@forwarder.example'
+        ),
+        {
+          ...env,
+          EMAIL_AUTO_POST_READY: 'true',
+          EMAIL_AUTO_POST_AFTER: '2026-10-06T01:45:00Z',
+          EMAIL_AUTH_QUEUE: { send } as unknown as Queue
+        }
+      );
+      expect(send).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps a Lulo purchase pending when forwarding is unverified', async () => {
     inbox.createForwardedPending.mockResolvedValue({
       id: 'inbox-id',

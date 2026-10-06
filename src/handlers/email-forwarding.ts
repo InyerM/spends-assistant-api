@@ -3,6 +3,7 @@ import { Env } from '../types/env';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 import { emailFingerprint, parseForwardedEmail } from '../utils/email-mime';
 import { triageForwardedEmail } from '../ai/email-triage';
+import { extractForwardedPurchase } from '../ai/forwarded-purchase';
 
 type IncomingEmail = Pick<ForwardableEmailMessage, 'from' | 'to' | 'raw' | 'rawSize' | 'setReject'>;
 const MAX_MIME_BYTES = 512 * 1024;
@@ -131,12 +132,32 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
     services.aiUsage
   );
   const receivedAt = new Date().toISOString();
-  await services.shortcutInbox.createForwardedPending({
+  const externalId = await emailFingerprint(parsed);
+  const write = await services.shortcutInbox.createForwardedPending({
     userId: route.user_id,
     source: 'forwarded_email',
-    externalId: await emailFingerprint(parsed),
+    externalId,
     receivedAt,
     rawText: triage.rawText,
     triageStatus: triage.triageStatus
   });
+  const cutoff = Date.parse(env.EMAIL_AUTO_POST_AFTER ?? '');
+  if (
+    !write.created ||
+    write.status !== 'pending' ||
+    !route.confirmation_received_at ||
+    !route.user_confirmed_at ||
+    env.EMAIL_AUTO_POST_READY !== 'true' ||
+    !env.EMAIL_AUTH_QUEUE ||
+    !Number.isFinite(cutoff) ||
+    Date.parse(receivedAt) < cutoff ||
+    !parsed.messageId ||
+    !extractForwardedPurchase(parsed, receivedAt)
+  )
+    return;
+  try {
+    await env.EMAIL_AUTH_QUEUE.send({ externalId, recipient, receivedAt }, { delaySeconds: 60 });
+  } catch {
+    console.error('[Email auto-post] Authentication queue unavailable');
+  }
 }

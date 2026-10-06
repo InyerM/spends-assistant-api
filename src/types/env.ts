@@ -1,3 +1,5 @@
+import type { ForwardedEmailJob } from './forwarded-email-job';
+
 export interface Env {
   // Supabase
   SUPABASE_URL: string;
@@ -23,6 +25,7 @@ export interface Env {
   EMAIL_AUTO_POST_AFTER?: string;
   CLOUDFLARE_ANALYTICS_TOKEN?: string;
   CLOUDFLARE_EMAIL_ZONE_ID?: string;
+  EMAIL_AUTH_QUEUE?: Queue<ForwardedEmailJob>;
 
   // Optional
   APP_URL?: string;

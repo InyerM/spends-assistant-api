@@ -1,5 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { handleScheduledForwardedEmails } from '../../src/handlers/forwarded-email-scheduled';
+import {
+  handleQueuedForwardedEmail,
+  handleScheduledForwardedEmails
+} from '../../src/handlers/forwarded-email-scheduled';
 import { emailFingerprint } from '../../src/utils/email-mime';
 import { createMockEnv } from '../__test-helpers__/factories';
 const mocks = vi.hoisted(() => ({
@@ -29,6 +32,7 @@ const env = {
   EMAIL_AUTO_POST_READY: 'true',
   EMAIL_AUTO_POST_AFTER: '2026-10-05T17:00:00Z',
   CLOUDFLARE_EMAIL_ZONE_ID: 'zone',
+  EMAIL_FORWARDING_DOMAIN: 'example.com',
   CLOUDFLARE_ANALYTICS_TOKEN: 'secret'
 };
 const event = {
@@ -258,4 +262,91 @@ it('queries only the eligible window with a fixed event cap', async () => {
     datetime_leq: '2026-10-05T17:50:00.000Z'
   });
   expect(payload.query).toContain('limit: 100');
+});
+
+it('posts a targeted authenticated notice before the scheduled age threshold', async () => {
+  const recent = { ...event, datetime: '2026-10-05T17:59:00Z' };
+  mocks.inbox.mockResolvedValue({
+    id: 'inbox',
+    user_id: 'owner',
+    external_id: await emailFingerprint({
+      messageId: event.messageId,
+      sender: null,
+      subject: '',
+      text: '',
+      date: ''
+    }),
+    status: 'pending',
+    source: 'forwarded_email',
+    received_at: recent.datetime,
+    raw_text: text
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ data: { viewer: { zones: [{ emailRoutingAdaptive: [recent] }] } } })
+      )
+  );
+  const result = await handleQueuedForwardedEmail(
+    {
+      externalId: await emailFingerprint({
+        messageId: event.messageId,
+        sender: null,
+        subject: '',
+        text: '',
+        date: ''
+      }),
+      recipient: event.to,
+      receivedAt: recent.datetime
+    },
+    env,
+    now
+  );
+  expect(result).toBe('done');
+  expect(mocks.post).toHaveBeenCalledOnce();
+});
+
+it('retries only when the correlated analytics event is unavailable', async () => {
+  const externalId = await emailFingerprint({
+    messageId: event.messageId,
+    sender: null,
+    subject: '',
+    text: '',
+    date: ''
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ data: { viewer: { zones: [{ emailRoutingAdaptive: [] }] } } })
+      )
+  );
+  expect(
+    await handleQueuedForwardedEmail(
+      { externalId, recipient: event.to, receivedAt: event.datetime },
+      env,
+      now
+    )
+  ).toBe('retry');
+  expect(mocks.classify).not.toHaveBeenCalled();
+
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(
+      Response.json({
+        data: { viewer: { zones: [{ emailRoutingAdaptive: [{ ...event, dmarc: 'fail' }] }] } }
+      })
+    )
+  );
+  expect(
+    await handleQueuedForwardedEmail(
+      { externalId, recipient: event.to, receivedAt: event.datetime },
+      env,
+      now
+    )
+  ).toBe('done');
+  expect(mocks.post).not.toHaveBeenCalled();
 });

@@ -24,10 +24,12 @@ vi.mock('../src/handlers/balance', () => ({
 const scheduledMocks = vi.hoisted(() => ({
   cleanup: vi.fn(),
   aiCleanup: vi.fn(),
-  forward: vi.fn()
+  forward: vi.fn(),
+  queued: vi.fn()
 }));
 vi.mock('../src/handlers/forwarded-email-scheduled', () => ({
-  handleScheduledForwardedEmails: scheduledMocks.forward
+  handleScheduledForwardedEmails: scheduledMocks.forward,
+  handleQueuedForwardedEmail: scheduledMocks.queued
 }));
 vi.mock('../src/services/supabase', () => ({
   createSupabaseServices: () => ({
@@ -144,4 +146,20 @@ it('routes the monthly cron exclusively to cleanup', async () => {
   expect(scheduledMocks.cleanup).toHaveBeenCalledOnce();
   expect(scheduledMocks.aiCleanup).toHaveBeenCalledOnce();
   expect(scheduledMocks.forward).not.toHaveBeenCalled();
+});
+
+it('acknowledges completed email jobs and retries unavailable authentication evidence', async () => {
+  const job = {
+    externalId: 'a'.repeat(64),
+    recipient: 'capture@example.com',
+    receivedAt: '2026-10-05T18:00:00Z'
+  };
+  const done = { body: job, ack: vi.fn(), retry: vi.fn() };
+  const pending = { body: job, ack: vi.fn(), retry: vi.fn() };
+  scheduledMocks.queued.mockResolvedValueOnce('done').mockResolvedValueOnce('retry');
+  await worker.queue({ messages: [done, pending] } as unknown as MessageBatch<unknown>, env, ctx);
+  expect(done.ack).toHaveBeenCalledOnce();
+  expect(done.retry).not.toHaveBeenCalled();
+  expect(pending.retry).toHaveBeenCalledWith({ delaySeconds: 60 });
+  expect(pending.ack).not.toHaveBeenCalled();
 });
