@@ -10,8 +10,10 @@ interface TriageResult {
   rawText: string;
 }
 
-const SECURITY_NOTICE =
+const SECURITY_SUBJECT =
   /\b(?:c[oó]digo(?: de)? (?:seguridad|verificaci[oó]n|confirmaci[oó]n|acceso)|c[oó]digo\s*(?:es|:)\s*[a-z0-9]{4,10}|clave din[aá]mica|one[- ]time (?:password|code)|verification code|security code|passcode|otp|token de seguridad)\b/iu;
+const SECURITY_CODE =
+  /((?:\b(?:c[oó]digo(?: de (?:seguridad|verificaci[oó]n|confirmaci[oó]n|acceso))?|clave din[aá]mica|one[- ]time (?:password|code)|verification code|security code|passcode|otp|token de seguridad)\b)\s*(?:(?:es|is)\s*|[:=]\s*)?)((?=[a-z0-9]{0,9}\d)[a-z0-9]{4,10})\b/giu;
 const TRANSACTION_NOTICE =
   /\b(?:compraste|compra realizada|pagaste|transferiste|recibiste|retiraste|consignaste|abono|devoluci[oó]n|pago realizado|cargo a tu cuenta|purchase|payment|withdrawal|transfer)\b/iu;
 const AMOUNT = /(?:\$|\bCOP\b|\bUSD\b)\s*[\d.,]+|\d[\d.,]*\s*(?:pesos?|d[oó]lares?|dollars?)/iu;
@@ -31,7 +33,12 @@ export async function triageForwardedEmail(
 ): Promise<TriageResult> {
   const fullText = `${email.subject}\n${email.text}`;
   const amountEvidence = AMOUNT.test(fullText);
-  if (SECURITY_NOTICE.test(email.subject) || (SECURITY_NOTICE.test(fullText) && !amountEvidence)) {
+  const redactedText = email.text.replace(
+    SECURITY_CODE,
+    (_match, label: string) => `${label}[code omitted]`
+  );
+  const hasSecurityCode = redactedText !== email.text;
+  if (SECURITY_SUBJECT.test(email.subject) || (hasSecurityCode && !amountEvidence)) {
     return {
       triageStatus: 'non_transaction',
       rawText: inboxText({ ...email, subject: '[security_notice]', text: '' })
@@ -39,9 +46,7 @@ export async function triageForwardedEmail(
   }
 
   if (amountEvidence || TRANSACTION_NOTICE.test(fullText)) {
-    const safeEmail = SECURITY_NOTICE.test(fullText)
-      ? { ...email, text: redactLongNumbers(email.text) }
-      : email;
+    const safeEmail = hasSecurityCode ? { ...email, text: redactedText } : email;
     return { triageStatus: 'pending', rawText: inboxText(safeEmail) };
   }
 

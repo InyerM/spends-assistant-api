@@ -472,6 +472,43 @@ describe('email forwarding', () => {
     expect(completeJson).not.toHaveBeenCalled();
   });
 
+  it('preserves a card suffix and purchase date when the security footer contains no code', async () => {
+    await handleForwardedEmail(
+      email(
+        'Subject: Alertas y Notificaciones\r\n\r\nBancolombia: Compraste $50.000 en TIENDAS ARA con tu T.Cred *8456, el 05/10/2026. Nunca compartas el código de seguridad de tu tarjeta.'
+      ),
+      env
+    );
+    const input = inbox.createForwardedPending.mock.calls[0][0];
+    expect(input.triageStatus).toBe('pending');
+    expect(input.rawText).toContain('T.Cred *8456');
+    expect(input.rawText).toContain('05/10/2026');
+  });
+
+  it('redacts an actual security code without erasing the card suffix', async () => {
+    await handleForwardedEmail(
+      email(
+        'Subject: Compra realizada\r\n\r\nCompraste $50.000 en TIENDAS ARA con tu tarjeta *8456. Tu código de seguridad es 481927.'
+      ),
+      env
+    );
+    const input = inbox.createForwardedPending.mock.calls[0][0];
+    expect(input.rawText).toContain('tarjeta *8456');
+    expect(input.rawText).not.toContain('481927');
+  });
+
+  it('redacts a mixed verification code while keeping purchase evidence', async () => {
+    await handleForwardedEmail(
+      email(
+        'Subject: Purchase alert\r\n\r\nPurchased $50.00 with card *8456. Your verification code is AB12C3.'
+      ),
+      env
+    );
+    const input = inbox.createForwardedPending.mock.calls[0][0];
+    expect(input.rawText).toContain('card *8456');
+    expect(input.rawText).not.toContain('AB12C3');
+  });
+
   it('keeps an amount-bearing debit pending when its body also mentions a code', async () => {
     await handleForwardedEmail(
       email('Subject: Débito automático\r\n\r\nCargo COP 120000. Tu código es 481927.'),

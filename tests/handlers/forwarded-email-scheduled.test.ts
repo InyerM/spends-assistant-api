@@ -85,7 +85,7 @@ beforeEach(async () => {
     }
   ]);
   mocks.categories.mockResolvedValue([]);
-  mocks.classify.mockResolvedValue('category');
+  mocks.classify.mockResolvedValue({ categoryId: 'category', model: 'model' });
   vi.stubGlobal(
     'fetch',
     vi

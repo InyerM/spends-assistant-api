@@ -193,7 +193,7 @@ async function postAuthenticatedEvent(
     if (matches.length !== 1) return;
     const categories = await services.categories.getCategories(route.user_id);
     const model = env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash';
-    const categoryId = await classifyForwardedPurchase(
+    const classification = await classifyForwardedPurchase(
       purchase.merchant,
       categories,
       env.OPENROUTER_API_KEY,
@@ -202,18 +202,18 @@ async function postAuthenticatedEvent(
       services.aiUsage,
       retryProviderFailures
     );
-    if (!categoryId) return;
+    if (!classification) return;
     await services.forwardedEmailAutoPost.post({
       userId: route.user_id,
       inboxItemId: inbox.id,
       accountId: matches[0].id,
-      categoryId,
+      categoryId: classification.categoryId,
       amount: purchase.amount,
       date: purchase.date,
       time: purchase.time,
       cardLastFour: purchase.cardLastFour,
       description: `Compra en ${purchase.merchant}`,
-      model
+      model: classification.model
     });
   } catch {
     console.error('[Email auto-post] Candidate processing failed');
