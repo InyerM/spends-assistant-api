@@ -158,6 +158,10 @@ it('does nothing without an activation cutoff', async () => {
   await handleScheduledForwardedEmails({ ...env, EMAIL_AUTO_POST_AFTER: undefined }, now);
   expect(fetch).not.toHaveBeenCalled();
 });
+it('waits until a post-activation event can be ten minutes old', async () => {
+  await handleScheduledForwardedEmails(env, new Date('2026-10-05T17:05:00Z'));
+  expect(fetch).not.toHaveBeenCalled();
+});
 it('leaves unresolved routes and ambiguous accounts pending', async () => {
   mocks.accounts.mockResolvedValue([{ id: 'wrong' }]);
   await handleScheduledForwardedEmails(env, now);

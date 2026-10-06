@@ -26,7 +26,7 @@ export async function handleScheduledForwardedEmails(env: Env, now = new Date())
     !env.CLOUDFLARE_ANALYTICS_TOKEN ||
     !env.CLOUDFLARE_EMAIL_ZONE_ID ||
     !Number.isFinite(cutoff) ||
-    cutoff > now.getTime()
+    cutoff > now.getTime() - 10 * 60_000
   )
     return;
   const since = new Date(Math.max(cutoff, now.getTime() - 40 * 60_000)).toISOString();
