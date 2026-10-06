@@ -48,7 +48,7 @@ describe('forwarded purchase category', () => {
     });
     expect(
       await classifyForwardedPurchase(
-        'AMAZON.COM',
+        'EBAY.COM',
         categories,
         'key',
         'model',
@@ -59,9 +59,65 @@ describe('forwarded purchase category', () => {
     expect(completeJson).toHaveBeenCalledWith(
       expect.objectContaining({
         system: expect.stringContaining('Amazon.com is a general marketplace'),
-        user: expect.stringContaining('AMAZON.COM')
+        user: expect.stringContaining('EBAY.COM')
       })
     );
+  });
+
+  it('recognizes the exact Amazon marketplace identity without mistaking Prime or AWS for purchases', async () => {
+    completeJson.mockClear();
+    expect(
+      await classifyForwardedPurchase(
+        'AMAZON.COM',
+        categories,
+        'key',
+        'model',
+        'owner',
+        usage as never
+      )
+    ).toEqual({ categoryId: 'shopping-id', model: 'merchant-catalog-v1' });
+    expect(completeJson).not.toHaveBeenCalled();
+    completeJson.mockResolvedValue({
+      data: { category_slug: 'shopping', confidence: 0.1, merchant_type: 'unknown' }
+    });
+    expect(
+      await classifyForwardedPurchase(
+        'AMAZON PRIME',
+        categories,
+        'key',
+        'model',
+        'owner',
+        usage as never
+      )
+    ).toBeNull();
+  });
+
+  it('allows a lower confidence suggestion for reviewed input without lowering automatic posting', async () => {
+    completeJson.mockResolvedValue({
+      data: { category_slug: 'shopping', confidence: 0.9, merchant_type: 'marketplace' }
+    });
+    expect(
+      await classifyForwardedPurchase(
+        'ALIEXPRESS.COM',
+        categories,
+        'key',
+        'model',
+        'owner',
+        usage as never
+      )
+    ).toBeNull();
+    expect(
+      await classifyForwardedPurchase(
+        'ALIEXPRESS.COM',
+        categories,
+        'key',
+        'model',
+        'owner',
+        usage as never,
+        false,
+        0.85
+      )
+    ).toEqual({ categoryId: 'shopping-id', model: 'model' });
   });
 
   it('holds payment processors and overly specific marketplace guesses for review', async () => {
@@ -72,11 +128,26 @@ describe('forwarded purchase category', () => {
       await classifyForwardedPurchase('PSE', categories, 'key', 'model', 'owner', usage as never)
     ).toBeNull();
     completeJson.mockResolvedValueOnce({
+      data: { category_slug: 'shopping', confidence: 0.9, merchant_type: 'payment_processor' }
+    });
+    expect(
+      await classifyForwardedPurchase(
+        'PSE',
+        categories,
+        'key',
+        'model',
+        'owner',
+        usage as never,
+        false,
+        0.85
+      )
+    ).toBeNull();
+    completeJson.mockResolvedValueOnce({
       data: { category_slug: 'clothing', confidence: 0.99, merchant_type: 'marketplace' }
     });
     expect(
       await classifyForwardedPurchase(
-        'AMAZON.COM',
+        'EBAY.COM',
         categories,
         'key',
         'model',

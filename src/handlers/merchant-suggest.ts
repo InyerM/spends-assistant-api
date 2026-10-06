@@ -33,7 +33,9 @@ export async function handleMerchantSuggest(request: Request, env: Env): Promise
       env.OPENROUTER_API_KEY,
       env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
       userId,
-      services.aiUsage
+      services.aiUsage,
+      false,
+      0.85
     );
     const category = categories.find(
       (candidate) =>

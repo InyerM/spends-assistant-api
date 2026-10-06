@@ -67,7 +67,9 @@ describe('merchant suggestions', () => {
       'test-openrouter-key',
       'deepseek/deepseek-v4.1-flash',
       'owner-1',
-      expect.any(Object)
+      expect.any(Object),
+      false,
+      0.85
     );
   });
 

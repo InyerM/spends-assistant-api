@@ -9,9 +9,10 @@ function knownMerchantCategory(merchant: string): string | null {
     .toUpperCase()
     .replace(/[^A-Z0-9]+/gu, ' ')
     .trim();
-  return /^(?:TIENDAS ARA|SUPERMERCADO MERCAMAS|MERCAMAS)(?: \d{1,4})?$/u.test(normalized)
-    ? 'groceries'
-    : null;
+  if (/^(?:TIENDAS ARA|SUPERMERCADO MERCAMAS|MERCAMAS)(?: \d{1,4})?$/u.test(normalized))
+    return 'groceries';
+  if (/^(?:AMAZON COM|AMAZON MARKETPLACE|AMZN MKTP)$/u.test(normalized)) return 'shopping';
+  return null;
 }
 
 export async function classifyForwardedPurchase(
@@ -21,7 +22,8 @@ export async function classifyForwardedPurchase(
   model: string,
   userId: string,
   usage: AiUsageService,
-  rethrowProviderErrors = false
+  rethrowProviderErrors = false,
+  minimumConfidence = 0.95
 ): Promise<{ categoryId: string; model: string } | null> {
   const genericSlugs = new Set(['missing', 'uncategorized', 'others']);
   const choices = categories.filter(
@@ -54,7 +56,7 @@ export async function classifyForwardedPurchase(
       typeof result.category_slug !== 'string' ||
       typeof result.confidence !== 'number' ||
       !['specialist', 'marketplace'].includes(result.merchant_type as string) ||
-      result.confidence < 0.95 ||
+      result.confidence < minimumConfidence ||
       result.confidence > 1
     )
       return null;
