@@ -62,12 +62,15 @@ async function database(): Promise<PGlite> {
         'From (unverified): notificaciones@lulobank.com\n\nCompra realizada\n\nRealizaste una compra en SHEIN.COM por $188,165.52\nOrigen tarjeta de crédito •8456\nFecha 5 de octubre de 2026\nHora 12:24 p.m.',repeat('a',64));
   `);
   await db.exec(migration('20261005000000_verified_forwarded_email_auto_post.sql'));
+  await db.exec('ALTER TABLE public.accounts ADD COLUMN bank_account_last_four text');
+  await db.exec(migration('20261006000060_account_identifiers.sql'));
+  await db.exec(migration('20261006000080_forwarded_email_alias_auto_post.sql'));
   return db;
 }
 
-function post(user = owner, item = inbox, amount = '188165.52'): string {
+function post(user = owner, item = inbox, amount = '188165.52', suffix = '8456'): string {
   return `SELECT public.auto_post_verified_forwarded_purchase('${user}','${item}',
-    '${account}','${category}','${amount}','2026-10-05','12:24:00','8456',
+    '${account}','${category}','${amount}','2026-10-05','12:24:00','${suffix}',
     'Compra en SHEIN.COM','deepseek/test') AS result`;
 }
 
@@ -82,6 +85,24 @@ async function asService(db: PGlite, sql: string): Promise<{ status: string; rep
 }
 
 describe('verified forwarded purchase auto post', () => {
+  it('accepts a secondary active credit card ending only when the email contains it', async () => {
+    const db = await database();
+    try {
+      await db.exec(`UPDATE public.accounts SET identifiers='[
+        {"kind":"credit_card","last_four":"8456","is_active":true,"is_primary":true},
+        {"kind":"credit_card","last_four":"9989","is_active":true,"is_primary":false}
+      ]' WHERE id='${account}';
+      INSERT INTO public.shortcut_inbox_items(id,user_id,source,external_id,received_at,raw_text,idempotency_key)
+      VALUES ('${mismatchInbox}','${owner}','forwarded_email','alias-mail',
+        '2026-10-05T18:00:00Z',
+        'From (unverified): notificaciones@lulobank.com\n\nCompra realizada\n\nRealizaste una compra en SHEIN.COM por $188,165.52\nOrigen tarjeta de crédito •9989\nFecha 5 de octubre de 2026\nHora 12:24 p.m.',repeat('c',64));`);
+      expect(await asService(db, post(owner, mismatchInbox, '188165.52', '9989'))).toMatchObject({
+        status: 'created'
+      });
+    } finally {
+      await db.close();
+    }
+  });
   it('posts once atomically and records a distinct automatic audit decision', async () => {
     const db = await database();
     try {

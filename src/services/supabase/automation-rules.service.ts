@@ -192,21 +192,27 @@ export class AutomationRulesService extends BaseService {
       if (account.type === 'cash') continue;
       if (!account.is_active) continue;
 
-      const keywords: string[] = [];
-      if (account.institution) keywords.push(account.institution);
-      if (account.last_four) keywords.push(account.last_four);
-      if (keywords.length === 0) continue;
-
-      rules.push({
-        user_id: userId,
-        name: `Account: ${account.name}`,
-        is_active: true,
-        priority: 100,
-        rule_type: 'account_detection',
-        condition_logic: 'and',
-        conditions: { raw_text_contains: keywords },
-        actions: { set_account: account.id }
-      });
+      const suffixes = account.identifiers?.length
+        ? account.identifiers
+            .filter((identifier) => identifier.is_active)
+            .map((identifier) => identifier.last_four)
+        : account.last_four
+          ? [account.last_four]
+          : [];
+      for (const suffix of suffixes.length ? [...new Set(suffixes)] : ['']) {
+        const keywords = [account.institution, suffix].filter(Boolean) as string[];
+        if (keywords.length === 0) continue;
+        rules.push({
+          user_id: userId,
+          name: `Account: ${account.name}${suffix ? ` *${suffix}` : ''}`,
+          is_active: true,
+          priority: 100,
+          rule_type: 'account_detection',
+          condition_logic: 'and',
+          conditions: { raw_text_contains: keywords },
+          actions: { set_account: account.id }
+        });
+      }
     }
 
     return rules;

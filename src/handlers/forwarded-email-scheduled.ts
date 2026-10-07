@@ -187,7 +187,14 @@ async function postAuthenticatedEvent(
       (account) =>
         account.institution?.toLowerCase().includes('lulo') &&
         account.type === 'credit_card' &&
-        account.last_four === purchase.cardLastFour &&
+        (account.identifiers?.length
+          ? account.identifiers.some(
+              (identifier) =>
+                identifier.kind === 'credit_card' &&
+                identifier.is_active &&
+                identifier.last_four === purchase.cardLastFour
+            )
+          : account.last_four === purchase.cardLastFour) &&
         account.currency === 'COP' &&
         account.is_active
     );

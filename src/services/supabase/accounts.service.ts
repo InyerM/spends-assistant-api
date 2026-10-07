@@ -14,7 +14,6 @@ export class AccountsService extends BaseService {
     accountType?: 'checking' | 'savings' | 'credit_card' | 'credit' | null,
     userId?: string
   ): Promise<Account | null> {
-
     const userFilter = userId ? `&user_id=eq.${userId}` : '';
 
     // Try with all params if provided
@@ -28,9 +27,7 @@ export class AccountsService extends BaseService {
         select: '*'
       });
 
-      const accounts = await this.fetch<Account[]>(
-        `/rest/v1/accounts?${params}${userFilter}`
-      );
+      const accounts = await this.fetch<Account[]>(`/rest/v1/accounts?${params}${userFilter}`);
 
       if (accounts[0]) {
         return accounts[0];
@@ -47,12 +44,23 @@ export class AccountsService extends BaseService {
         select: '*'
       });
 
-      const accounts = await this.fetch<Account[]>(
-        `/rest/v1/accounts?${params}${userFilter}`
-      );
+      const accounts = await this.fetch<Account[]>(`/rest/v1/accounts?${params}${userFilter}`);
 
       if (accounts[0]) {
         return accounts[0];
+      }
+
+      if (userId) {
+        const owned = await this.getAccounts(userId);
+        const matches = owned.filter(
+          (account) =>
+            account.institution?.toLowerCase() === institution.toLowerCase() &&
+            (!accountType || account.type === accountType) &&
+            account.identifiers?.some(
+              (identifier) => identifier.is_active && identifier.last_four === lastFour
+            )
+        );
+        return matches.length === 1 ? matches[0] : null;
       }
     }
 
@@ -66,9 +74,7 @@ export class AccountsService extends BaseService {
         select: '*'
       });
 
-      const accounts = await this.fetch<Account[]>(
-        `/rest/v1/accounts?${params}${userFilter}`
-      );
+      const accounts = await this.fetch<Account[]>(`/rest/v1/accounts?${params}${userFilter}`);
 
       if (accounts[0]) {
         return accounts[0];
@@ -83,9 +89,7 @@ export class AccountsService extends BaseService {
       select: '*'
     });
 
-    const accounts = await this.fetch<Account[]>(
-      `/rest/v1/accounts?${params}${userFilter}`
-    );
+    const accounts = await this.fetch<Account[]>(`/rest/v1/accounts?${params}${userFilter}`);
 
     return accounts[0] || null;
   }
@@ -105,17 +109,12 @@ export class AccountsService extends BaseService {
     amount: number,
     operation: 'add' | 'subtract'
   ): Promise<void> {
-    const currentBalance = await this.getAccountBalance(accountId) ?? 0;
-    const newBalance = operation === 'subtract'
-      ? currentBalance - amount
-      : currentBalance + amount;
+    const currentBalance = (await this.getAccountBalance(accountId)) ?? 0;
+    const newBalance = operation === 'subtract' ? currentBalance - amount : currentBalance + amount;
 
-    await this.fetch(
-      `/rest/v1/accounts?id=eq.${accountId}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ balance: newBalance })
-      }
-    );
+    await this.fetch(`/rest/v1/accounts?id=eq.${accountId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ balance: newBalance })
+    });
   }
 }

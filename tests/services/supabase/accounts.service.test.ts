@@ -14,6 +14,28 @@ describe('AccountsService', () => {
   });
 
   describe('getAccount', () => {
+    it('finds a secondary active card suffix on an owned account', async () => {
+      const account = {
+        ...createMockAccount(),
+        institution: 'bancolombia',
+        type: 'savings',
+        last_four: '2651',
+        identifiers: [
+          { kind: 'bank_account', last_four: '2651', is_active: true, is_primary: true },
+          { kind: 'debit_card', last_four: '9989', is_active: true, is_primary: false }
+        ]
+      };
+      let calls = 0;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          async () => new Response(JSON.stringify(++calls < 3 ? [] : [account]), { status: 200 })
+        )
+      );
+      expect(await service.getAccount('bancolombia', '9989', 'savings', 'test-user-id')).toEqual(
+        account
+      );
+    });
     it('does not log account identifiers during lookup', async () => {
       const log = vi.spyOn(console, 'log').mockImplementation(() => {});
       vi.stubGlobal('fetch', createMockFetch({ accounts: { data: [] } }));
@@ -34,15 +56,18 @@ describe('AccountsService', () => {
     it('falls back to institution + lastFour when type search fails', async () => {
       const account = createMockAccount();
       let callCount = 0;
-      vi.stubGlobal('fetch', vi.fn(async () => {
-        callCount++;
-        // First call (all params) returns empty, second call (inst+last4) returns account
-        const data = callCount === 1 ? [] : [account];
-        return new Response(JSON.stringify(data), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          callCount++;
+          // First call (all params) returns empty, second call (inst+last4) returns account
+          const data = callCount === 1 ? [] : [account];
+          return new Response(JSON.stringify(data), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        })
+      );
 
       const result = await service.getAccount('bancolombia', '2651', 'checking', 'test-user-id');
       expect(result).toEqual(account);
@@ -58,12 +83,15 @@ describe('AccountsService', () => {
 
     it('falls back to institution only', async () => {
       const account = createMockAccount();
-      vi.stubGlobal('fetch', vi.fn(async () => {
-        return new Response(JSON.stringify([account]), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          return new Response(JSON.stringify([account]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        })
+      );
 
       const result = await service.getAccount('bancolombia', undefined, undefined, 'test-user-id');
       expect(result).toEqual(account);
@@ -79,10 +107,7 @@ describe('AccountsService', () => {
 
   describe('getAccountBalance', () => {
     it('returns balance for existing account', async () => {
-      vi.stubGlobal(
-        'fetch',
-        createMockFetch({ accounts: { data: [{ balance: 500000 }] } }),
-      );
+      vi.stubGlobal('fetch', createMockFetch({ accounts: { data: [{ balance: 500000 }] } }));
 
       const result = await service.getAccountBalance('acc-1');
       expect(result).toBe(500000);
@@ -99,16 +124,19 @@ describe('AccountsService', () => {
   describe('updateBalance', () => {
     it('adds to balance', async () => {
       const calls: { url: string; body: string }[] = [];
-      vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
-        calls.push({ url, body: options?.body as string || '' });
-        // First call: getAccountBalance returns 500000
-        // Second call: PATCH
-        const data = calls.length === 1 ? [{ balance: 500000 }] : {};
-        return new Response(JSON.stringify(data), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string, options?: RequestInit) => {
+          calls.push({ url, body: (options?.body as string) || '' });
+          // First call: getAccountBalance returns 500000
+          // Second call: PATCH
+          const data = calls.length === 1 ? [{ balance: 500000 }] : {};
+          return new Response(JSON.stringify(data), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        })
+      );
 
       await service.updateBalance('acc-1', 100000, 'add');
       const patchCall = calls[1];
@@ -117,14 +145,17 @@ describe('AccountsService', () => {
 
     it('subtracts from balance', async () => {
       const calls: { url: string; body: string }[] = [];
-      vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
-        calls.push({ url, body: options?.body as string || '' });
-        const data = calls.length === 1 ? [{ balance: 500000 }] : {};
-        return new Response(JSON.stringify(data), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string, options?: RequestInit) => {
+          calls.push({ url, body: (options?.body as string) || '' });
+          const data = calls.length === 1 ? [{ balance: 500000 }] : {};
+          return new Response(JSON.stringify(data), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        })
+      );
 
       await service.updateBalance('acc-1', 100000, 'subtract');
       const patchCall = calls[1];

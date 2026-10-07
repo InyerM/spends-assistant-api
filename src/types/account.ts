@@ -1,9 +1,9 @@
-export type AccountType = 
-  | 'checking' 
-  | 'savings' 
-  | 'credit_card' 
-  | 'cash' 
-  | 'investment' 
+export type AccountType =
+  | 'checking'
+  | 'savings'
+  | 'credit_card'
+  | 'cash'
+  | 'investment'
   | 'crypto'
   | 'credit';
 
@@ -14,6 +14,12 @@ export interface Account {
   type: AccountType;
   institution: string | null;
   last_four: string | null;
+  identifiers?: Array<{
+    kind: 'bank_account' | 'debit_card' | 'credit_card' | 'other';
+    last_four: string;
+    is_active: boolean;
+    is_primary: boolean;
+  }>;
   currency: string;
   balance: number;
   is_active: boolean;
