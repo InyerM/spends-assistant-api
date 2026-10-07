@@ -9,7 +9,7 @@ import {
   type AiConsentScope
 } from '../services/supabase/ai-consent.service';
 
-function knownMerchantCategory(merchant: string): string | null {
+export function knownMerchantCategory(merchant: string): string | null {
   const normalized = merchant
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/gu, '')

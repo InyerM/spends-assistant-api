@@ -33,6 +33,7 @@ async function database(): Promise<PGlite> {
       'Synthetic purchase',repeat('a',64));
   `);
   await db.exec(migration('20261006000010_forwarded_email_analysis.sql'));
+  await db.exec(migration('20261006000030_forwarded_email_review_copy.sql'));
   return db;
 }
 
@@ -46,6 +47,38 @@ async function asUser<T>(db: PGlite, userId: string, sql: string): Promise<T[]> 
 }
 
 describe('persisted forwarded email analysis', () => {
+  it('lets only the owner enrich a pending proposal while keeping financial state untouched', async () => {
+    const db = await database();
+    try {
+      await asUser(
+        db,
+        owner,
+        `INSERT INTO public.forwarded_email_analyses
+        (inbox_item_id,user_id,status) VALUES ('${inbox}','${owner}','needs_review')`
+      );
+      const update = `UPDATE public.forwarded_email_analyses SET analysis_version=2,
+        suggested_type='expense', description='Lunch at Krokan', notes='Owner confirmed lunch.'
+        WHERE inbox_item_id='${inbox}' RETURNING description,notes`;
+      expect(await asUser(db, other, update)).toEqual([]);
+      expect(await asUser(db, owner, update)).toEqual([
+        { description: 'Lunch at Krokan', notes: 'Owner confirmed lunch.' }
+      ]);
+      await expect(
+        asUser(
+          db,
+          owner,
+          `UPDATE public.forwarded_email_analyses
+        SET status='parsed' WHERE inbox_item_id='${inbox}'`
+        )
+      ).rejects.toThrow();
+      await db.exec(
+        `UPDATE public.shortcut_inbox_items SET status='dismissed' WHERE id='${inbox}'`
+      );
+      expect(await asUser(db, owner, update)).toEqual([]);
+    } finally {
+      await db.close();
+    }
+  });
   it('stores one owner-scoped proposal without posting a transaction', async () => {
     const db = await database();
     try {

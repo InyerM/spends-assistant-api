@@ -15,7 +15,7 @@ const accountOther = '20000000-0000-4000-8000-000000000002';
 const categoryA = '30000000-0000-4000-8000-000000000001';
 const categoryOther = '30000000-0000-4000-8000-000000000002';
 
-async function database(withEventTime = false): Promise<PGlite> {
+async function database(withEventTime = false, withNotes = false): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(`
     CREATE ROLE authenticated;
@@ -40,7 +40,7 @@ async function database(withEventTime = false): Promise<PGlite> {
     CREATE TABLE public.transactions (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES auth.users(id),
       amount numeric(15,2) NOT NULL CHECK (amount > 0), date date NOT NULL,
-      time time NOT NULL, description text NOT NULL, account_id uuid NOT NULL
+      time time NOT NULL, description text NOT NULL, notes text, account_id uuid NOT NULL
         REFERENCES public.accounts(id), category_id uuid REFERENCES public.categories(id),
       type text NOT NULL CHECK (type IN ('expense','income','transfer')),
       source varchar(50) NOT NULL, raw_text text, parsed_data jsonb, duplicate_status text,
@@ -78,6 +78,9 @@ async function database(withEventTime = false): Promise<PGlite> {
     await db.exec(migration('20260929000120_shortcut_match_reversal'));
     await db.exec(migration('20260929000180_shortcut_reviewed_event_time'));
   }
+  if (withNotes) {
+    await db.exec(migration('20261006000040_shortcut_reviewed_notes'));
+  }
   return db;
 }
 
@@ -101,6 +104,29 @@ const create = (
   `SELECT public.confirm_shortcut_transaction('${item}',${reviewedPayload},'${reviewHash}',${confirmDistinct}) AS result`;
 
 describe('reviewed Shortcut transaction creation', () => {
+  it('stores reviewed notes in the financial record and immutable review snapshot', async () => {
+    const db = await database(true, true);
+    try {
+      const reviewed = payload(',"notes":"Lunch confirmed by the owner."');
+      const first = (await asUser(db, owner, create(inboxA, '', false, reviewed)))[0] as {
+        result: { transaction_id: string };
+      };
+      const rows = (
+        await db.query(`SELECT t.notes,
+        d.transaction_snapshot->>'notes' AS snapshot_notes
+        FROM public.transactions t JOIN public.shortcut_inbox_match_decisions d
+          ON d.transaction_id = t.id WHERE t.id = '${first.result.transaction_id}'`)
+      ).rows;
+      expect(rows).toEqual([
+        { notes: 'Lunch confirmed by the owner.', snapshot_notes: 'Lunch confirmed by the owner.' }
+      ]);
+      await expect(
+        asUser(db, owner, create(inboxB, '', false, payload(',"notes":42')))
+      ).rejects.toThrow();
+    } finally {
+      await db.close();
+    }
+  });
   it('stores the reviewed purchase time separately from a notice received 20 minutes later', async () => {
     const db = await database(true);
     try {

@@ -9,6 +9,7 @@ import { handleTransaction } from './handlers/transaction';
 import { handleParse } from './handlers/parse';
 import { handleVisionExtract } from './handlers/vision-extract';
 import { handleMerchantSuggest } from './handlers/merchant-suggest';
+import { handleForwardedEmailSuggest } from './handlers/forwarded-email-suggest';
 import { handleBalance } from './handlers/balance';
 import { handleAutomationGenerate } from './handlers/automation-generate';
 import { handleAiConsent } from './handlers/ai-consent';
@@ -93,6 +94,10 @@ export default {
 
     if (url.pathname === '/merchant/suggest' && request.method === 'POST') {
       return handleMerchantSuggest(request, env);
+    }
+
+    if (url.pathname === '/forwarded-email/suggest' && request.method === 'POST') {
+      return handleForwardedEmailSuggest(request, env);
     }
 
     // Transaction API
