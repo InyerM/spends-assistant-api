@@ -123,6 +123,18 @@ describe('reviewed Shortcut transaction creation', () => {
       await expect(
         asUser(db, owner, create(inboxB, '', false, payload(',"notes":42')))
       ).rejects.toThrow();
+      const withTime = payload(
+        ',"notes":"Reviewed card purchase.","event_at":"2026-09-28T05:40:00-05:00","event_time_confirmed":true'
+      ).replace('1200.50', '1201.50');
+      const second = (await asUser(db, owner, create(inboxB, '', false, withTime)))[0] as {
+        result: { transaction_id: string };
+      };
+      expect(
+        (
+          await db.query(`SELECT notes,time::text AS time FROM public.transactions
+        WHERE id='${second.result.transaction_id}'`)
+        ).rows
+      ).toEqual([{ notes: 'Reviewed card purchase.', time: '05:40:00' }]);
     } finally {
       await db.close();
     }
