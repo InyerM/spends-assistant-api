@@ -34,6 +34,7 @@ async function database(): Promise<PGlite> {
   `);
   await db.exec(migration('20261006000010_forwarded_email_analysis.sql'));
   await db.exec(migration('20261006000030_forwarded_email_review_copy.sql'));
+  await db.exec(migration('20261006000050_forwarded_email_review_provenance.sql'));
   return db;
 }
 
@@ -63,6 +64,16 @@ describe('persisted forwarded email analysis', () => {
       expect(await asUser(db, owner, update)).toEqual([
         { description: 'Lunch at Krokan', notes: 'Owner confirmed lunch.' }
       ]);
+      await asUser(
+        db,
+        owner,
+        `UPDATE public.forwarded_email_analyses
+        SET category_id='30000000-0000-4000-8000-000000000001',
+          category_source='review_context' WHERE inbox_item_id='${inbox}'`
+      );
+      expect(
+        await asUser(db, owner, `SELECT category_source FROM public.forwarded_email_analyses`)
+      ).toEqual([{ category_source: 'review_context' }]);
       await expect(
         asUser(
           db,
