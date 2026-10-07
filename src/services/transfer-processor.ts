@@ -124,7 +124,6 @@ export async function processTransfer(
 
   if (!rule) {
     // No rule match → category: missing (or keep original)
-    console.log(`[Transfer] No rule found for phone: ${phone}`);
     return {
       transactions: [
         {
@@ -144,8 +143,6 @@ export async function processTransfer(
   }
 
   // 4. Internal transfer detected - create dual transactions
-  console.log(`[Transfer] Rule matched: ${rule.name} for phone: ${phone}`);
-
   transferInfo.isInternalTransfer = true;
   transferInfo.linkedAccountId = rule.transfer_to_account_id || undefined;
   transferInfo.ruleName = rule.name;
@@ -252,8 +249,6 @@ export function buildAutomationRulesPromptSection(rules: AutomationRule[]): stri
     .filter(Boolean);
 
   if (lines.length === 0) return '';
-
-  console.log('[Transfer] Automation rules prompt section built:', JSON.stringify(lines, null, 2));
 
   return `AUTOMATION RULES (apply these when conditions match, they override default categorization):
 ${lines.join('\n')}

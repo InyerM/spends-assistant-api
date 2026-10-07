@@ -5,12 +5,12 @@ import {
   isTransferMessage,
   processTransfer,
   buildTransferPromptSection,
-  buildAutomationRulesPromptSection,
+  buildAutomationRulesPromptSection
 } from '../../src/services/transfer-processor';
 import {
   createMockAutomationRule,
   createMockTransactionInput,
-  createMockCategory,
+  createMockCategory
 } from '../__test-helpers__/factories';
 import type { SupabaseServices } from '../../src/services/supabase';
 
@@ -69,19 +69,21 @@ describe('processTransfer', () => {
     vi.restoreAllMocks();
   });
 
-  function createMockServices(overrides: {
-    findTransferRule?: ReturnType<typeof vi.fn>;
-    getCategory?: ReturnType<typeof vi.fn>;
-  } = {}): SupabaseServices {
+  function createMockServices(
+    overrides: {
+      findTransferRule?: ReturnType<typeof vi.fn>;
+      getCategory?: ReturnType<typeof vi.fn>;
+    } = {}
+  ): SupabaseServices {
     return {
       automationRules: {
-        findTransferRule: overrides.findTransferRule ?? vi.fn().mockResolvedValue(null),
+        findTransferRule: overrides.findTransferRule ?? vi.fn().mockResolvedValue(null)
       },
       categories: {
-        getCategory: overrides.getCategory ?? vi.fn().mockResolvedValue(null),
+        getCategory: overrides.getCategory ?? vi.fn().mockResolvedValue(null)
       },
       accounts: {} as SupabaseServices['accounts'],
-      transactions: {} as SupabaseServices['transactions'],
+      transactions: {} as SupabaseServices['transactions']
     } as unknown as SupabaseServices;
   }
 
@@ -89,7 +91,13 @@ describe('processTransfer', () => {
     const tx = createMockTransactionInput({ description: 'Compra almacen' });
     const services = createMockServices();
 
-    const result = await processTransfer(tx, 'Compraste en almacen', services, 'cat-missing', 'test-user-id');
+    const result = await processTransfer(
+      tx,
+      'Compraste en almacen',
+      services,
+      'cat-missing',
+      'test-user-id'
+    );
     expect(result.transactions).toHaveLength(1);
     expect(result.transactions[0].type).toBe('expense');
     expect(result.transactions[0].category_id).toBe('cat-missing');
@@ -105,7 +113,7 @@ describe('processTransfer', () => {
       'Transferiste a *3104633357 desde tu cuenta 2651',
       services,
       'cat-missing',
-      'test-user-id',
+      'test-user-id'
     );
     expect(result.transactions).toHaveLength(1);
     expect(result.transactions[0].type).toBe('expense');
@@ -114,22 +122,40 @@ describe('processTransfer', () => {
     expect(result.transferInfo.isInternalTransfer).toBe(false);
   });
 
+  it('does not write a destination phone to runtime logs', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const tx = createMockTransactionInput({ description: 'Transfer' });
+
+    await processTransfer(
+      tx,
+      'Transferiste a *3104633357 desde tu cuenta 2651',
+      createMockServices(),
+      undefined,
+      'test-user-id'
+    );
+
+    const logged = log.mock.calls.flat().join(' ');
+    log.mockRestore();
+    expect(logged).not.toContain('3104633357');
+  });
+
   it('creates dual transactions when phone matches a rule', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const tx = createMockTransactionInput({
       description: 'Transfer',
       amount: 100000,
-      account_id: 'acc-source',
+      account_id: 'acc-source'
     });
     const rule = createMockAutomationRule({
       name: 'Nequi',
       match_phone: '3104633357',
-      transfer_to_account_id: 'acc-dest',
+      transfer_to_account_id: 'acc-dest'
     });
     const transferCategory = createMockCategory({ id: 'cat-transfer', slug: 'transfer' });
 
     const services = createMockServices({
       findTransferRule: vi.fn().mockResolvedValue(rule),
-      getCategory: vi.fn().mockResolvedValue(transferCategory),
+      getCategory: vi.fn().mockResolvedValue(transferCategory)
     });
 
     const result = await processTransfer(
@@ -137,7 +163,7 @@ describe('processTransfer', () => {
       'Transferiste a *3104633357 desde tu cuenta 2651',
       services,
       undefined,
-      'test-user-id',
+      'test-user-id'
     );
 
     expect(result.transactions).toHaveLength(2);
@@ -154,18 +180,21 @@ describe('processTransfer', () => {
     expect(result.transferInfo.isInternalTransfer).toBe(true);
     expect(result.transferInfo.linkedAccountId).toBe('acc-dest');
     expect(result.transferInfo.ruleName).toBe('Nequi');
+    const logged = log.mock.calls.flat().join(' ');
+    log.mockRestore();
+    expect(logged).not.toContain('3104633357');
   });
 
   it('includes origin account in incoming transaction notes', async () => {
     const tx = createMockTransactionInput({ description: 'Transfer', account_id: 'acc-source' });
     const rule = createMockAutomationRule({
       name: 'Nequi',
-      transfer_to_account_id: 'acc-dest',
+      transfer_to_account_id: 'acc-dest'
     });
 
     const services = createMockServices({
       findTransferRule: vi.fn().mockResolvedValue(rule),
-      getCategory: vi.fn().mockResolvedValue(null),
+      getCategory: vi.fn().mockResolvedValue(null)
     });
 
     const result = await processTransfer(
@@ -173,7 +202,7 @@ describe('processTransfer', () => {
       'Transferiste a *3104633357 desde tu cuenta 2651',
       services,
       undefined,
-      'test-user-id',
+      'test-user-id'
     );
 
     expect(result.transactions[1].notes).toContain('2651');
@@ -188,7 +217,7 @@ describe('processTransfer', () => {
       'Compraste en almacen sin telefono',
       services,
       'cat-missing',
-      'test-user-id',
+      'test-user-id'
     );
 
     expect(result.transactions[0].notes).toContain('existing note');
@@ -207,9 +236,7 @@ describe('buildTransferPromptSection', () => {
   });
 
   it('includes phone mappings', () => {
-    const rules = [
-      createMockAutomationRule({ match_phone: '3104633357', name: 'Nequi' }),
-    ];
+    const rules = [createMockAutomationRule({ match_phone: '3104633357', name: 'Nequi' })];
     const result = buildTransferPromptSection(rules);
     expect(result).toContain('*3104633357');
     expect(result).toContain('TRANSFERS');
@@ -226,8 +253,8 @@ describe('buildAutomationRulesPromptSection', () => {
       createMockAutomationRule({
         match_phone: '3104633357',
         conditions: { description_contains: ['test'] },
-        actions: { set_type: 'income' },
-      }),
+        actions: { set_type: 'income' }
+      })
     ];
     expect(buildAutomationRulesPromptSection(rules)).toBe('');
   });
@@ -238,8 +265,8 @@ describe('buildAutomationRulesPromptSection', () => {
         name: 'Salary',
         match_phone: null,
         conditions: { description_contains: ['nomina', 'salario'] },
-        actions: { set_type: 'income', set_category: 'salary' },
-      }),
+        actions: { set_type: 'income', set_category: 'salary' }
+      })
     ];
     const result = buildAutomationRulesPromptSection(rules);
     expect(result).toContain('AUTOMATION RULES');
@@ -248,14 +275,32 @@ describe('buildAutomationRulesPromptSection', () => {
     expect(result).toContain('income');
   });
 
+  it('does not write private automation conditions to runtime logs', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const rules = [
+      createMockAutomationRule({
+        name: 'Salary',
+        match_phone: null,
+        conditions: { description_contains: ['private-payee-name'] },
+        actions: { set_type: 'income' }
+      })
+    ];
+
+    buildAutomationRulesPromptSection(rules);
+
+    const logged = log.mock.calls.flat().join(' ');
+    log.mockRestore();
+    expect(logged).not.toContain('private-payee-name');
+  });
+
   it('includes amount_between condition', () => {
     const rules = [
       createMockAutomationRule({
         name: 'Big expense',
         match_phone: null,
         conditions: { amount_between: [100000, 500000] },
-        actions: { set_category: 'large-purchase' },
-      }),
+        actions: { set_category: 'large-purchase' }
+      })
     ];
     const result = buildAutomationRulesPromptSection(rules);
     expect(result).toContain('amount between 100000-500000');
@@ -267,8 +312,8 @@ describe('buildAutomationRulesPromptSection', () => {
         name: 'Regex rule',
         match_phone: null,
         conditions: { description_regex: '^Nomina.*' },
-        actions: { set_type: 'income' },
-      }),
+        actions: { set_type: 'income' }
+      })
     ];
     const result = buildAutomationRulesPromptSection(rules);
     expect(result).toContain('description matches /^Nomina.*/');
@@ -280,8 +325,8 @@ describe('buildAutomationRulesPromptSection', () => {
         name: 'Empty rule',
         match_phone: null,
         conditions: {},
-        actions: { set_type: 'income' },
-      }),
+        actions: { set_type: 'income' }
+      })
     ];
     // No conditions means condParts is empty, so it returns ''
     expect(buildAutomationRulesPromptSection(rules)).toBe('');
@@ -293,8 +338,8 @@ describe('buildAutomationRulesPromptSection', () => {
         name: 'Email rule',
         match_phone: null,
         conditions: { source: ['bancolombia_email'] },
-        actions: { set_type: 'expense' },
-      }),
+        actions: { set_type: 'expense' }
+      })
     ];
     const result = buildAutomationRulesPromptSection(rules);
     expect(result).toContain('source is [bancolombia_email]');
