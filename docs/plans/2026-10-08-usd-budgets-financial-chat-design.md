@@ -1,6 +1,6 @@
 # USD, budgets, and financial chat: web-first design
 
-Status: owner-approved product direction on 2026-10-08; implementation pending.
+Status: owner-approved product direction on 2026-10-08. The COP/USD posting guard and the first web monthly-budget slice are implemented locally; neither has been deployed. Cross-currency posting, refund netting, converted USD actuals, proactive budget alerts, and grounded chat remain pending.
 
 ## Product decisions
 
