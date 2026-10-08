@@ -10,7 +10,7 @@ EMAIL_FORWARDING_READY = "true"
 EMAIL_AUTO_POST_READY = "true"
 EMAIL_AUTO_POST_AFTER = "2026-10-06T01:45:00Z"
 CLOUDFLARE_EMAIL_ZONE_ID = "08eb68367ee4508342d26f223fcb5c2a"
-APP_URL = "https://anotto.app"
+APP_URL = "https://my.anotto.app"
 
 [observability]
 enabled = true
