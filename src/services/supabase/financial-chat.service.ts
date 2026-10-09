@@ -12,6 +12,31 @@ export interface FinancialChatSnapshot {
 
 /** Fixed read tools; no model-controlled SQL, field lists, or write operations. */
 export class FinancialChatService extends BaseService {
+  async saveAnswer(
+    userId: string,
+    entry: {
+      month: string;
+      question: string;
+      answer: string;
+      insufficientContext: boolean;
+      citationIds: string[];
+    }
+  ): Promise<string> {
+    const rows = await this.fetch<Array<{ id: string }>>('/rest/v1/financial_chat_history', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: userId,
+        month: entry.month,
+        question: entry.question,
+        answer: entry.answer,
+        insufficient_context: entry.insufficientContext,
+        citation_ids: entry.citationIds
+      })
+    });
+    if (!rows[0]?.id) throw new Error('Chat history was not saved');
+    return rows[0].id;
+  }
+
   async snapshot(userId: string, month: string): Promise<FinancialChatSnapshot> {
     const [year, monthNumber] = month.split('-').map(Number);
     const nextMonth = new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10);

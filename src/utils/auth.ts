@@ -45,7 +45,15 @@ export async function resolveSupabaseJwtUserId(request: Request, env: Env): Prom
       }
     });
     if (userRes.ok) {
-      const user = (await userRes.json()) as { id?: unknown };
+      const user = (await userRes.json()) as {
+        id?: unknown;
+        app_metadata?: { anotto_terms_required?: unknown; anotto_terms_version?: unknown };
+      };
+      if (
+        user.app_metadata?.anotto_terms_required === true &&
+        user.app_metadata.anotto_terms_version !== '2026-10-08'
+      )
+        return null;
       return typeof user.id === 'string' && user.id.length > 0 ? user.id : null;
     }
   } catch {
