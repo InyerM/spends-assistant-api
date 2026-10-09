@@ -36,3 +36,9 @@ SQL tests exercise owner boundaries, principal exclusions, monthly overrides, st
 `src/utils/email-mime.ts` currently retains parsed text but does not persist MIME attachments. The email handler also has a 512 KB message size bound. The shipped document upload endpoint accepts images, not PDF statements. Bulk reconciliation of extracted observations does not itself implement emailed PDF extraction.
 
 Next implementation must persist owner-scoped attachments, enforce size/MIME bounds and deduplication, handle encrypted statements through a separate password workflow, and extract drafts without financial posting. An OCR subprocessor must satisfy the approved privacy routing before receiving financial PDFs. Reconciliation then compares date, signed amount, currency, account and available references; ambiguous matches require review, and any new financial transaction remains an explicit audited decision.
+
+## Release verification
+
+The two migrations were applied through the Supabase Management API (HTTP 201) and recorded in migration history. Web deployment `dpl_6VLyfao2TCSpswz1qYFvGwtmP4S7` is Ready at https://my.anotto.app. Landing deployment `dpl_7qFo8PRkqaYH9ZHJQWdc2KFnQAGt` is Ready at https://anotto.app. Backend [deployment run 37870791823](https://github.com/InyerM/spends-assistant-api/actions/runs/37870791823) succeeded. Unauthenticated Worker chat requests return 401. Authenticated personal-data browser testing remains for the owner.
+
+Mobile commit `cf00254` applies device-local logout and a shorter logo cycle; its regression test, typecheck, and scoped ESLint passed. Existing unrelated local mobile changes were preserved. The new chat, budget recurrence, and document reconciliation have not been ported to mobile.

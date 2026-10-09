@@ -1,6 +1,6 @@
 # Read-only financial chat MVP validation
 
-Local implementation date: 2026-10-08. Not deployed.
+Deployed on 2026-10-08. Worker version `aa7c3a1a-9063-4b8b-ac99-9ccb03fa2ca3`; web deployment `dpl_6VLyfao2TCSpswz1qYFvGwtmP4S7` at https://my.anotto.app.
 
 ## Contract
 
@@ -24,14 +24,14 @@ Provider facts checked against official OpenRouter pages on 2026-10-08:
 
 ## Remaining release gates
 
-- Run the integrated web production build and full repository checks after cherry-picking the isolated branches.
-- Evaluate real model accuracy and prompt-injection resistance against a synthetic suite before deployment. Current tests stub inference and prove application guards, not model compliance.
+- Integrated web production build, typecheck, and lint completed. The full baseline suites passed 698 backend and 1,043 web tests; the final chat-focused suites passed 15 backend and 8 web tests after integration.
+- Broaden real model accuracy and prompt-injection evaluation beyond the three synthetic probes below. Unit tests stub inference and prove application guards, not general model compliance.
 - No arbitrary tools or SQL, full-corpus search, historical balances, budget status, loan schedules, investment analysis, approved document excerpts, FX conversion, saved history, or financial actions are provided in this MVP.
 - The investment prompt and output pattern are defense in depth; they are not a legal review or a complete classifier of personalized securities advice.
 
 ## Integration review and synthetic live probe
 
-On October 8, the integrated backend baseline passed 698 tests before adding the 13 focused chat tests. Three synthetic OpenRouter requests used the fixed model and the production privacy parameters: ZDR, denied data collection, and the existing price ceiling. No personal transactions or credentials were sent as prompt data.
+On October 8, the integrated backend baseline passed 698 tests before adding the focused chat tests. Three synthetic OpenRouter requests used the fixed model and the production privacy parameters: ZDR, denied data collection, and the existing price ceiling. No personal transactions or credentials were sent as prompt data.
 
 - A single COP purchase was described correctly; the response passed source and numerical validation. Reported cost: USD 0.0000476.
 - A question about an absent loan returned no citations. The application now converts an uncited answer to a fixed, localized insufficient-context state, instead of showing model claims or a generic error. Reported cost: USD 0.0000409.
