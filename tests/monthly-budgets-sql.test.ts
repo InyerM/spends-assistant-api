@@ -24,6 +24,8 @@ async function database(): Promise<PGlite> {
     CREATE TABLE auth.users(id uuid PRIMARY KEY);
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
       SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+    CREATE FUNCTION public.has_accepted_required_terms() RETURNS boolean LANGUAGE sql STABLE AS $$
+      SELECT coalesce(nullif(current_setting('test.terms_accepted', true), ''), 'true')::boolean $$;
     CREATE TABLE public.categories(
       id uuid PRIMARY KEY, user_id uuid NOT NULL, parent_id uuid,
       name text NOT NULL, slug text NOT NULL, type text NOT NULL,
@@ -84,6 +86,12 @@ async function database(): Promise<PGlite> {
   await db.exec(
     readFileSync(
       new URL('../supabase/migrations/20261008000020_recurring_budgets.sql', import.meta.url),
+      'utf8'
+    )
+  );
+  await db.exec(
+    readFileSync(
+      new URL('../supabase/migrations/20261008000032_budget_edit_history.sql', import.meta.url),
       'utf8'
     )
   );
@@ -309,4 +317,158 @@ describe('monthly COP budgets', () => {
       await db.close();
     }
   });
+});
+
+describe('budget category editing', () => {
+  it('updates by owned ID, audits the category change, and rejects collisions without overwriting', async () => {
+    const db = await database();
+    try {
+      await asOwner(db);
+      const id = await upsert(db);
+      const edit = (category: string, limit = 600) =>
+        db.query(
+          'SELECT public.update_monthly_budget($1::uuid,$2::date,$3::uuid,$4::numeric,$5::boolean)',
+          [id, '2026-10-01', category, limit, false]
+        );
+      await expect(edit(foreignCategory)).rejects.toThrow(/category/i);
+      await expect(edit(incomeCategory)).rejects.toThrow(/category/i);
+      await expect(edit(investments)).rejects.toThrow(/categor/i);
+      await expect(edit(loans)).rejects.toThrow(/categor/i);
+      await expect(edit(dining, 12.345)).rejects.toThrow(/limit/i);
+      await expect(edit(dining, 0)).rejects.toThrow(/limit/i);
+      await asOwner(db, other);
+      await expect(edit(dining)).rejects.toThrow(/not found/i);
+      await asOwner(db);
+      await upsert(db, dining, 800);
+      await expect(edit(dining)).rejects.toThrow(/already exists/i);
+      expect((await status(db)).find((row) => row.budget_id === id)).toMatchObject({
+        category_id: food,
+        limit_cop: '500.00'
+      });
+      await db.query('SELECT public.deactivate_monthly_budget($1::uuid)', [
+        (await status(db)).find((row) => row.category_id === dining)?.budget_id
+      ]);
+      // Inactive rows still occupy a month/category and must never be silently overwritten.
+      await expect(edit(dining)).rejects.toThrow(/already exists/i);
+      await edit(food, 650);
+      expect(await status(db)).toMatchObject([{ budget_id: id, limit_cop: '650.00' }]);
+      expect((await db.query('SELECT * FROM public.monthly_budget_edits')).rows).toHaveLength(1);
+    } finally {
+      await db.close();
+    }
+  });
+  it('reassigns a category without changing transactions and keeps recurring past months', async () => {
+    const db = await database();
+    try {
+      await asOwner(db);
+      const result = await db.query<{ id: string }>(
+        "SELECT public.upsert_monthly_budget('2026-10-01',$1::uuid,500,true) AS id",
+        [food]
+      );
+      await db.query(
+        "SELECT public.update_monthly_budget($1::uuid,'2026-11-01',$2::uuid,700,true)",
+        [result.rows[0].id, dining]
+      );
+      expect(await status(db)).toMatchObject([
+        { category_id: food, limit_cop: '500.00', spent_cop: '300.00' }
+      ]);
+      expect(
+        (await db.query("SELECT * FROM public.get_monthly_budget_status('2026-11-01')")).rows
+      ).toMatchObject([{ category_id: dining, limit_cop: '700.00' }]);
+      const audit = (
+        await db.query<{
+          before_state: { category_id: string };
+          after_state: { category_id: string };
+        }>('SELECT * FROM public.monthly_budget_edits')
+      ).rows;
+      expect(audit).toHaveLength(1);
+      expect(audit[0].before_state.category_id).toBe(food);
+      expect(audit[0].after_state.category_id).toBe(dining);
+      await db.exec('RESET ROLE');
+      const ledger = await db.query(
+        'SELECT count(*)::integer AS count, sum(amount)::text AS total FROM public.transactions'
+      );
+      expect(ledger.rows[0]).toMatchObject({ count: 10, total: '5560.00' });
+    } finally {
+      await db.close();
+    }
+  });
+});
+
+it('limits previous-month comparisons to their month and preserves future recurrence after a one-month category edit', async () => {
+  const db = await database();
+  try {
+    await asOwner(db);
+    const created = await db.query<{ id: string }>(
+      "SELECT public.upsert_monthly_budget('2026-09-01',$1::uuid,500,true) AS id",
+      [food]
+    );
+    await db.query(
+      "SELECT public.update_monthly_budget($1::uuid,'2026-10-01',$2::uuid,700,false)",
+      [created.rows[0].id, dining]
+    );
+    expect(await status(db)).toMatchObject([
+      { category_id: dining, limit_cop: '700.00', spent_cop: '200.00' }
+    ]);
+    expect(
+      (await db.query("SELECT * FROM public.get_monthly_budget_status('2026-11-01')")).rows
+    ).toMatchObject([{ category_id: food, limit_cop: '500.00' }]);
+    const history = await db.query("SELECT * FROM public.get_monthly_budget_status('2026-09-01')");
+    expect(history.rows).toMatchObject([{ category_id: food, spent_cop: '0.00' }]);
+  } finally {
+    await db.close();
+  }
+});
+
+it('creates a historical limit without recurring into current months and rejects duplicate creation', async () => {
+  const db = await database();
+  try {
+    await asOwner(db);
+    const create = () =>
+      db.query("SELECT public.create_monthly_budget('2026-09-01',$1::uuid,500,false)", [food]);
+    await create();
+    await expect(create()).rejects.toThrow(/already exists/i);
+    expect(
+      (await db.query("SELECT * FROM public.get_monthly_budget_status('2026-09-01')")).rows
+    ).toMatchObject([{ spent_cop: '0.00', limit_cop: '500.00' }]);
+    expect(await status(db)).toEqual([]);
+  } finally {
+    await db.close();
+  }
+});
+
+it('requires accepted terms for status, creation, editing, and direct audit/skip reads', async () => {
+  const db = await database();
+  try {
+    await asOwner(db);
+    const created = await db.query<{ id: string }>(
+      "SELECT public.upsert_monthly_budget('2026-09-01',$1::uuid,500,true) AS id",
+      [food]
+    );
+    await db.query(
+      "SELECT public.update_monthly_budget($1::uuid,'2026-10-01',$2::uuid,700,false)",
+      [created.rows[0].id, dining]
+    );
+    expect((await db.query('SELECT * FROM public.monthly_budget_edits')).rows).toHaveLength(1);
+    expect((await db.query('SELECT * FROM public.monthly_budget_skips')).rows).toHaveLength(1);
+    await asOwner(db, other);
+    expect((await db.query('SELECT * FROM public.monthly_budget_edits')).rows).toEqual([]);
+    expect((await db.query('SELECT * FROM public.monthly_budget_skips')).rows).toEqual([]);
+    await asOwner(db);
+    await db.exec("SET test.terms_accepted = 'false'");
+    await expect(status(db)).rejects.toThrow(/terms acceptance required/i);
+    await expect(
+      db.query("SELECT public.create_monthly_budget('2026-08-01',$1::uuid,500,false)", [food])
+    ).rejects.toThrow(/terms acceptance required/i);
+    await expect(
+      db.query("SELECT public.update_monthly_budget($1::uuid,'2026-11-01',$2::uuid,700,true)", [
+        created.rows[0].id,
+        dining
+      ])
+    ).rejects.toThrow(/terms acceptance required/i);
+    expect((await db.query('SELECT * FROM public.monthly_budget_edits')).rows).toEqual([]);
+    expect((await db.query('SELECT * FROM public.monthly_budget_skips')).rows).toEqual([]);
+  } finally {
+    await db.close();
+  }
 });
