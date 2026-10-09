@@ -24,3 +24,14 @@ Therefore emailed statement PDF reconciliation is not yet available. Required im
 - Visual harness used actual components with synthetic data at 1440px and 390px: no horizontal overflow, correct public links, in-header collapse control and blocking terms dialog. This is not an authenticated owner-session browser test or a real Google signup test.
 - The previously passing authentication tests needed a ResizeObserver test double and explicit checkbox acceptance after the signup change; their six cases pass.
 - Published FAQ, privacy and terms URLs returned HTTP 200; the privacy retention anchor exists.
+
+## Production release verification
+
+- Database migrations 20261008000022 through 20261008000024 applied in one transaction (Management API HTTP 201).
+- Backend commit `eda35cf`; GitHub Actions run 37874233104 succeeded. Worker deployment reported version `3033c565-b02e-4dd7-ad72-f4aa053bd766` before the successful CI redeployment.
+- Web commits `cb4629d` and `0913140`; production alias https://my.anotto.app points to deployment `3DRZsNT9Mg9pcJUPSdLNRuTs2B7K`.
+- Landing commit `0941b72` published the saved-chat retention disclosure at https://anotto.app/privacy/ (HTTP 200, content verified).
+- Full web suite passed 164 files / 1086 tests. After the canonical session-metadata safeguard, the focused auth/guard/API suite passed 58 tests; web typecheck and scoped lint passed. Production builds passed.
+- A temporary confirmed test account proved the protected new-account flag, denied preacceptance RLS reads, real deployed web acceptance endpoint with same-origin cookies, idempotent version audit, stale-JWT database acceptance, refreshed session metadata, and deletion cascade. The account and audit were removed afterward. Admin creation's initial response omitted trigger-added metadata while subsequent getUser returned it, so client initialization preserves verified metadata over stale INITIAL_SESSION and session-returning signup rechecks getUser.
+- Live synthetic scope checks accepted a financial query and rejected an unrelated query. The upstream model returned non-JSON refusal content for an explicit override attempt; the production JSON parser fails closed before financial data retrieval. This limited check does not establish universal injection resistance.
+- Mobile Metro responded `packager-status:running` at http://192.168.68.56:8081. Native terms implementation is handled separately after the web release.
