@@ -79,3 +79,19 @@ export async function explanationFingerprint(
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
+
+/** Only classifications of errors produced by our code may reach diagnostics. */
+export function explanationFailureCode(error: unknown): string {
+  if (!(error instanceof Error)) return 'UNAVAILABLE';
+  const providerStatus = /^OpenRouter request failed \(([1-5]\d\d|0)\)$/.exec(error.message)?.[1];
+  if (providerStatus) return `PROVIDER_${providerStatus}`;
+  const known: Record<string, string> = {
+    'OpenRouter response truncated': 'PROVIDER_TRUNCATED',
+    'OpenRouter returned invalid JSON': 'PROVIDER_INVALID_JSON',
+    'OpenRouter returned no content': 'PROVIDER_EMPTY',
+    'OpenRouter API key is not configured': 'PROVIDER_UNCONFIGURED',
+    'Invalid automation explanation': 'INVALID_EXPLANATION'
+  };
+  if (error.name === 'TimeoutError' || error.name === 'AbortError') return 'TIMEOUT';
+  return known[error.message] ?? 'UNAVAILABLE';
+}

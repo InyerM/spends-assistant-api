@@ -93,3 +93,52 @@ describe('automation explanation cache', () => {
     expect(mocks.save).not.toHaveBeenCalled();
   });
 });
+
+describe('safe automation explanation diagnostics', () => {
+  it('rejects null/non-object model output with an allowlisted validation reason', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    for (const data of [null, 'unexpected', []]) {
+      mocks.complete.mockResolvedValueOnce({ data });
+      const response = await handleAutomationExplain(request(), createMockEnv());
+      expect(await response.json()).toMatchObject({
+        stage: 'validation',
+        reason: 'INVALID_EXPLANATION'
+      });
+    }
+    expect(mocks.save).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+  it('identifies cache-read failures without exposing database details or owner data', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mocks.get.mockRejectedValueOnce(new Error('API Error: private table SQL owner-token'));
+    const response = await handleAutomationExplain(request(), createMockEnv());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      code: 'AUTOMATION_EXPLANATION_UNAVAILABLE',
+      stage: 'cache_read'
+    });
+    expect(log).toHaveBeenCalledWith('[Automation explanation] Failed', {
+      stage: 'cache_read',
+      code: 'UNAVAILABLE'
+    });
+    expect(JSON.stringify(log.mock.calls)).not.toContain('owner-token');
+    expect(mocks.complete).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+  it('distinguishes provider/schema failure from a cache-write failure', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mocks.complete.mockRejectedValueOnce(new Error('OpenRouter request failed (404)'));
+    const provider = await handleAutomationExplain(request(), createMockEnv());
+    expect(await provider.json()).toMatchObject({ stage: 'generation', reason: 'PROVIDER_404' });
+    expect(log).toHaveBeenCalledWith('[Automation explanation] Failed', {
+      stage: 'generation',
+      code: 'PROVIDER_404'
+    });
+    mocks.complete.mockResolvedValueOnce({ data: { explanation: 'Private explanation' } });
+    mocks.save.mockRejectedValueOnce(new Error('Private SQL details'));
+    const storage = await handleAutomationExplain(request(), createMockEnv());
+    expect(await storage.json()).toMatchObject({ stage: 'cache_write' });
+    expect(JSON.stringify(log.mock.calls)).not.toContain('Private');
+    log.mockRestore();
+  });
+});
