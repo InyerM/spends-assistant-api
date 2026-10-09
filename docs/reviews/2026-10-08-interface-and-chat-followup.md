@@ -44,3 +44,13 @@ The inbox links each attachment to its private Document. Existing audited reconc
 - Web inbox PDF links and statement-specific actions passed alongside existing inbox review tests (28 assertions); owner-bound terms acknowledgement passed three tests. PDF parsing tests include synthetic encrypted files and bounded overflow; a local encrypted Amex statement produced four pages and 7,417 characters without external processing.
 - Mobile commit `445d6d2` adds the terms gate before sync, owner-specific acknowledgement, canonical session metadata and encrypted verified-owner offline cache. Fourteen focused tests, typecheck and scoped lint passed. Only new legal changes were committed; earlier unrelated local work remains untouched. Physical-device validation remains pending.
 - Landing commit `439e0cf` updates the factual private-PDF disclosure; 20 tests, build and lint passed.
+
+## PDF production release verification
+
+- Migrations `20261008000025` and `20261008000026` applied atomically (Management API HTTP 201). Worker commit `893b1ff` deployed as `4f26a919-b59b-494c-9c30-100bef23e137`; follow-up security-subject redaction commit `d5c5bed` passed 39 handler tests and GitHub Actions run 37876443809.
+- Web commit `3453b34` published to https://my.anotto.app; deployment `FnzAGb7NUMj2udK2V1ibWHchaxqn` is READY. Full web suite passed 166 files / 1100 tests, followed by 16 focused checks including password-to-consent/quota recovery, owner acknowledgement and encrypted PDF parsing. Production build and commit-hook ESLint/formatting passed.
+- Landing commit `439e0cf` published to https://anotto.app; deployment `Bt9xSDiXwUGpKVPeBAje4JUsCRVy` is READY. Published privacy returned HTTP 200 with the PDF and ephemeral-password disclosure.
+- A synthetic encrypted PDF passed the real MIME handler against production Supabase and private storage; repeating delivery produced exactly one inbox row and one document. This exercised the intake code and production services, not external SMTP delivery.
+- The actual published web API returned the owner-scoped PDF link, requested a password (`PDF_PASSWORD_REQUIRED`), successfully opened the synthetic encrypted fixture, then enforced financial-text consent (`AI_CONSENT_REQUIRED`, HTTP 428). No model request or financial transaction was made. Temporary accounts, rows and private objects were removed.
+- Mobile `445d6d2` is pushed and Metro remains available at http://192.168.68.56:8081. The first launch after this update needs an online canonical verification before the encrypted offline cache can be used. Physical iPhone and a real forwarded bank PDF remain user validation tasks.
+- Only the primary worktree remains in each of the four repositories; no finished auxiliary worktree required removal.
