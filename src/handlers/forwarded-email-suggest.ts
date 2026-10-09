@@ -1,3 +1,4 @@
+import { OpenRouterError } from '../ai/openrouter';
 import { suggestForwardedEmail } from '../ai/forwarded-email-suggestion';
 import { createSupabaseServices } from '../services/supabase';
 import type { Env } from '../types/env';
@@ -37,6 +38,12 @@ export async function handleForwardedEmailSuggest(request: Request, env: Env): P
   } catch (error) {
     const consentResponse = aiConsentErrorResponse(error);
     if (consentResponse) return consentResponse;
+    console.error('forwarded_email_suggestion_failed', {
+      operation: 'triage_forwarded_email',
+      model: env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
+      reason: error instanceof OpenRouterError ? error.reason : 'internal',
+      upstream_status: error instanceof OpenRouterError ? error.status : null
+    });
     return Response.json({ error: 'Email suggestion unavailable' }, { status: 503 });
   }
 }

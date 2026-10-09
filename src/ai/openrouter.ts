@@ -8,7 +8,22 @@ interface CompletionInput {
   maxOutputTokens?: number;
 }
 
+export class OpenRouterError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly reason: 'http' | 'network' | 'invalid_json' | 'empty' | 'truncated'
+  ) {
+    super(
+      reason === 'http'
+        ? `OpenRouter request failed (${status})`
+        : `OpenRouter ${reason === 'invalid_json' ? 'returned invalid JSON' : reason === 'empty' ? 'returned no content' : reason === 'truncated' ? 'response truncated' : 'network request failed'}`
+    );
+    this.name = 'OpenRouterError';
+  }
+}
+
 interface CompletionResponse {
+  error?: { code?: number };
   choices?: Array<{
     message?: { content?: string | null };
     finish_reason?: string | null;
@@ -53,35 +68,52 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
     })
   };
 
-  let response: Response | undefined;
+  // Bound total retry latency; never retain or expose an upstream error body.
+  const deadline = Date.now() + 45_000;
+  const transientStatuses = new Set([408, 429, 500, 502, 503, 504]);
+  let result: CompletionResponse | undefined;
   for (let attempt = 0; attempt < 3; attempt++) {
+    let response: Response | undefined;
+    let failure: OpenRouterError | undefined;
     try {
       response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         ...request,
-        signal: AbortSignal.timeout(30_000)
+        signal: AbortSignal.timeout(Math.max(1, Math.min(30_000, deadline - Date.now())))
       });
-    } catch (error) {
-      input.meter?.record(null);
-      throw error;
+    } catch {
+      failure = new OpenRouterError(0, 'network');
     }
-    if (response.status !== 429 || attempt === 2) break;
+    if (response) {
+      if (!response.ok) {
+        failure = new OpenRouterError(response.status, 'http');
+      } else {
+        try {
+          result = (await response.json()) as CompletionResponse;
+          if (!result || typeof result !== 'object')
+            failure = new OpenRouterError(0, 'invalid_json');
+          else if (result.error)
+            failure = new OpenRouterError(
+              Number.isInteger(result.error.code) ? result.error.code! : 502,
+              'http'
+            );
+        } catch {
+          failure = new OpenRouterError(0, 'invalid_json');
+        }
+      }
+    }
+    if (!failure && result) break;
     input.meter?.record(null);
-    await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+    const retryable = failure?.reason === 'network' || transientStatuses.has(failure?.status ?? 0);
+    const retryAfter = Number(response?.headers.get('Retry-After'));
+    const delay =
+      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 500 * (attempt + 1);
+    if (!retryable || attempt === 2 || Date.now() + delay >= deadline) {
+      throw failure ?? new OpenRouterError(0, 'network');
+    }
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    result = undefined;
   }
-
-  // Upstream responses can contain private financial text. Keep errors generic.
-  if (!response?.ok) {
-    input.meter?.record(null);
-    throw new Error(`OpenRouter request failed (${response?.status ?? 0})`);
-  }
-
-  let result: CompletionResponse;
-  try {
-    result = (await response.json()) as CompletionResponse;
-  } catch {
-    input.meter?.record(null);
-    throw new Error('OpenRouter returned invalid JSON');
-  }
+  if (!result) throw new OpenRouterError(0, 'network');
   const rawUsage = result.usage;
   input.meter?.record(
     rawUsage &&
@@ -95,14 +127,14 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
       : null
   );
   const choice = result.choices?.[0];
-  if (choice?.finish_reason === 'length') throw new Error('OpenRouter response truncated');
-  if (!choice?.message?.content) throw new Error('OpenRouter returned no content');
+  if (choice?.finish_reason === 'length') throw new OpenRouterError(0, 'truncated');
+  if (!choice?.message?.content) throw new OpenRouterError(0, 'empty');
 
   let data: T;
   try {
     data = JSON.parse(choice.message.content) as T;
   } catch {
-    throw new Error('OpenRouter returned invalid JSON');
+    throw new OpenRouterError(0, 'invalid_json');
   }
 
   const usage =

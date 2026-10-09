@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockCategory, createMockEnv } from '../__test-helpers__/factories';
 import { handleForwardedEmailSuggest } from '../../src/handlers/forwarded-email-suggest';
+import { OpenRouterError } from '../../src/ai/openrouter';
 import { AiConsentRequiredError } from '../../src/services/supabase/ai-consent.service';
 
 const mocks = vi.hoisted(() => ({
@@ -80,6 +81,25 @@ describe('forwarded email suggestion endpoint', () => {
       );
     }
     expect(mocks.suggest).not.toHaveBeenCalled();
+  });
+
+  it('logs only safe failure classification and returns a generic error', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.suggest.mockRejectedValueOnce(new OpenRouterError(503, 'http'));
+    const response = await handleForwardedEmailSuggest(
+      request('Private synthetic financial content'),
+      createMockEnv()
+    );
+    expect(response.status).toBe(503);
+    expect(log).toHaveBeenCalledWith('forwarded_email_suggestion_failed', {
+      operation: 'triage_forwarded_email',
+      model: 'deepseek/deepseek-v4.1-flash',
+      reason: 'http',
+      upstream_status: 503
+    });
+    expect(JSON.stringify(log.mock.calls)).not.toContain('Private');
+    expect(await response.json()).toEqual({ error: 'Email suggestion unavailable' });
+    log.mockRestore();
   });
 
   it('preserves the forwarded-email consent requirement', async () => {

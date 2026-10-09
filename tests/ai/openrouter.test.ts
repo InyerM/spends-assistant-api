@@ -45,6 +45,57 @@ describe('completeJson', () => {
     expect(body.usage).toEqual({ include: true });
   });
 
+  it.each([502, 503, 504])('recovers from transient upstream %s errors', async (status) => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('private', { status }))
+      .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: '{"ok":true}' } }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect(
+      (
+        await completeJson<{ ok: boolean }>({
+          apiKey: 'key',
+          model: 'model',
+          system: 's',
+          user: 'u'
+        })
+      ).data.ok
+    ).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('recovers from network failures and meters both attempts', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('private network details'))
+      .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: '{}' } }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const meter = new AiUsageMeter();
+    await completeJson({ apiKey: 'key', model: 'model', system: 's', user: 'u', meter });
+    expect(meter.summary().billedCalls).toBe(2);
+  });
+
+  it('recognizes upstream errors delivered inside a successful HTTP response', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ error: { code: 503, message: 'private' } }))
+      .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: '{}' } }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      completeJson({ apiKey: 'key', model: 'model', system: 's', user: 'u' })
+    ).resolves.toMatchObject({ data: {} });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry authorization failures', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('private', { status: 401 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      completeJson({ apiKey: 'key', model: 'model', system: 's', user: 'u' })
+    ).rejects.toThrow('(401)');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('bounds optional output capacity without changing the default', async () => {
     const fetchMock = vi
       .fn()
@@ -160,6 +211,6 @@ describe('completeJson', () => {
     await expect(
       completeJson({ apiKey: 'key', model: 'model', system: 's', user: 'u', meter })
     ).rejects.toThrow('OpenRouter request failed (500)');
-    expect(meter.summary()).toMatchObject({ billedCalls: 1, costSource: 'unknown' });
+    expect(meter.summary()).toMatchObject({ billedCalls: 3, costSource: 'unknown' });
   });
 });
