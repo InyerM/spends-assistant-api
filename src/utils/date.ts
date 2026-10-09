@@ -3,7 +3,7 @@
  */
 export function getCurrentColombiaTimes(): { date: string; time: string } {
   const now = new Date();
-  
+
   const formatter = new Intl.DateTimeFormat('es-CO', {
     timeZone: 'America/Bogota',
     year: 'numeric',
@@ -16,7 +16,7 @@ export function getCurrentColombiaTimes(): { date: string; time: string } {
 
   const parts = formatter.formatToParts(now);
   const values: Record<string, string> = {};
-  
+
   parts.forEach(({ type, value }) => {
     values[type] = value;
   });
@@ -127,4 +127,77 @@ export function validateAndFixTime(time: string | null | undefined): string | nu
   }
 
   return null;
+}
+
+/** Validate an AI-selected timestamp against an exact transaction excerpt. */
+export function validateEmailEventTime(
+  message: string,
+  date: unknown,
+  time: unknown,
+  evidence: unknown
+): string | null {
+  if (typeof date !== 'string' || typeof time !== 'string' || typeof evidence !== 'string')
+    return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
+  const normalized = (value: string) => value.replace(/\s+/gu, ' ').trim();
+  const quote = normalized(evidence);
+  if (!quote || quote.length > 600 || !normalized(message).includes(quote)) return null;
+  if (
+    !/\b(?:compra|compraste|pagaste|pago|transferiste|transferencia|recibiste|retiro|retiraste|consignaste|abono|cobro)\b/iu.test(
+      quote
+    ) ||
+    !/(?:\$|\bCOP\b|\bUSD\b)\s*\d/iu.test(quote)
+  )
+    return null;
+  if (/\b(?:horario|atenci[oó]n|soporte|copyright|factura|vencimiento)\b/iu.test(quote))
+    return null;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (
+    !Number.isFinite(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 10) !== date ||
+    !validateAndFixTime(time)
+  )
+    return null;
+  const months = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre'
+  ];
+  const dates = new Set<string>();
+  for (const match of quote.matchAll(/\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})\b/gu)) {
+    dates.add(
+      `${match[3].length === 2 ? '20' : ''}${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`
+    );
+  }
+  for (const match of quote.matchAll(/\b\d{4}-\d{2}-\d{2}\b/gu)) dates.add(match[0]);
+  for (const match of quote.matchAll(
+    /\b(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+de\s+(\d{4})\b/giu
+  )) {
+    dates.add(
+      `${match[3]}-${String(months.indexOf(match[2].toLowerCase()) + 1).padStart(2, '0')}-${match[1].padStart(2, '0')}`
+    );
+  }
+  const times = new Set<string>();
+  for (const match of quote.matchAll(/\b(\d{1,2}):(\d{2})(?::\d{2})?\s*(?:([ap])\.?\s*m\.?)?/giu)) {
+    let hour = Number(match[1]);
+    if (match[3]) {
+      if (hour < 1 || hour > 12) return null;
+      hour = (hour % 12) + (match[3].toLowerCase() === 'p' ? 12 : 0);
+    }
+    const clock = validateAndFixTime(`${String(hour).padStart(2, '0')}:${match[2]}`);
+    if (!clock) return null;
+    times.add(clock);
+  }
+  return dates.size === 1 && dates.has(date) && times.size === 1 && times.has(time)
+    ? `${date}T${time}:00-05:00`
+    : null;
 }

@@ -58,7 +58,8 @@ describe('forwarded email suggestion endpoint', () => {
       category_id: 'education-id',
       category_source: 'catalog',
       description: 'Course at CEA Practicar del Eje',
-      notes: 'Card ending 8456.'
+      notes: 'Card ending 8456.',
+      bank_event_at: null
     });
     expect(mocks.suggest).toHaveBeenCalledWith(
       expect.any(String),
@@ -68,6 +69,22 @@ describe('forwarded email suggestion endpoint', () => {
       'owner',
       expect.any(Object)
     );
+  });
+
+  it('exposes validated event time to web and native clients', async () => {
+    mocks.suggest.mockResolvedValueOnce({
+      type: 'expense',
+      categoryId: null,
+      categorySource: null,
+      description: null,
+      notes: null,
+      bankEventAt: '2026-10-02T16:31:00-05:00'
+    });
+    const response = await handleForwardedEmailSuggest(
+      request('Pago QR de $15,800 el 02/10/2026 a las 16:31.'),
+      createMockEnv()
+    );
+    expect(await response.json()).toMatchObject({ bank_event_at: '2026-10-02T16:31:00-05:00' });
   });
 
   it('requires authentication and bounded email text', async () => {

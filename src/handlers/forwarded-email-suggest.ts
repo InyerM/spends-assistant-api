@@ -33,7 +33,8 @@ export async function handleForwardedEmailSuggest(request: Request, env: Env): P
       category_id: suggestion.categoryId,
       category_source: suggestion.categorySource,
       description: suggestion.description,
-      notes: suggestion.notes
+      notes: suggestion.notes,
+      bank_event_at: suggestion.bankEventAt ?? null
     });
   } catch (error) {
     const consentResponse = aiConsentErrorResponse(error);

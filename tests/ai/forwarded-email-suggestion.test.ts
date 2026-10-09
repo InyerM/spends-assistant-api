@@ -50,7 +50,8 @@ describe('forwarded email suggestions', () => {
       categoryId: 'education-id',
       categorySource: 'catalog',
       description: 'Curso en CEA Practicar del Eje',
-      notes: 'Compra con tarjeta terminada en 8456; verificar en el extracto.'
+      notes: 'Compra con tarjeta terminada en 8456; verificar en el extracto.',
+      bankEventAt: null
     });
     expect(usage.track).toHaveBeenCalledWith(
       expect.objectContaining({ operation: 'triage_forwarded_email' }),
@@ -100,5 +101,90 @@ describe('forwarded email suggestions', () => {
         usage as never
       )
     ).toMatchObject({ categoryId: 'education-id', categorySource: 'catalog' });
+  });
+  it('recovers explicit event time from an unfamiliar bank notice independently of category confidence', async () => {
+    const evidence = 'Pago QR de $15,800 completado el 02/10/2026 a las 4:31 p.m.';
+    completeJson.mockResolvedValueOnce({
+      data: {
+        type: 'expense',
+        confidence: 0.2,
+        category_slug: null,
+        event_date: '2026-10-02',
+        event_time: '16:31',
+        event_time_evidence: evidence
+      }
+    });
+    const result = await suggestForwardedEmail(
+      evidence,
+      categories,
+      'key',
+      'model',
+      'owner',
+      usage as never
+    );
+    expect(result).toMatchObject({ bankEventAt: '2026-10-02T16:31:00-05:00', categoryId: null });
+    expect(completeJson).toHaveBeenLastCalledWith(
+      expect.objectContaining({ system: expect.stringContaining('event_time_evidence') })
+    );
+  });
+
+  it.each([
+    [
+      'invented quotation',
+      'Pago QR de $15,800 el 02/10/2026 a las 16:31.',
+      'Pago QR de $15,800 el 02/10/2026 a las 18:00.',
+      '2026-10-02',
+      '18:00'
+    ],
+    [
+      'wrong time',
+      'Pago QR de $15,800 el 02/10/2026 a las 16:31.',
+      'Pago QR de $15,800 el 02/10/2026 a las 16:31.',
+      '2026-10-02',
+      '18:00'
+    ],
+    [
+      'wrong date',
+      'Pago QR de $15,800 el 02/10/2026 a las 16:31.',
+      'Pago QR de $15,800 el 02/10/2026 a las 16:31.',
+      '2026-10-03',
+      '16:31'
+    ],
+    [
+      'invalid date',
+      'Pago QR de $15,800 el 30/02/2026 a las 16:31.',
+      'Pago QR de $15,800 el 30/02/2026 a las 16:31.',
+      '2026-02-30',
+      '16:31'
+    ],
+    [
+      'email header',
+      'Date: 02/10/2026 16:31. Compra pendiente.',
+      'Date: 02/10/2026 16:31.',
+      '2026-10-02',
+      '16:31'
+    ],
+    [
+      'footer time',
+      'Compra pendiente. Horario de atención: 02/10/2026 16:31.',
+      'Horario de atención: 02/10/2026 16:31.',
+      '2026-10-02',
+      '16:31'
+    ],
+    [
+      'ambiguous clocks',
+      'Pago QR de $15,800 el 02/10/2026 a las 16:31 o 18:00.',
+      'Pago QR de $15,800 el 02/10/2026 a las 16:31 o 18:00.',
+      '2026-10-02',
+      '16:31'
+    ]
+  ])('rejects unsupported event time: %s', async (_name, message, evidence, date, time) => {
+    completeJson.mockResolvedValueOnce({
+      data: { type: 'expense', event_date: date, event_time: time, event_time_evidence: evidence }
+    });
+    expect(
+      (await suggestForwardedEmail(message, categories, 'key', 'model', 'owner', usage as never))
+        .bankEventAt
+    ).toBeNull();
   });
 });
