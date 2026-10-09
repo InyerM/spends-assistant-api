@@ -7,7 +7,7 @@ interface ChatSource {
 export function validateChatAnswer(
   value: unknown,
   sources: ChatSource[]
-): { answer: string; citations: string[] } {
+): { answer: string; citations: string[]; insufficientContext?: true } {
   if (!value || typeof value !== 'object') throw new Error('Invalid grounded response');
   const data = value as Record<string, unknown>;
   if (
@@ -19,7 +19,6 @@ export function validateChatAnswer(
     data.citations.some(
       (id) => typeof id !== 'string' || !sources.some((source) => source.id === id)
     ) ||
-    (sources.length > 0 && data.citations.length === 0) ||
     /https?:\/\/|\]\(/i.test(data.answer)
   ) {
     throw new Error('Invalid grounded response');
@@ -43,6 +42,17 @@ export function validateChatAnswer(
     ];
     if (!candidates.some((number) => knownNumbers.has(number)))
       throw new Error('Unsupported numerical claim');
+  }
+  const currencies = new Set(cited.map((source) => source.record.currency));
+  for (const currency of data.answer.match(/\b(?:COP|USD|EUR|GBP|USDT|BTC)\b/g) ?? []) {
+    if (!currencies.has(currency)) throw new Error('Unsupported currency claim');
+  }
+  if (data.citations.length === 0) {
+    return {
+      answer: 'There is not enough verified context to answer this question.',
+      citations: [],
+      insufficientContext: true
+    };
   }
   const recommendation =
     /(?:should|recommend|suggest|deber[ií]as?|recomiendo|sugiero).{0,35}(?:buy|sell|hold|comprar|vender|mantener).{0,80}(?:stock|share|securit|bond|ETF|crypto|acci[oó]n|acciones|bono)/iu;

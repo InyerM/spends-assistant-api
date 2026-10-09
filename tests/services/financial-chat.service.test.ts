@@ -18,6 +18,7 @@ describe('bounded owner-scoped financial snapshot', () => {
         expect(params.get('deleted_at')).toBe('is.null');
         expect(params.get('duplicate_status')).toBe('is.null');
       }
+      if (url.includes('/accounts?')) expect(params.get('deleted_at')).toBe('is.null');
       if (url.includes('/documents?')) expect(params.get('archived_at')).toBe('is.null');
     }
   });

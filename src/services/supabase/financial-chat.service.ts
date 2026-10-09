@@ -29,6 +29,7 @@ export class FinancialChatService extends BaseService {
       ...owner,
       select: 'id,name,type,currency,balance',
       is_active: 'eq.true',
+      deleted_at: 'is.null',
       order: 'id',
       limit: '51'
     });

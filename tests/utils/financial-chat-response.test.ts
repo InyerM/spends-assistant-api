@@ -49,6 +49,16 @@ describe('grounded financial chat validation', () => {
       expect(() => validateChatAnswer({ answer, citations: ['transaction:a'] }, sources)).toThrow();
     }
   });
+  it('returns an explicit context gap instead of a model claim without sources', () => {
+    expect(
+      validateChatAnswer({ answer: 'I cannot find your loan.', citations: [] }, sources)
+    ).toMatchObject({ insufficientContext: true, citations: [] });
+  });
+  it('rejects a currency that does not occur in cited records', () => {
+    expect(() =>
+      validateChatAnswer({ answer: 'You spent 42 USD', citations: ['transaction:a'] }, sources)
+    ).toThrow();
+  });
   it('does not accept numbers when no records exist', () => {
     expect(() => validateChatAnswer({ answer: 'You spent 42 COP', citations: [] }, [])).toThrow();
   });

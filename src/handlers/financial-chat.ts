@@ -64,7 +64,7 @@ export async function handleFinancialChat(request: Request, env: Env): Promise<R
       })),
       ...snapshot.documents.map((record) => ({
         id: `document:${record.id}`,
-        href: `/documents/${encodeURIComponent(record.id)}`,
+        href: `/documents#document-${encodeURIComponent(record.id)}`,
         record
       }))
     ];
@@ -92,6 +92,7 @@ Answer in the question's language. Do not include URLs or Markdown links; source
         const validated = validateChatAnswer(data, sources);
         return {
           answer: validated.answer,
+          insufficientContext: validated.insufficientContext === true,
           citations: sources.filter((source) => validated.citations.includes(source.id))
         };
       }

@@ -11,7 +11,9 @@ describe('read-only financial chat', () => {
       headers: auth ? { Authorization: `Bearer ${env.API_KEY}` } : {},
       body: JSON.stringify(body)
     });
-  function mock(options: { consent?: boolean; quota?: boolean; citations?: string[] } = {}) {
+  function mock(
+    options: { consent?: boolean; quota?: boolean; citations?: string[]; documents?: boolean } = {}
+  ) {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.includes('ai_consent_decisions'))
         return Response.json(
@@ -42,7 +44,12 @@ describe('read-only financial chat', () => {
         ]);
       if (url.includes('/accounts?'))
         return Response.json([{ id: 'account-one', name: 'Cash', currency: 'COP', balance: 100 }]);
-      if (url.includes('/documents?')) return Response.json([]);
+      if (url.includes('/documents?'))
+        return Response.json(
+          options.documents
+            ? [{ id: 'doc-one', status: 'extracted', document_type: 'receipt' }]
+            : []
+        );
       if (url.includes('openrouter.ai'))
         return Response.json({
           choices: [
@@ -123,6 +130,14 @@ describe('read-only financial chat', () => {
     expect(JSON.parse(String(event[1]?.body))).toMatchObject({ operation: 'financial_chat' });
     expect(String(event[1]?.body)).not.toContain('Lunch');
   });
+  it('links document citations to the actual document list anchor', async () => {
+    mock({ documents: true, citations: ['document:doc-one'] });
+    const response = await handleFinancialChat(request(body), env);
+    expect(await response.json()).toMatchObject({
+      citations: [{ href: '/documents#document-doc-one' }]
+    });
+  });
+
   it('rejects citations outside the owner snapshot', async () => {
     mock({ citations: ['transaction:other-owner'] });
     expect((await handleFinancialChat(request(body), env)).status).toBe(502);
