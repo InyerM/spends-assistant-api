@@ -11,7 +11,7 @@
 
 ## Delivery audit
 
-The Gmail filter `{bancolombia from:notificaciones@lulobank.com}` was queried for October 6–9, 2026. All 36 returned RFC message identities were present in the owner's imported inbox: **36 matched, zero missing**. Current routing evidence contained 40 events with no GraphQL errors; the latest observed event was October 9 at 12:15:12 UTC. Raw messages, identifiers, credentials, and personal exports are intentionally excluded from this report.
+Gmail was queried with `{bancolombia from:notificaciones@lulobank.com} after:2026/10/05 before:2026/10/10`. All 36 returned RFC message identities were present in the owner's imported inbox: **36 matched, zero missing**. Current routing evidence contained 40 events with no GraphQL errors; the latest observed event was October 9 at 12:15:12 UTC. Raw messages, identifiers, credentials, and personal exports are intentionally excluded from this report.
 
 The previous September/October recovery remains documented in `2026-10-08-mail-review-notifications-release.md`: 209 matching messages, 38 existing, and 171 recovered. Gmail filter execution history was unavailable, so an exact historical delivery failure cause has not been proved.
 
