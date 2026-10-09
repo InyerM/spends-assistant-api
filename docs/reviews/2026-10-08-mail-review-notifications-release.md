@@ -89,6 +89,14 @@ Cloudflare enabled the receiving subdomain and three public MX records. The zone
 to the existing Worker. The explicit support forwarding rule was compared before/after and is
 unchanged. Existing user route addresses are retained; only newly created routes use Anotto.
 
+Production synthetic route smoke: POST returned HTTP 201 with the Anotto receiving domain and
+a 56-character local part; DELETE returned HTTP 204 and GET confirmed removal. The existing
+owner route was compared before/after: its legacy-domain address hash, creation date and both
+confirmation timestamps were unchanged. No email was sent; the temporary account was deleted.
+
+Code release commits: backend `174f918`, web `84f92df`. Backend workflow:
+https://github.com/InyerM/spends-assistant-api/actions/runs/37883110166.
+
 ## Remaining boundary
 
 Native notification UI and native visual validation are separate from the web release. No claim of
