@@ -754,6 +754,26 @@ describe('forwarded PDF intake', () => {
     await handleForwardedEmail(statementMessage(), { ...env, EMAIL_PDF_INTAKE_READY: 'true' });
     expect(attachments.store).toHaveBeenCalledOnce();
   });
+  it('omits security-code subjects even when a PDF is attached', async () => {
+    const raw = [
+      'Subject: Tu código de seguridad 123456',
+      'Content-Type: multipart/mixed; boundary="pdf"',
+      '',
+      '--pdf',
+      'Content-Type: text/plain',
+      '',
+      'Private notice',
+      '--pdf',
+      'Content-Type: application/pdf',
+      'Content-Disposition: attachment; filename="statement.pdf"',
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from('%PDF-1.7\nstatement').toString('base64'),
+      '--pdf--'
+    ].join('\r\n');
+    await handleForwardedEmail(email(raw), { ...env, EMAIL_PDF_INTAKE_READY: 'true' });
+    expect(inbox.createForwardedPending.mock.calls[0][0].rawText).not.toContain('123456');
+  });
   it('never auto-posts a purchase-like message containing a PDF', async () => {
     const send = vi.fn();
     await handleForwardedEmail(

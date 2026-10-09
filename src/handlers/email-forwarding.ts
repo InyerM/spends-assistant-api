@@ -1,7 +1,7 @@
 import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
-import { emailFingerprint, inboxText, parseForwardedEmail } from '../utils/email-mime';
+import { emailFingerprint, parseForwardedEmail } from '../utils/email-mime';
 import { triageForwardedEmail } from '../ai/email-triage';
 import { extractForwardedPurchase } from '../ai/forwarded-purchase';
 
@@ -142,22 +142,17 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
     return;
   }
 
-  const triage = hasPdf
-    ? {
-        triageStatus: 'pending' as const,
-        rawText: inboxText({
-          ...parsed,
-          text: 'PDF attachment received. Review the private document before posting.'
-        })
-      }
-    : await triageForwardedEmail(
-        parsed,
-        env.OPENROUTER_API_KEY,
-        env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
-        route.user_id,
-        services.aiUsage,
-        !!route.confirmation_received_at && !!route.user_confirmed_at
-      );
+  const triage = await triageForwardedEmail(
+    hasPdf
+      ? { ...parsed, text: 'PDF attachment received. Review the private document before posting.' }
+      : parsed,
+    env.OPENROUTER_API_KEY,
+    env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
+    route.user_id,
+    services.aiUsage,
+    !hasPdf && !!route.confirmation_received_at && !!route.user_confirmed_at
+  );
+  if (hasPdf) triage.triageStatus = 'pending';
   const receivedAt = new Date().toISOString();
   const externalId = await emailFingerprint(parsed);
   const write = await services.shortcutInbox.createForwardedPending({
