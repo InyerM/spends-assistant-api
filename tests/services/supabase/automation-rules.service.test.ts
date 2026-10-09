@@ -389,3 +389,23 @@ describe('AutomationRulesService', () => {
     });
   });
 });
+
+describe('automation explanation service', () => {
+  it('reads only the requested owner/fingerprint/language and stores using the same unique key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json([{ explanation: 'Cached summary' }]));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new AutomationRulesService(URL, KEY);
+    expect(await service.getExplanation('owner', 'a'.repeat(64), 'es')).toBe('Cached summary');
+    const readUrl = new globalThis.URL(String(fetchMock.mock.calls[0][0]));
+    expect(readUrl.searchParams.get('user_id')).toBe('eq.owner');
+    expect(readUrl.searchParams.get('locale')).toBe('eq.es');
+    expect(readUrl.searchParams.get('fingerprint')).toBe(`eq.${'a'.repeat(64)}`);
+    fetchMock.mockResolvedValueOnce(Response.json([]));
+    await service.saveExplanation('owner', 'a'.repeat(64), 'es', 'New summary');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+      user_id: 'owner',
+      locale: 'es',
+      explanation: 'New summary'
+    });
+  });
+});

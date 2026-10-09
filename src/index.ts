@@ -13,6 +13,7 @@ import { handleVisionExtract } from './handlers/vision-extract';
 import { handleMerchantSuggest } from './handlers/merchant-suggest';
 import { handleForwardedEmailSuggest } from './handlers/forwarded-email-suggest';
 import { handleBalance } from './handlers/balance';
+import { handleAutomationExplain } from './handlers/automation-explain';
 import { handleAutomationGenerate } from './handlers/automation-generate';
 import { handleAiConsent } from './handlers/ai-consent';
 import { createSupabaseServices } from './services/supabase';
@@ -115,6 +116,10 @@ export default {
     }
 
     // Automation rule generation (AI preview, no save)
+    if (url.pathname === '/automation/explain' && request.method === 'POST') {
+      return handleAutomationExplain(request, env);
+    }
+
     if (url.pathname === '/automation/generate' && request.method === 'POST') {
       return handleAutomationGenerate(request, env);
     }

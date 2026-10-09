@@ -20,6 +20,40 @@ export interface CreateRuleInput {
 }
 
 export class AutomationRulesService extends BaseService {
+  async getExplanation(
+    userId: string,
+    fingerprint: string,
+    locale: string
+  ): Promise<string | null> {
+    const params = new URLSearchParams({
+      user_id: `eq.${userId}`,
+      fingerprint: `eq.${fingerprint}`,
+      locale: `eq.${locale}`,
+      select: 'explanation',
+      limit: '1'
+    });
+    const rows = await this.fetch<{ explanation: string }[]>(
+      `/rest/v1/automation_rule_explanations?${params}`
+    );
+    return rows[0]?.explanation ?? null;
+  }
+
+  async saveExplanation(
+    userId: string,
+    fingerprint: string,
+    locale: string,
+    explanation: string
+  ): Promise<void> {
+    await this.fetch(
+      '/rest/v1/automation_rule_explanations?on_conflict=user_id,fingerprint,locale',
+      {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify({ user_id: userId, fingerprint, locale, explanation })
+      }
+    );
+  }
+
   async getAutomationRules(userId?: string): Promise<AutomationRule[]> {
     const userFilter = userId ? `&user_id=eq.${userId}` : '';
     return await this.fetch<AutomationRule[]>(
