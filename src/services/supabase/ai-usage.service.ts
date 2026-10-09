@@ -6,6 +6,7 @@ import { AiConsentUnavailableError } from './ai-consent.service';
 export interface TrackAiUsageParams {
   userId: string;
   operation:
+    | 'financial_chat'
     | 'parse_expense'
     | 'generate_automation'
     | 'extract_document'

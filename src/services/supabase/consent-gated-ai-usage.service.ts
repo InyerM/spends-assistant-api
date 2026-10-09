@@ -7,6 +7,7 @@ interface ConsentChecker {
 }
 
 const OPERATION_SCOPE: Record<TrackAiUsageParams['operation'], AiConsentScope> = {
+  financial_chat: 'financial_text',
   parse_expense: 'financial_text',
   generate_automation: 'financial_text',
   extract_document: 'document_images',

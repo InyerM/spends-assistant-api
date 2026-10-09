@@ -1,3 +1,4 @@
+import { handleFinancialChat } from './handlers/financial-chat';
 import {
   handleQueuedForwardedEmail,
   handleScheduledForwardedEmails
@@ -81,6 +82,10 @@ export default {
 
     if (url.pathname === '/ai/consent') {
       return handleAiConsent(request, env);
+    }
+
+    if (url.pathname === '/financial/chat' && request.method === 'POST') {
+      return handleFinancialChat(request, env);
     }
 
     // Parse API (parse only, no save)
