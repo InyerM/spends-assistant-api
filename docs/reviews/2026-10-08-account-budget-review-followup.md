@@ -22,6 +22,13 @@ The owner requested independent sidebar groups, exact account balance targets wi
 - Production migrations 20261008000031, 20261008000032, and 20261008000033 applied through reviewed management queries on October 8, 2026 (Bogota).
 - Production synthetic account smoke: exact target/difference, request replay, manual target without a transaction, budget ID/category editing and month isolation, active email metadata editing, financial-edit rejection, unchanged balance, and complete temporary-user cleanup passed.
 
+## Publication and visual review
+
+- Backend code commit: `0df9b29`; CI succeeded at https://github.com/InyerM/spends-assistant-api/actions/runs/37884939998.
+- Web release: `2702f02` plus accessible account-action label `d11ba66`; https://my.anotto.app resolves to ready production deployment `dpl_ARTKtssuqrkVRNbZTgKjP64GimjE`.
+- Native source commit: `4ce07de`; this is a development-client update, not an App Store release.
+- Independent bounded UI review recorded eight screenshot/DOM checks across 1440 px and 390 px, with no blocking observed defects. Long-filename truncation was reviewed in source; the origin screenshot and lower mobile email form were not fully visually inspected. All temporary review users were removed.
+
 ## Remaining validation
 
 - Physical iPhone: offline target queue, reconnect/retry, and local schema upgrade. Native document/inbox and budget screens are absent in this checkout; this release does not claim those native modules exist.
