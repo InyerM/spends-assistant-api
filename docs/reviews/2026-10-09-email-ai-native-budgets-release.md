@@ -28,3 +28,12 @@ The owner's AI consents were granted. Today's telemetry contained 13 successful 
 ## Physical-device checks remaining
 
 Review an email on the iPhone; edit a suggested field before analysis finishes and verify the edit survives. Open More → Budgets, create a limit offline, reconnect, and edit the still-open record. Change category/recurrence, inspect a historical month, open a contributing transaction, and navigate back. No device reinstall or local-data reset is required for these JavaScript changes.
+
+## Published release and live verification
+
+- Backend feature commit: `709959d`; diagnostic follow-up: `ae28043`. GitHub deployment runs `37958888798` and `37959899547` completed successfully.
+- Web commit: `69d1147`. Vercel deployment `dpl_AWUXdk5eRhkoLyytFZvkPbMN6LVs` is Ready and aliased to `https://my.anotto.app`; the login page returned HTTP 200.
+- Native commit: `58e0351`, pushed to main. Metro restarted with a cleared bundler cache on `http://192.168.68.56:8081`. The iOS bundle returned HTTP 200 and included the new review and budget modules; the temporary bundle was deleted. The installed development client was launched with the current server URL and accepted a subsequent reload command. Visual confirmation on the physical device remains a user check.
+- An uncached production explanation initially returned HTTP 503. A seeded production cache read and a real-database/consent/cache-write isolation with intercepted model output both returned 200, isolating that failure to generation rather than account access or cache permissions. Diagnostics now expose only allowlisted stages/reasons; prompts and provider/DB payloads are never logged.
+- The final real production test returned HTTP 200 with a 543-character explanation; its identical second request returned HTTP 200 with `cached:true`. The exact initial generation failure was not reproduced, so its cause remains unproved.
+- The live native-budget RPC created a temporary owner's budget and replayed the same command with the same budget ID and `replayed:true`. All temporary users were deleted after testing; no owner transactions were posted or changed.
