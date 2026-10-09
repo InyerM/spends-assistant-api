@@ -45,6 +45,27 @@ describe('completeJson', () => {
     expect(body.usage).toEqual({ include: true });
   });
 
+  it('bounds optional output capacity without changing the default', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ choices: [{ message: { content: '{}' }, finish_reason: 'stop' }] })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    for (const limit of [0, 8193, 128.5])
+      await expect(
+        completeJson({
+          apiKey: 'key',
+          model: 'model',
+          system: 's',
+          user: 'u',
+          maxOutputTokens: limit
+        })
+      ).rejects.toThrow('Invalid output token limit');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await completeJson({ apiKey: 'key', model: 'model', system: 's', user: 'u' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).max_tokens).toBe(2048);
+  });
   it('does not log or echo the financial input on an upstream error', async () => {
     vi.stubGlobal(
       'fetch',

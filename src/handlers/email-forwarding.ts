@@ -1,7 +1,7 @@
 import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
-import { emailFingerprint, parseForwardedEmail } from '../utils/email-mime';
+import { emailFingerprint, inboxText, parseForwardedEmail } from '../utils/email-mime';
 import { triageForwardedEmail } from '../ai/email-triage';
 import { extractForwardedPurchase } from '../ai/forwarded-purchase';
 
@@ -83,10 +83,11 @@ export async function handleEmailForwardingRoute(request: Request, env: Env): Pr
 
 export async function handleForwardedEmail(message: IncomingEmail, env: Env): Promise<void> {
   const recipient = message.to.toLowerCase();
+  const maxMimeBytes = env.EMAIL_PDF_INTAKE_READY === 'true' ? 8 * 1024 * 1024 : MAX_MIME_BYTES;
   if (
     !validDomain(env.EMAIL_FORWARDING_DOMAIN) ||
     !recipient.endsWith(`@${env.EMAIL_FORWARDING_DOMAIN}`) ||
-    message.rawSize > MAX_MIME_BYTES
+    message.rawSize > maxMimeBytes
   ) {
     message.setReject('Invalid forwarding destination or message size');
     return;
@@ -100,12 +101,29 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
   }
 
   const raw = await new Response(message.raw).arrayBuffer();
-  if (raw.byteLength > MAX_MIME_BYTES) {
+  if (raw.byteLength > maxMimeBytes) {
     message.setReject('Message too large');
     return;
   }
-  const parsed = await parseForwardedEmail(raw);
-  if (!parsed.text) {
+  let parsed;
+  try {
+    parsed = await parseForwardedEmail(raw);
+  } catch {
+    message.setReject('Invalid MIME or PDF attachment limits exceeded');
+    return;
+  }
+  const pdfAttachments = parsed.pdfAttachments ?? [];
+  const hasPdf = pdfAttachments.length > 0;
+  if (
+    hasPdf &&
+    (env.EMAIL_PDF_INTAKE_READY !== 'true' ||
+      !route.confirmation_received_at ||
+      !route.user_confirmed_at)
+  ) {
+    message.setReject('PDF intake requires verified forwarding');
+    return;
+  }
+  if (!parsed.text && !hasPdf) {
     message.setReject('Message has no readable text');
     return;
   }
@@ -124,14 +142,22 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
     return;
   }
 
-  const triage = await triageForwardedEmail(
-    parsed,
-    env.OPENROUTER_API_KEY,
-    env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
-    route.user_id,
-    services.aiUsage,
-    !!route.confirmation_received_at && !!route.user_confirmed_at
-  );
+  const triage = hasPdf
+    ? {
+        triageStatus: 'pending' as const,
+        rawText: inboxText({
+          ...parsed,
+          text: 'PDF attachment received. Review the private document before posting.'
+        })
+      }
+    : await triageForwardedEmail(
+        parsed,
+        env.OPENROUTER_API_KEY,
+        env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
+        route.user_id,
+        services.aiUsage,
+        !!route.confirmation_received_at && !!route.user_confirmed_at
+      );
   const receivedAt = new Date().toISOString();
   const externalId = await emailFingerprint(parsed);
   const write = await services.shortcutInbox.createForwardedPending({
@@ -142,6 +168,17 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
     rawText: triage.rawText,
     triageStatus: triage.triageStatus
   });
+  if (hasPdf) {
+    for (const attachment of pdfAttachments) {
+      await services.emailAttachments.store({
+        userId: route.user_id,
+        inboxItemId: write.id,
+        externalId,
+        attachment
+      });
+    }
+    return;
+  }
   const cutoff = Date.parse(env.EMAIL_AUTO_POST_AFTER ?? '');
   if (
     !write.created ||

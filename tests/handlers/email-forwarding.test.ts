@@ -5,27 +5,38 @@ import {
 } from '../../src/handlers/email-forwarding';
 import { createMockEnv } from '../__test-helpers__/factories';
 
-const { routes, inbox, aiUsage, completeJson, resolveUserId, accounts, categories, autoPost } =
-  vi.hoisted(() => ({
-    routes: {
-      getForUser: vi.fn(),
-      createForUser: vi.fn(),
-      deleteForUser: vi.fn(),
-      getByAddress: vi.fn(),
-      recordConfirmation: vi.fn(),
-      acknowledgeVerification: vi.fn()
-    },
-    inbox: { createForwardedPending: vi.fn() },
-    accounts: { getAccounts: vi.fn() },
-    categories: { getCategories: vi.fn() },
-    autoPost: { post: vi.fn() },
-    aiUsage: { track: vi.fn() },
-    completeJson: vi.fn(),
-    resolveUserId: vi.fn()
-  }));
+const {
+  attachments,
+  routes,
+  inbox,
+  aiUsage,
+  completeJson,
+  resolveUserId,
+  accounts,
+  categories,
+  autoPost
+} = vi.hoisted(() => ({
+  attachments: { store: vi.fn() },
+  routes: {
+    getForUser: vi.fn(),
+    createForUser: vi.fn(),
+    deleteForUser: vi.fn(),
+    getByAddress: vi.fn(),
+    recordConfirmation: vi.fn(),
+    acknowledgeVerification: vi.fn()
+  },
+  inbox: { createForwardedPending: vi.fn() },
+  accounts: { getAccounts: vi.fn() },
+  categories: { getCategories: vi.fn() },
+  autoPost: { post: vi.fn() },
+  aiUsage: { track: vi.fn() },
+  completeJson: vi.fn(),
+  resolveUserId: vi.fn()
+}));
 
 vi.mock('../../src/services/supabase', () => ({
   createSupabaseServices: () => ({
+    emailAttachments: attachments,
     forwardingRoutes: routes,
     shortcutInbox: inbox,
     accounts,
@@ -668,5 +679,95 @@ describe('email forwarding', () => {
     await handleForwardedEmail(message, env);
     expect(message.rejected).toBe(false);
     expect(inbox.createForwardedPending).toHaveBeenCalledOnce();
+  });
+});
+
+function statementMessage(body = 'Your statement is attached.') {
+  return email(
+    [
+      'Message-ID: <statement@bank.test>',
+      'Subject: Bank statement',
+      'Content-Type: multipart/mixed; boundary="pdf"',
+      '',
+      '--pdf',
+      'Content-Type: text/plain',
+      '',
+      body,
+      '--pdf',
+      'Content-Type: application/pdf',
+      'Content-Disposition: attachment; filename="statement.pdf"',
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from('%PDF-1.7\nstatement').toString('base64'),
+      '--pdf--'
+    ].join('\r\n'),
+    address,
+    'bank@bank.test'
+  );
+}
+
+describe('forwarded PDF intake', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    routes.getByAddress.mockResolvedValue({
+      user_id: 'owner-id',
+      address,
+      confirmation_received_at: '2026-10-03T16:45:00Z',
+      user_confirmed_at: '2026-10-03T17:00:00Z'
+    });
+    inbox.createForwardedPending.mockResolvedValue({
+      id: 'inbox-id',
+      status: 'pending',
+      created: true
+    });
+    attachments.store.mockResolvedValue({ id: 'document-id' });
+  });
+  it('stores attachments only after owner verification and keeps statement evidence pending', async () => {
+    const message = statementMessage();
+    await handleForwardedEmail(message, { ...env, EMAIL_PDF_INTAKE_READY: 'true' });
+    expect(message.rejected).toBe(false);
+    expect(attachments.store).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'owner-id',
+        inboxItemId: 'inbox-id',
+        attachment: expect.objectContaining({ fileName: 'statement.pdf' })
+      })
+    );
+    expect(inbox.createForwardedPending).toHaveBeenCalledWith(
+      expect.objectContaining({ triageStatus: 'pending' })
+    );
+    expect(completeJson).not.toHaveBeenCalled();
+  });
+  it('rejects a PDF before verification instead of retaining private bytes', async () => {
+    routes.getByAddress.mockResolvedValue({ user_id: 'owner-id', address });
+    const message = statementMessage();
+    await handleForwardedEmail(message, { ...env, EMAIL_PDF_INTAKE_READY: 'true' });
+    expect(message.rejected).toBe(true);
+    expect(attachments.store).not.toHaveBeenCalled();
+  });
+  it('retries attachment storage for a previously captured inbox item', async () => {
+    inbox.createForwardedPending.mockResolvedValue({
+      id: 'inbox-id',
+      status: 'pending',
+      created: false
+    });
+    await handleForwardedEmail(statementMessage(), { ...env, EMAIL_PDF_INTAKE_READY: 'true' });
+    expect(attachments.store).toHaveBeenCalledOnce();
+  });
+  it('never auto-posts a purchase-like message containing a PDF', async () => {
+    const send = vi.fn();
+    await handleForwardedEmail(
+      statementMessage(
+        'Realizaste una compra en STORE por $18,000\nOrigen tarjeta de crédito •8456\nFecha 5 de octubre de 2026\nHora 8:59 p.m.'
+      ),
+      {
+        ...env,
+        EMAIL_PDF_INTAKE_READY: 'true',
+        EMAIL_AUTO_POST_READY: 'true',
+        EMAIL_AUTO_POST_AFTER: '2020-01-01',
+        EMAIL_AUTH_QUEUE: { send } as unknown as Queue
+      }
+    );
+    expect(send).not.toHaveBeenCalled();
   });
 });

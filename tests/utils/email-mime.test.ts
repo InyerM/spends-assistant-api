@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseForwardedEmail } from '../../src/utils/email-mime';
+import { emailFingerprint, parseForwardedEmail } from '../../src/utils/email-mime';
 
 describe('forwarded MIME parsing', () => {
   it('keeps a Gmail confirmation link from an HTML-only message', async () => {
@@ -58,5 +58,50 @@ describe('forwarded MIME parsing', () => {
     const result = await parseForwardedEmail(new TextEncoder().encode(raw).buffer);
     expect(result.text).toContain('crédito •8456');
     expect(result.text).toContain('Bogotá, Colombia. © 2026');
+  });
+});
+
+function pdfMessage(content: string, name = 'statement.pdf', type = 'application/pdf') {
+  return new TextEncoder().encode(
+    [
+      'Subject: Statement',
+      'Content-Type: multipart/mixed; boundary="pdf"',
+      '',
+      '--pdf',
+      'Content-Type: text/plain',
+      '',
+      'Your statement is attached.',
+      '--pdf',
+      `Content-Type: ${type}`,
+      `Content-Disposition: attachment; filename="${name}"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from(content).toString('base64'),
+      '--pdf--'
+    ].join('\r\n')
+  ).buffer;
+}
+
+describe('PDF email evidence', () => {
+  it('separates a bounded PDF from the readable mail body', async () => {
+    const parsed = await parseForwardedEmail(pdfMessage('%PDF-1.7\nprivate statement'));
+    expect(parsed.pdfAttachments).toHaveLength(1);
+    expect(parsed.pdfAttachments?.[0].fileName).toBe('statement.pdf');
+    expect(parsed.text).not.toContain('private statement');
+    expect(parsed.text).toBe('Your statement is attached.');
+  });
+  it('ignores a forged PDF extension without a PDF signature', async () => {
+    const parsed = await parseForwardedEmail(pdfMessage('not a PDF'));
+    expect(parsed.pdfAttachments).toEqual([]);
+  });
+  it('rejects a PDF above the private bucket size limit', async () => {
+    await expect(
+      parseForwardedEmail(pdfMessage('%PDF-' + 'x'.repeat(5 * 1024 * 1024)))
+    ).rejects.toThrow('PDF attachment too large');
+  });
+  it('distinguishes attachments in fallback fingerprints without a message ID', async () => {
+    const first = await parseForwardedEmail(pdfMessage('%PDF-1.7\nfirst'));
+    const second = await parseForwardedEmail(pdfMessage('%PDF-1.7\nsecond'));
+    expect(await emailFingerprint(first)).not.toBe(await emailFingerprint(second));
   });
 });

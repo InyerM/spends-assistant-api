@@ -39,7 +39,13 @@ function decodeHtmlEntities(value: string): string {
   });
 }
 
+export interface EmailPdfAttachment {
+  fileName: string;
+  bytes: Uint8Array;
+}
+
 export interface ParsedForwardedEmail {
+  pdfAttachments?: EmailPdfAttachment[];
   sender: string | null;
   subject: string;
   text: string;
@@ -88,7 +94,23 @@ export async function parseForwardedEmail(raw: ArrayBuffer): Promise<ParsedForwa
     maxRfc822NestingDepth: 2,
     maxHeadersSize: 16 * 1024
   });
+  const pdfAttachments: EmailPdfAttachment[] = [];
+  for (const attachment of email.attachments) {
+    if (attachment.mimeType !== 'application/pdf' && !/\.pdf$/iu.test(attachment.filename ?? ''))
+      continue;
+    if (typeof attachment.content === 'string') continue;
+    const bytes = new Uint8Array(attachment.content);
+    if (new TextDecoder().decode(bytes.subarray(0, 5)) !== '%PDF-') continue;
+    if (bytes.byteLength > 5 * 1024 * 1024) throw new Error('PDF attachment too large');
+    if (pdfAttachments.length >= 4) throw new Error('Too many PDF attachments');
+    const fileName =
+      cleanText(attachment.filename ?? 'statement.pdf')
+        .replace(/[\\/]/gu, '_')
+        .slice(0, 255) || 'statement.pdf';
+    pdfAttachments.push({ fileName, bytes });
+  }
   return {
+    pdfAttachments,
     sender: cleanText(email.from?.address ?? '').slice(0, 254) || null,
     subject: cleanText(email.subject ?? '').slice(0, 300),
     text: cleanText(decodeHtmlEntities(email.text || plainFromHtml(email.html ?? ''))),
@@ -101,10 +123,16 @@ export async function emailFingerprint(email: ParsedForwardedEmail): Promise<str
   const identity = email.messageId
     ? ['message-id', email.messageId.toLowerCase()]
     : ['content', email.subject, email.date, email.text];
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(JSON.stringify(identity))
-  );
+  if (!email.messageId && email.pdfAttachments?.length) {
+    identity.push(
+      ...(await Promise.all(email.pdfAttachments.map((attachment) => sha256Hex(attachment.bytes))))
+    );
+  }
+  return sha256Hex(new TextEncoder().encode(JSON.stringify(identity)));
+}
+
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 

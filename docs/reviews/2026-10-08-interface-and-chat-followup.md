@@ -13,9 +13,11 @@
 
 A read-only production query on 2026-10-08 found three forwarded messages mentioning statements, two also mentioning Bancolombia. This identifies message text, not a successfully imported statement.
 
-`src/utils/email-mime.ts` currently returns readable body/header fields and discards MIME attachments. `src/handlers/email-forwarding.ts` bounds raw MIME to 512 KiB. Existing Documents intake supports images; its bulk reconciliation reviews exact eligible matches before an explicit audited decision.
+The intake now separates PDF attachments from readable message text. Verified forwarding accepts up to four signature-checked PDFs, each at most 5 MiB, within an 8 MiB MIME message. Unsupported attachments remain excluded. Private objects and immutable owner-scoped email provenance deduplicate repeated deliveries; a failed metadata insert removes its new upload. Messages containing PDFs never enter automatic purchase posting.
 
-Therefore emailed statement PDF reconciliation is not yet available. Required implementation: bounded private attachment intake with provenance/deduplication, explicit encrypted-PDF password handling, extraction using an approved provider path, statement-period/account/currency validation, then preview of existing matches and missing items. Posting and balance correction must remain separate audited decisions. Never label a statement reconciled from the email body alone.
+Documents supports original text PDFs, including encrypted statements. A bounded local PDF.js worker reads at most ten pages and 40,000 characters, with a 20-second timeout and memory limits. Passwords stay request-local and never reach AI. Image-only PDFs require screenshots. The financial-text consent and document AI allowance gate extraction; every bounded model call is metered, with one document allowance for the analysis. Drafts must cite source excerpts and grounded amounts; overflow or incomplete responses fail atomically.
+
+The inbox links each attachment to its private Document. Existing audited reconciliation previews transaction matches and missing movements before explicit decisions. A saved PDF is not a reconciled statement; balances and posting remain separate reviewed actions. Previously received attachments were discarded by the old intake and are not retroactively recovered. A Gmail read-only search located the September savings statement on 2026-10-08; its attachment download failed with INVALID_ARGUMENT, so no recovery is claimed.
 
 ## Validation
 
@@ -35,3 +37,10 @@ Therefore emailed statement PDF reconciliation is not yet available. Required im
 - A temporary confirmed test account proved the protected new-account flag, denied preacceptance RLS reads, real deployed web acceptance endpoint with same-origin cookies, idempotent version audit, stale-JWT database acceptance, refreshed session metadata, and deletion cascade. The account and audit were removed afterward. Admin creation's initial response omitted trigger-added metadata while subsequent getUser returned it, so client initialization preserves verified metadata over stale INITIAL_SESSION and session-returning signup rechecks getUser.
 - Live synthetic scope checks accepted a financial query and rejected an unrelated query. The upstream model returned non-JSON refusal content for an explicit override attempt; the production JSON parser fails closed before financial data retrieval. This limited check does not establish universal injection resistance.
 - Mobile Metro responded `packager-status:running` at http://192.168.68.56:8081. Native terms implementation is handled separately after the web release.
+
+## PDF and native follow-up validation
+
+- Backend full suite passed 91 files / 741 tests; targeted MIME, storage, forwarding and provenance checks passed 51 tests. Database provenance tests cover foreign-owner rejection, immutable keys, duplicate delivery constraints and account-deletion cascade.
+- Web inbox PDF links and statement-specific actions passed alongside existing inbox review tests (28 assertions); owner-bound terms acknowledgement passed three tests. PDF parsing tests include synthetic encrypted files and bounded overflow; a local encrypted Amex statement produced four pages and 7,417 characters without external processing.
+- Mobile commit `445d6d2` adds the terms gate before sync, owner-specific acknowledgement, canonical session metadata and encrypted verified-owner offline cache. Fourteen focused tests, typecheck and scoped lint passed. Only new legal changes were committed; earlier unrelated local work remains untouched. Physical-device validation remains pending.
+- Landing commit `439e0cf` updates the factual private-PDF disclosure; 20 tests, build and lint passed.

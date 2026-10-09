@@ -1,3 +1,4 @@
+import { handleStatementTextExtract } from './handlers/statement-text-extract';
 import { handleFinancialChat } from './handlers/financial-chat';
 import {
   handleQueuedForwardedEmail,
@@ -93,6 +94,9 @@ export default {
       return handleParse(request, env);
     }
 
+    if (url.pathname === '/documents/extract-text' && request.method === 'POST') {
+      return handleStatementTextExtract(request, env);
+    }
     if (url.pathname === '/vision/extract' && request.method === 'POST') {
       return handleVisionExtract(request, env);
     }

@@ -5,6 +5,7 @@ interface CompletionInput {
   system: string;
   user: string;
   meter?: AiUsageMeter;
+  maxOutputTokens?: number;
 }
 
 interface CompletionResponse {
@@ -19,6 +20,13 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
   data: T;
   usage: { prompt_tokens: number; completion_tokens: number } | null;
 }> {
+  if (
+    input.maxOutputTokens !== undefined &&
+    (!Number.isInteger(input.maxOutputTokens) ||
+      input.maxOutputTokens < 128 ||
+      input.maxOutputTokens > 8192)
+  )
+    throw new Error('Invalid output token limit');
   if (!input.apiKey) throw new Error('OpenRouter API key is not configured');
 
   const request: RequestInit = {
@@ -36,7 +44,7 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
       response_format: { type: 'json_object' },
       usage: { include: true },
       temperature: 0.1,
-      max_tokens: 2048,
+      max_tokens: input.maxOutputTokens ?? 2048,
       provider: {
         zdr: true,
         data_collection: 'deny',

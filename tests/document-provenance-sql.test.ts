@@ -37,6 +37,7 @@ async function database(): Promise<PGlite> {
     VALUES ('${documentId}','${owner}','receipt.png','${owner}/receipt.png','image/png','${'a'.repeat(64)}');
   `);
   await db.exec(migration('20260929000070_document_provenance.sql'));
+  await db.exec(migration('20261008000025_pdf_document_intake.sql'));
   return db;
 }
 
@@ -83,6 +84,44 @@ function completion(token: string, ownerId = owner): string {
 }
 
 describe('server-only document extraction persistence', () => {
+  it('allows private PDF uploads and completes at most 500 pending drafts without financial posting', async () => {
+    const db = await database();
+    try {
+      await db.exec(
+        `UPDATE documents SET mime_type = 'application/pdf', file_name = 'synthetic.pdf' WHERE id = '${documentId}'`
+      );
+      expect(
+        (await db.query("SELECT allowed_mime_types FROM storage.buckets WHERE id = 'documents'"))
+          .rows[0]
+      ).toMatchObject({ allowed_mime_types: expect.arrayContaining(['application/pdf']) });
+      const token = await claim(db);
+      const drafts = Array.from({ length: 501 }, (_, ordinal) => ({
+        ...JSON.parse(observation)[0],
+        ordinal
+      }));
+      const complete = (rows: unknown[]) =>
+        `SELECT complete_document_extraction_server('${documentId}','${owner}','${token}','statement','openai/gpt-4.1-nano','${JSON.stringify(rows)}'::jsonb) AS count`;
+      await expect(asRole(db, 'service_role', owner, complete(drafts))).rejects.toThrow();
+      expect(
+        (await db.query('SELECT count(*)::int AS count FROM document_observations')).rows
+      ).toEqual([{ count: 0 }]);
+      expect(await asRole(db, 'service_role', owner, complete(drafts.slice(0, 500)))).toEqual([
+        { count: 500 }
+      ]);
+      expect(
+        (
+          await db.query(
+            "SELECT count(*)::int AS count FROM document_observations WHERE status = 'pending'"
+          )
+        ).rows
+      ).toEqual([{ count: 500 }]);
+      expect((await db.query('SELECT count(*)::int AS count FROM transactions')).rows).toEqual([
+        { count: 0 }
+      ]);
+    } finally {
+      await db.close();
+    }
+  });
   it('persists signed movements while still rejecting zero-value observations', async () => {
     const db = await database();
     try {

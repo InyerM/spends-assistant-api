@@ -1,3 +1,4 @@
+import { EmailAttachmentsService } from './email-attachments.service';
 import { FinancialChatService } from './financial-chat.service';
 import { AccountsService } from './accounts.service';
 import { CategoriesService } from './categories.service';
@@ -14,6 +15,7 @@ import { EmailForwardingRoutesService } from './email-forwarding-routes.service'
 import { ForwardedEmailAutoPostService } from './forwarded-email-auto-post.service';
 
 export interface SupabaseServices {
+  emailAttachments: EmailAttachmentsService;
   financialChat: FinancialChatService;
   accounts: AccountsService;
   categories: CategoriesService;
@@ -32,6 +34,7 @@ export interface SupabaseServices {
 export function createSupabaseServices(url: string, serviceKey: string): SupabaseServices {
   const aiConsent = new AiConsentService(url, serviceKey);
   return {
+    emailAttachments: new EmailAttachmentsService(url, serviceKey),
     financialChat: new FinancialChatService(url, serviceKey),
     accounts: new AccountsService(url, serviceKey),
     categories: new CategoriesService(url, serviceKey),
