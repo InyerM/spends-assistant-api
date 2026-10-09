@@ -31,6 +31,14 @@ The owner requested independent sidebar groups, exact account balance targets wi
 
 ## Remaining validation
 
-- Physical iPhone: offline target queue, reconnect/retry, and local schema upgrade. Native document/inbox and budget screens are absent in this checkout; this release does not claim those native modules exist.
+- Physical iPhone: offline target queue, reconnect/retry, and local schema upgrade. The initial main-branch inspection missed completed native document/inbox and wealth modules on the preserved `feat/anotto-mobile-integration` branch. They are integrated into native main as of 2026-10-09 (`c114b6f`). Native budget/chat parity remains outside this integration.
 - Real email delivery to the new receipt domain still needs a genuine sender delivery test; synthetic HTTP and database checks do not establish SMTP delivery.
 - Private exports, statements, screenshots, credential files, and temporary synthetic fixtures are excluded from commits.
+
+## Native integration correction — 2026-10-09
+
+- Root cause of the hybrid iPhone interface: Metro served native main with recent loader/settings changes, while the complete Anotto brand and native document/email/wealth/security features remained on `feat/anotto-mobile-integration`.
+- Integrated both histories in native commit `c114b6f`, retaining the terms acceptance gate, local-only sign-out, audited target balance outbox, account identifier matching, and read-only managed automation guards.
+- Schema v9 and synchronous existing-file preflight preserve both previously published SQLite v3/v4 histories; actual SQLite tests verify queued balance requests and unsynced rows survive main-v4, canonical-v4, and canonical-v8 upgrades. No local database reset is performed. Evidence: native `tests/database/schema-integration.test.ts`.
+- Validation: 88 suites / 250 tests passed; full TypeScript and ESLint checks passed. Dependencies installed with `pnpm install --frozen-lockfile`. Local work from the prior main checkout is retained in a named Git stash; unique managed-rule protections were integrated, while superseded pre-brand components were not reapplied.
+- Metro restarted with a cleared bundle cache on port 8081. The physical device launch command succeeded; screen-level validation on the owner's unlocked iPhone is still required.
