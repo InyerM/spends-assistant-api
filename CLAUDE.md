@@ -12,7 +12,7 @@
   5. Return JSON response
 - **Services** (`src/services/supabase/*.ts`): All DB access. Extend `BaseService`. Never call `fetch()` to Supabase outside services
 - **`createSupabaseServices()`**: Factory function for DI. All services instantiated here
-- **Parsers** (`src/parsers/*.ts`): External API integrations (Gemini AI). Retry logic, caching, response extraction
+- **Parsers** (`src/parsers/*.ts`): External AI integrations (OpenRouter). Retry logic, caching, response extraction
 - **Utils** (`src/utils/*.ts`): Pure functions. Auth, date, formatting, validation
 
 ### Performance Rules

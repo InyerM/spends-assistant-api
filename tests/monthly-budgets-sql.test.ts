@@ -81,6 +81,12 @@ async function database(): Promise<PGlite> {
   `);
   if (!migration) throw new Error('Monthly budget migration is missing');
   await db.exec(migration);
+  await db.exec(
+    readFileSync(
+      new URL('../supabase/migrations/20261008000020_recurring_budgets.sql', import.meta.url),
+      'utf8'
+    )
+  );
   return db;
 }
 
@@ -105,6 +111,88 @@ async function status(db: PGlite): Promise<Record<string, unknown>[]> {
 }
 
 describe('monthly COP budgets', () => {
+  it('repeats monthly, allows one-month overrides, and preserves history when stopped', async () => {
+    const db = await database();
+    try {
+      await asOwner(db);
+      const created = await db.query<{ upsert_monthly_budget: string }>(
+        'SELECT public.upsert_monthly_budget($1::date,$2::uuid,$3::numeric,$4::boolean)',
+        ['2026-10-01', food, 500, true]
+      );
+      const id = created.rows[0].upsert_monthly_budget;
+      const future = () =>
+        db.query('SELECT * FROM public.get_monthly_budget_status($1::date)', ['2026-12-01']);
+      expect((await future()).rows).toMatchObject([
+        { budget_id: id, repeat_monthly: true, spent_cop: '0.00' }
+      ]);
+      await db.query(
+        'SELECT public.upsert_monthly_budget($1::date,$2::uuid,$3::numeric,$4::boolean)',
+        ['2026-11-01', food, 700, false]
+      );
+      const november = await db.query('SELECT * FROM public.get_monthly_budget_status($1::date)', [
+        '2026-11-01'
+      ]);
+      expect(november.rows).toMatchObject([{ limit_cop: '700.00', repeat_monthly: false }]);
+      await db.query('SELECT public.stop_monthly_budget($1::uuid,$2::date)', [id, '2026-12-01']);
+      expect((await future()).rows).toEqual([]);
+      expect(await status(db)).toMatchObject([{ budget_id: id, spent_cop: '300.00' }]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('does not resurrect a superseded recurring limit after stopping its replacement', async () => {
+    const db = await database();
+    try {
+      await asOwner(db);
+      await db.query(
+        'SELECT public.upsert_monthly_budget($1::date,$2::uuid,$3::numeric,$4::boolean)',
+        ['2026-10-01', food, 500, true]
+      );
+      const next = await db.query<{ upsert_monthly_budget: string }>(
+        'SELECT public.upsert_monthly_budget($1::date,$2::uuid,$3::numeric,$4::boolean)',
+        ['2026-11-01', food, 700, true]
+      );
+      await db.query('SELECT public.stop_monthly_budget($1::uuid,$2::date)', [
+        next.rows[0].upsert_monthly_budget,
+        '2026-12-01'
+      ]);
+      const december = await db.query('SELECT * FROM public.get_monthly_budget_status($1::date)', [
+        '2026-12-01'
+      ]);
+      expect(december.rows).toEqual([]);
+      expect(await status(db)).toMatchObject([{ limit_cop: '500.00' }]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('keeps a historical edit bounded by the newer recurring rule', async () => {
+    const db = await database();
+    try {
+      await asOwner(db);
+      const save = (month: string, limit: number) =>
+        db.query<{ upsert_monthly_budget: string }>(
+          'SELECT public.upsert_monthly_budget($1::date,$2::uuid,$3::numeric,$4::boolean)',
+          [month, food, limit, true]
+        );
+      await save('2026-10-01', 500);
+      const next = await save('2026-11-01', 700);
+      await save('2026-10-01', 550);
+      await db.query('SELECT public.stop_monthly_budget($1::uuid,$2::date)', [
+        next.rows[0].upsert_monthly_budget,
+        '2026-12-01'
+      ]);
+      expect(
+        (await db.query('SELECT * FROM public.get_monthly_budget_status($1::date)', ['2026-12-01']))
+          .rows
+      ).toEqual([]);
+      expect(await status(db)).toMatchObject([{ limit_cop: '550.00' }]);
+    } finally {
+      await db.close();
+    }
+  });
+
   it('includes child categories once and reports excluded or unresolved expense coverage', async () => {
     const db = await database();
     try {
