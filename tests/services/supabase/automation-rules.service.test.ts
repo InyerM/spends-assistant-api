@@ -45,6 +45,45 @@ describe('AutomationRulesService', () => {
     ]);
   });
 
+  describe('unique pre-parse account detection', () => {
+    it('declines ambiguous matches even when one rule has higher priority', () => {
+      const first = createMockAutomationRule({
+        rule_type: 'account_detection',
+        priority: 100,
+        conditions: { raw_text_contains: ['bank'] },
+        actions: { set_account: 'account-a' }
+      });
+      const second = createMockAutomationRule({
+        rule_type: 'account_detection',
+        priority: 10,
+        conditions: { raw_text_contains: ['bank', '1234'] },
+        actions: { set_account: 'account-b' }
+      });
+      expect(service.findUniqueAccountDetectionRule([first, second], 'Bank 1234')).toBeNull();
+    });
+    it('keeps the first matching rule when aliases resolve to the same account and ignores nonmatches', () => {
+      const first = createMockAutomationRule({
+        rule_type: 'account_detection',
+        conditions: { raw_text_contains: ['bank'] },
+        actions: { set_account: 'account-a' }
+      });
+      const alias = createMockAutomationRule({
+        rule_type: 'account_detection',
+        conditions: { raw_text_contains: ['1234'] },
+        actions: { set_account: 'account-a' }
+      });
+      const other = createMockAutomationRule({
+        rule_type: 'account_detection',
+        conditions: { raw_text_contains: ['other'] },
+        actions: { set_account: 'account-b' }
+      });
+      expect(service.findUniqueAccountDetectionRule([first, alias, other], 'Bank 1234')).toEqual(
+        first
+      );
+      expect(service.findUniqueAccountDetectionRule([first], 'Unrelated')).toBeNull();
+    });
+  });
+
   describe('getAutomationRules', () => {
     it('returns active rules', async () => {
       const rules = [createMockAutomationRule()];

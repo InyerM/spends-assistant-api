@@ -15,7 +15,11 @@ const accountOther = '20000000-0000-4000-8000-000000000002';
 const categoryA = '30000000-0000-4000-8000-000000000001';
 const categoryOther = '30000000-0000-4000-8000-000000000002';
 
-async function database(withEventTime = false, withNotes = false): Promise<PGlite> {
+async function database(
+  withEventTime = false,
+  withNotes = false,
+  withTransfers = false
+): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(`
     CREATE ROLE authenticated;
@@ -81,6 +85,12 @@ async function database(withEventTime = false, withNotes = false): Promise<PGlit
   if (withNotes) {
     await db.exec(migration('20261006000040_shortcut_reviewed_notes'));
   }
+  if (withTransfers) {
+    await db.exec(`ALTER TABLE public.accounts ADD COLUMN currency text DEFAULT 'COP';
+      ALTER TABLE public.transactions ADD COLUMN transfer_to_account_id uuid REFERENCES public.accounts(id);
+      INSERT INTO public.accounts (id,user_id,balance) VALUES ('20000000-0000-4000-8000-000000000003','${owner}',2000);`);
+    await db.exec(migration('20261008000029_shortcut_reviewed_transfers'));
+  }
   return db;
 }
 
@@ -104,6 +114,64 @@ const create = (
   `SELECT public.confirm_shortcut_transaction('${item}',${reviewedPayload},'${reviewHash}',${confirmDistinct}) AS result`;
 
 describe('reviewed Shortcut transaction creation', () => {
+  it('posts an owned transfer once with balanced accounts and an audited destination', async () => {
+    const db = await database(true, true, true);
+    try {
+      const destination = '20000000-0000-4000-8000-000000000003';
+      const reviewed = payload(`,"transfer_to_account_id":"${destination}"`)
+        .replace('"type":"expense"', '"type":"transfer"')
+        .replace(`"${categoryA}"`, 'null');
+      const first = await asUser(db, owner, create(inboxA, '', false, reviewed));
+      expect(first[0]).toMatchObject({ result: { status: 'created', replayed: false } });
+      expect((await asUser(db, owner, create(inboxA, '', false, reviewed)))[0]).toMatchObject({
+        result: { replayed: true }
+      });
+      expect(
+        (
+          await db.query(
+            `SELECT balance FROM public.accounts WHERE user_id = '${owner}' ORDER BY id`
+          )
+        ).rows
+      ).toEqual([{ balance: '8799.50' }, { balance: '3200.50' }]);
+      expect(
+        (
+          await db.query(`SELECT t.transfer_to_account_id, d.transaction_snapshot->>'transfer_to_account_id' AS audited_destination
+        FROM public.transactions t JOIN public.shortcut_inbox_match_decisions d ON d.transaction_id = t.id`)
+        ).rows
+      ).toEqual([{ transfer_to_account_id: destination, audited_destination: destination }]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('rejects foreign, identical, inactive and mismatched-currency transfer destinations without posting', async () => {
+    const db = await database(true, true, true);
+    try {
+      const destination = '20000000-0000-4000-8000-000000000003';
+      const transfer = (to: string): string =>
+        payload(`,"transfer_to_account_id":"${to}"`)
+          .replace('"type":"expense"', '"type":"transfer"')
+          .replace(`"${categoryA}"`, 'null');
+      for (const to of [accountOther, accountA]) {
+        await expect(asUser(db, owner, create(inboxA, '', false, transfer(to)))).rejects.toThrow();
+      }
+      await db.exec(`UPDATE public.accounts SET is_active = false WHERE id = '${destination}'`);
+      await expect(
+        asUser(db, owner, create(inboxA, '', false, transfer(destination)))
+      ).rejects.toThrow();
+      await db.exec(
+        `UPDATE public.accounts SET is_active = true, currency = 'USD' WHERE id = '${destination}'`
+      );
+      await expect(
+        asUser(db, owner, create(inboxA, '', false, transfer(destination)))
+      ).rejects.toThrow();
+      expect(
+        (await db.query('SELECT count(*)::int AS count FROM public.transactions')).rows
+      ).toEqual([{ count: 0 }]);
+    } finally {
+      await db.close();
+    }
+  });
   it('stores reviewed notes in the financial record and immutable review snapshot', async () => {
     const db = await database(true, true);
     try {

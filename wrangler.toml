@@ -5,12 +5,13 @@ compatibility_date = "2024-11-23"
 
 [vars]
 ENVIRONMENT = "production"
-EMAIL_FORWARDING_DOMAIN = "receipts.inyerm.com"
+EMAIL_FORWARDING_DOMAIN = "receipts.anotto.app"
+EMAIL_FORWARDING_LEGACY_DOMAINS = "receipts.inyerm.com"
 EMAIL_FORWARDING_READY = "true"
-EMAIL_AUTO_POST_READY = "true"
+EMAIL_AUTO_POST_READY = "false"
 EMAIL_PDF_INTAKE_READY = "true"
 EMAIL_AUTO_POST_AFTER = "2026-10-06T01:45:00Z"
-CLOUDFLARE_EMAIL_ZONE_ID = "08eb68367ee4508342d26f223fcb5c2a"
+CLOUDFLARE_EMAIL_ZONE_ID = "e579a8358b13aeadf0c5260a7cde3660"
 APP_URL = "https://my.anotto.app"
 
 [observability]

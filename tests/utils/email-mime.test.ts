@@ -83,6 +83,28 @@ function pdfMessage(content: string, name = 'statement.pdf', type = 'application
 }
 
 describe('PDF email evidence', () => {
+  it('accepts a five-statement bank bundle and rejects more than eight PDFs', async () => {
+    const buildBundle = (count: number): ArrayBuffer =>
+      new TextEncoder().encode(
+        [
+          'Subject: Monthly bank statements',
+          'Content-Type: multipart/mixed; boundary="bundle"',
+          '',
+          ...Array.from({ length: count }, (_, index) =>
+            [
+              '--bundle',
+              'Content-Type: application/pdf',
+              `Content-Disposition: attachment; filename="statement-${index}.pdf"`,
+              '',
+              '%PDF-1.7 statement'
+            ].join('\r\n')
+          ),
+          '--bundle--'
+        ].join('\r\n')
+      ).buffer;
+    expect((await parseForwardedEmail(buildBundle(5))).pdfAttachments).toHaveLength(5);
+    await expect(parseForwardedEmail(buildBundle(9))).rejects.toThrow('Too many PDF attachments');
+  });
   it('separates a bounded PDF from the readable mail body', async () => {
     const parsed = await parseForwardedEmail(pdfMessage('%PDF-1.7\nprivate statement'));
     expect(parsed.pdfAttachments).toHaveLength(1);

@@ -102,7 +102,7 @@ export async function parseForwardedEmail(raw: ArrayBuffer): Promise<ParsedForwa
     const bytes = new Uint8Array(attachment.content);
     if (new TextDecoder().decode(bytes.subarray(0, 5)) !== '%PDF-') continue;
     if (bytes.byteLength > 5 * 1024 * 1024) throw new Error('PDF attachment too large');
-    if (pdfAttachments.length >= 4) throw new Error('Too many PDF attachments');
+    if (pdfAttachments.length >= 8) throw new Error('Too many PDF attachments');
     const fileName =
       cleanText(attachment.filename ?? 'statement.pdf')
         .replace(/[\\/]/gu, '_')

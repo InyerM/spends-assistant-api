@@ -13,7 +13,12 @@ function json(value: unknown, status = 200): Response {
 }
 
 function validDomain(value: string | undefined): value is string {
-  return Boolean(value && /^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$/u.test(value));
+  return Boolean(
+    value &&
+      value.length <= 253 &&
+      value.split('.').length >= 2 &&
+      value.split('.').every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(label))
+  );
 }
 
 export async function handleEmailForwardingRoute(request: Request, env: Env): Promise<Response> {
@@ -83,10 +88,16 @@ export async function handleEmailForwardingRoute(request: Request, env: Env): Pr
 
 export async function handleForwardedEmail(message: IncomingEmail, env: Env): Promise<void> {
   const recipient = message.to.toLowerCase();
+  const allowedDomains = [
+    env.EMAIL_FORWARDING_DOMAIN,
+    ...(env.EMAIL_FORWARDING_LEGACY_DOMAINS ?? '')
+      .split(',')
+      .map((domain) => domain.trim().toLowerCase())
+  ].filter(validDomain);
   const maxMimeBytes = env.EMAIL_PDF_INTAKE_READY === 'true' ? 8 * 1024 * 1024 : MAX_MIME_BYTES;
   if (
     !validDomain(env.EMAIL_FORWARDING_DOMAIN) ||
-    !recipient.endsWith(`@${env.EMAIL_FORWARDING_DOMAIN}`) ||
+    !allowedDomains.some((domain) => recipient.endsWith(`@${domain}`)) ||
     message.rawSize > maxMimeBytes
   ) {
     message.setReject('Invalid forwarding destination or message size');

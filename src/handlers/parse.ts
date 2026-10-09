@@ -1,7 +1,6 @@
 import { CacheService } from '../services/cache.service';
 import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
-import { CreateTransactionInput } from '../types/transaction';
 import { validateAndFixDate, validateAndFixTime } from '../utils/date';
 import {
   buildTransferPromptSection,
@@ -54,12 +53,9 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
 
     // Pre-parse account detection: check raw text against account_detection rules
     const generalRules = allRules.filter((r) => r.rule_type !== 'account_detection');
-    const preMatchedAccount = accountDetectionRules.find((rule) =>
-      services.automationRules.matchesConditions(
-        { raw_text: text } as Partial<CreateTransactionInput>,
-        rule.conditions,
-        rule.condition_logic ?? 'or'
-      )
+    const preMatchedAccount = services.automationRules.findUniqueAccountDetectionRule(
+      accountDetectionRules,
+      text
     );
 
     const accountHint = preMatchedAccount?.actions.set_account

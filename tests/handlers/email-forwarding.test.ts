@@ -94,6 +94,100 @@ describe('email forwarding', () => {
     });
   });
 
+  it.each(['receipts.anotto.app', 'receipts.inyerm.com', 'archive.example.com'])(
+    'accepts an exact registered destination at %s',
+    async (domain) => {
+      const recipient = `capture+${'a'.repeat(48)}@${domain}`;
+      routes.getByAddress.mockResolvedValue({
+        user_id: 'owner-id',
+        address: recipient,
+        user_confirmed_at: null
+      });
+      inbox.createForwardedPending.mockResolvedValue({
+        id: 'inbox-id',
+        status: 'pending',
+        created: true
+      });
+      const message = email(
+        'Subject: Notice\r\n\r\nReview this account notice.',
+        recipient,
+        'notice@bank.test'
+      );
+      await handleForwardedEmail(message, {
+        ...env,
+        EMAIL_FORWARDING_DOMAIN: 'receipts.anotto.app',
+        EMAIL_FORWARDING_LEGACY_DOMAINS: ' receipts.inyerm.com, archive.example.com '
+      });
+      expect(message.setReject).not.toHaveBeenCalled();
+      expect(routes.getByAddress).toHaveBeenCalledWith(recipient);
+      expect(inbox.createForwardedPending).toHaveBeenCalled();
+    }
+  );
+
+  it.each(['receipts.inyerm.com.evil.test', 'unrelated.example.com', '-invalid.test', 'bad..test'])(
+    'rejects unconfigured or invalid domain %s before route lookup',
+    async (domain) => {
+      const message = email('Subject: Notice\r\n\r\nAccount notice.', `capture+token@${domain}`);
+      await handleForwardedEmail(message, {
+        ...env,
+        EMAIL_FORWARDING_DOMAIN: 'receipts.anotto.app',
+        EMAIL_FORWARDING_LEGACY_DOMAINS: 'receipts.inyerm.com,-invalid.test,bad..test'
+      });
+      expect(message.setReject).toHaveBeenCalled();
+      expect(routes.getByAddress).not.toHaveBeenCalled();
+    }
+  );
+
+  it('retains exact route lookup for allowlisted legacy destinations', async () => {
+    routes.getByAddress.mockResolvedValue(null);
+    const message = email(
+      'Subject: Notice\r\n\r\nAccount notice.',
+      'capture+unknown@receipts.inyerm.com'
+    );
+    await handleForwardedEmail(message, {
+      ...env,
+      EMAIL_FORWARDING_DOMAIN: 'receipts.anotto.app',
+      EMAIL_FORWARDING_LEGACY_DOMAINS: 'receipts.inyerm.com'
+    });
+    expect(routes.getByAddress).toHaveBeenCalledWith('capture+unknown@receipts.inyerm.com');
+    expect(message.setReject).toHaveBeenCalledWith('Unknown forwarding destination');
+  });
+
+  it('returns an existing verified legacy route unchanged after switching the creation domain', async () => {
+    const legacy = {
+      address: 'capture+existing@receipts.inyerm.com',
+      created_at: '2026-10-01',
+      confirmation_received_at: '2026-10-02',
+      verification_text: 'Confirmed',
+      user_confirmed_at: '2026-10-03'
+    };
+    routes.getForUser.mockResolvedValue(legacy);
+    const response = await handleEmailForwardingRoute(
+      new Request('https://example.test/email-forwarding'),
+      {
+        ...env,
+        EMAIL_FORWARDING_DOMAIN: 'receipts.anotto.app',
+        EMAIL_FORWARDING_LEGACY_DOMAINS: 'receipts.inyerm.com'
+      }
+    );
+    expect(await response.json()).toEqual({ status: 'active', ...legacy });
+    expect(routes.createForUser).not.toHaveBeenCalled();
+  });
+
+  it('creates new routes on the current domain rather than the legacy allowlist', async () => {
+    routes.createForUser.mockResolvedValue({ address: 'capture+new@receipts.anotto.app' });
+    const response = await handleEmailForwardingRoute(
+      new Request('https://example.test/email-forwarding', { method: 'POST' }),
+      {
+        ...env,
+        EMAIL_FORWARDING_DOMAIN: 'receipts.anotto.app',
+        EMAIL_FORWARDING_LEGACY_DOMAINS: 'receipts.inyerm.com'
+      }
+    );
+    expect(response.status).toBe(201);
+    expect(routes.createForUser).toHaveBeenCalledWith('owner-id', 'receipts.anotto.app');
+  });
+
   it('keeps eligible purchases pending until scheduled authentication', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-05T18:00:00Z'));

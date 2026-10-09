@@ -72,12 +72,9 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
 
       // Pre-parse account detection: check raw text against account_detection rules
       const generalRules = allRules.filter((r) => r.rule_type !== 'account_detection');
-      const preMatchedAccount = accountDetectionRules.find((rule) =>
-        services.automationRules.matchesConditions(
-          { raw_text: cleanText } as Partial<CreateTransactionInput>,
-          rule.conditions,
-          rule.condition_logic ?? 'or'
-        )
+      const preMatchedAccount = services.automationRules.findUniqueAccountDetectionRule(
+        accountDetectionRules,
+        cleanText
       );
 
       const accountHint = preMatchedAccount?.actions.set_account

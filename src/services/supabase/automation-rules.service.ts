@@ -36,6 +36,24 @@ export class AutomationRulesService extends BaseService {
     );
   }
 
+  findUniqueAccountDetectionRule(rules: AutomationRule[], rawText: string): AutomationRule | null {
+    let matchedRule: AutomationRule | null = null;
+    for (const rule of rules) {
+      if (
+        !rule.actions.set_account ||
+        !this.matchesConditions(
+          { raw_text: rawText },
+          rule.conditions,
+          rule.condition_logic ?? 'or'
+        )
+      )
+        continue;
+      if (matchedRule && matchedRule.actions.set_account !== rule.actions.set_account) return null;
+      matchedRule ??= rule;
+    }
+    return matchedRule;
+  }
+
   /**
    * Get all active prompt texts for dynamic injection into the parser model
    */
