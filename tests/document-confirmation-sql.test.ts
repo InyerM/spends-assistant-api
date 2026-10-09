@@ -84,6 +84,57 @@ async function asUser(db: PGlite, userId: string, sql: string): Promise<unknown[
 }
 
 describe('document confirmation migration', () => {
+  it('rejects mismatched and unknown currencies while preserving ledger state and idempotence', async () => {
+    const db = await database();
+    try {
+      await db.exec(`
+        CREATE TABLE public.accounts(id uuid PRIMARY KEY, user_id uuid NOT NULL, currency text);
+        ALTER TABLE public.transactions ADD COLUMN account_id uuid, ADD COLUMN currency text;
+        INSERT INTO public.accounts VALUES ('50000000-0000-4000-8000-000000000001', '${userA}', 'COP');
+        UPDATE public.transactions SET account_id = '50000000-0000-4000-8000-000000000001', currency = 'USD' WHERE id = '${transactionA}';
+        UPDATE public.document_observations SET currency = 'COP' WHERE id = '${observationA}';
+      `);
+      await db.exec(
+        readFileSync(
+          join(
+            process.cwd(),
+            'supabase/migrations/20261008000021_document_reconciliation_currency.sql'
+          ),
+          'utf8'
+        )
+      );
+      const call = `SELECT public.decide_document_observation('${observationA}', 'accept', '${transactionA}', '40000000-0000-4000-8000-000000000099') AS id`;
+      await expect(asUser(db, userA, call)).rejects.toThrow(/Currencies do not match/);
+      await db.exec(`UPDATE public.transactions SET currency = NULL WHERE id = '${transactionA}'`);
+      await expect(asUser(db, userA, call)).rejects.toThrow(/Currencies do not match/);
+      await db.exec(
+        `UPDATE public.transactions SET currency = 'COP' WHERE id = '${transactionA}'; UPDATE public.document_observations SET currency = NULL WHERE id = '${observationA}'`
+      );
+      await expect(asUser(db, userA, call)).rejects.toThrow(/Currencies do not match/);
+      await db.exec(
+        `UPDATE public.document_observations SET currency = 'COP' WHERE id = '${observationA}'`
+      );
+      const before = (await db.query(`SELECT * FROM transactions ORDER BY id`)).rows;
+      const result = await asUser(db, userA, call);
+      expect(await asUser(db, userA, call)).toEqual(result);
+      expect((await db.query(`SELECT * FROM transactions ORDER BY id`)).rows).toEqual(before);
+      expect(
+        (await db.query(`SELECT count(*)::int AS count FROM document_observation_decisions`)).rows
+      ).toEqual([{ count: 1 }]);
+      expect(
+        (await db.query(`SELECT transaction_snapshot FROM document_observation_decisions`)).rows[0]
+      ).toMatchObject({
+        transaction_snapshot: {
+          currency: 'COP',
+          type: 'expense',
+          account_id: '50000000-0000-4000-8000-000000000001'
+        }
+      });
+    } finally {
+      await db.close();
+    }
+  });
+
   it('confirms a negative bank debit against a positive expense without changing the observation sign', async () => {
     const db = await database();
     const signedObservation = '20000000-0000-4000-8000-000000000003';
