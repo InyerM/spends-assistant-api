@@ -30,6 +30,7 @@ vi.mock('../src/handlers/balance', () => ({
 const scheduledMocks = vi.hoisted(() => ({
   cleanup: vi.fn(),
   aiCleanup: vi.fn(),
+  planning: vi.fn(),
   forward: vi.fn(),
   queued: vi.fn()
 }));
@@ -39,6 +40,7 @@ vi.mock('../src/handlers/forwarded-email-scheduled', () => ({
 }));
 vi.mock('../src/services/supabase', () => ({
   createSupabaseServices: () => ({
+    planning: { processDueExpenses: scheduledMocks.planning },
     usage: { cleanupOldRecords: scheduledMocks.cleanup },
     aiUsage: { cleanupOldEvents: scheduledMocks.aiCleanup }
   })
@@ -153,11 +155,12 @@ describe('Worker routing', () => {
   });
 });
 
-it('routes only the exact email cron to automatic posting', async () => {
+it('routes only the fifteen-minute cron to email and opt-in recurring expense processing', async () => {
   vi.clearAllMocks();
   for (const cron of ['*/15 * * * *', 'unknown']) {
     await worker.scheduled({ cron, scheduledTime: 123 } as ScheduledEvent, env, ctx);
   }
+  expect(scheduledMocks.planning).toHaveBeenCalledOnce();
   expect(scheduledMocks.forward).toHaveBeenCalledOnce();
   expect(scheduledMocks.forward).toHaveBeenCalledWith(env, new Date(123));
   expect(scheduledMocks.cleanup).not.toHaveBeenCalled();
@@ -168,6 +171,7 @@ it('routes the monthly cron exclusively to cleanup', async () => {
   expect(scheduledMocks.cleanup).toHaveBeenCalledOnce();
   expect(scheduledMocks.aiCleanup).toHaveBeenCalledOnce();
   expect(scheduledMocks.forward).not.toHaveBeenCalled();
+  expect(scheduledMocks.planning).not.toHaveBeenCalled();
 });
 
 it('acknowledges completed email jobs and retries unavailable authentication evidence', async () => {

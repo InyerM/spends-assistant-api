@@ -158,7 +158,11 @@ export default {
       const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
       await Promise.all([services.usage.cleanupOldRecords(), services.aiUsage.cleanupOldEvents()]);
     } else if (event.cron === '*/15 * * * *') {
-      await handleScheduledForwardedEmails(env, new Date(event.scheduledTime));
+      const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
+      await Promise.all([
+        handleScheduledForwardedEmails(env, new Date(event.scheduledTime)),
+        services.planning.processDueExpenses()
+      ]);
     }
   }
 };
