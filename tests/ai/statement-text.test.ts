@@ -64,6 +64,34 @@ describe('grounded PDF statement drafts', () => {
       )
     ).toThrow('Ungrounded statement amount');
   });
+  it('parses original amount text on the server and leaves unverified amounts for review', () => {
+    const evidence = 'Synthetic Bancolombia COP 2026\n11/09 PURCHASE -42.000,25';
+    const candidate = {
+      ...row,
+      amount: undefined,
+      amount_text: '42.000,25',
+      direction: 'outgoing',
+      source_line_start: 2,
+      source_line_end: 2,
+      occurred_at: '2026-09-11'
+    };
+    expect(
+      validateStatementChunk({ complete: true, observations: [candidate] }, evidence)
+        .observations[0].amount
+    ).toBe(-42000.25);
+    const unknown = validateStatementChunk(
+      { complete: true, observations: [{ ...candidate, amount_text: '99.000,00' }] },
+      evidence
+    ).observations[0];
+    const grouped = validateStatementChunk(
+      { complete: true, observations: [{ ...candidate, amount_text: '1 234,56' }] },
+      'Synthetic Bancolombia COP 2026\n11/09 PURCHASE 1 234,56'
+    );
+    expect(grouped.observations[0].amount).toBe(-1234.56);
+    expect(unknown.amount).toBeNull();
+    expect(unknown.confidence).toBeLessThan(0.5);
+    expect(unknown.source_excerpt).toBe('11/09 PURCHASE -42.000,25');
+  });
   it('fails the whole draft when the model truncates or declares incomplete coverage', () => {
     expect(() =>
       validateStatementChunk({ observations: [row], complete: false }, source)
