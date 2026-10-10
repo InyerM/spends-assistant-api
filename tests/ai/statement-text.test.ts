@@ -92,6 +92,24 @@ describe('grounded PDF statement drafts', () => {
     expect(unknown.confidence).toBeLessThan(0.5);
     expect(unknown.source_excerpt).toBe('11/09 PURCHASE -42.000,25');
   });
+  it('excludes statement summary headings without transaction evidence', () => {
+    const candidate = {
+      ...row,
+      amount_text: null,
+      direction: 'unknown',
+      source_line_start: 1,
+      source_line_end: 1,
+      occurred_at: null
+    };
+    for (const label of ['Cargos', 'Abonos', '+ Saldo anterior', '+ Compras del mes']) {
+      expect(
+        validateStatementChunk(
+          { complete: true, observations: [{ ...candidate, description: label }] },
+          label
+        ).observations
+      ).toEqual([]);
+    }
+  });
   it('fails the whole draft when the model truncates or declares incomplete coverage', () => {
     expect(() =>
       validateStatementChunk({ observations: [row], complete: false }, source)

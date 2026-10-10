@@ -2,7 +2,7 @@ import { normalizeEmailAmount } from '../utils/email-event-evidence';
 import { completeJson } from './openrouter';
 import type { AiUsageMeter } from './usage-meter';
 import type { ImageExtractionDraft, ImageObservation } from './vision';
-export const STATEMENT_TEXT_MODEL = 'openai/gpt-4.1-nano';
+export const STATEMENT_TEXT_MODEL = 'deepseek/deepseek-v4.1-flash';
 const normalize = (text: string): string => text.replace(/\s+/gu, ' ').trim();
 function nullableString(value: unknown): value is string | null {
   return value === null || (typeof value === 'string' && value.length <= 500);
@@ -133,6 +133,14 @@ export function validateStatementChunk(
         : currency === 'COP' && /\bCOP\b|\bpesos\b|bancolombia|nequi|lulobank/iu.test(evidence)
           ? 'COP'
           : null;
+    if (
+      row.amount === null &&
+      !date &&
+      /^(?:[+−(-]*\s*)?(?:cargos|abonos|saldo (?:anterior|a favor)|compras del mes|intereses (?:de mora|corrientes)|avances|otros cargos|pagos\s*\/\s*abonos)\s*\)?$/iu.test(
+        excerpt
+      )
+    )
+      continue;
     observations.push({
       amount: row.amount as number | null,
       currency: supportedCurrency,
