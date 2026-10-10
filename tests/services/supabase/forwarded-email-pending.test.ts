@@ -14,3 +14,27 @@ it('looks up only the owner pending forwarding fingerprint after activation', as
   expect(url.searchParams.get('external_id')).toBe(`eq.${'a'.repeat(64)}`);
   expect(url.searchParams.get('received_at')).toBe('gte.2026-10-05T18:00:00Z');
 });
+
+it('persists an intake label without changing financial review authority', async () => {
+  const fetchMock = vi.fn().mockResolvedValue(Response.json([{ id: 'inbox', status: 'pending' }]));
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new ShortcutInboxService('https://db.example', 'service-secret');
+  await service.createForwardedPending({
+    userId: 'owner',
+    source: 'forwarded_email',
+    externalId: 'a'.repeat(64),
+    receivedAt: '2026-10-09T12:00:00Z',
+    rawText: 'Extracto pendiente',
+    triageStatus: 'pending',
+    messageKind: 'statement',
+    messageKindSource: 'rules'
+  });
+  const row = JSON.parse(fetchMock.mock.calls[0][1].body);
+  expect(row).toMatchObject({
+    user_id: 'owner',
+    status: 'pending',
+    message_kind: 'statement',
+    message_kind_source: 'rules'
+  });
+  expect(Number.isFinite(Date.parse(row.message_classified_at))).toBe(true);
+});

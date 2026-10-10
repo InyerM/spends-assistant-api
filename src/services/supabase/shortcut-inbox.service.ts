@@ -1,4 +1,5 @@
 import { BaseService } from './base.service';
+import type { EmailMessageKind } from '../../utils/email-message-kind';
 
 export interface CreateShortcutInboxItemInput {
   userId: string;
@@ -10,6 +11,8 @@ export interface CreateShortcutInboxItemInput {
 export interface CreateForwardedInboxItemInput extends CreateShortcutInboxItemInput {
   externalId: string;
   triageStatus?: 'pending' | 'non_transaction';
+  messageKind?: EmailMessageKind;
+  messageKindSource?: 'rules' | 'ai';
 }
 
 export interface ForwardedInboxWrite {
@@ -69,7 +72,10 @@ export class ShortcutInboxService extends BaseService {
       received_at: new Date(input.receivedAt).toISOString(),
       raw_text: input.rawText,
       idempotency_key: key,
-      status: input.triageStatus ?? 'pending'
+      status: input.triageStatus ?? 'pending',
+      message_kind: input.messageKind ?? 'uncertain',
+      message_kind_source: input.messageKindSource ?? 'unclassified',
+      message_classified_at: input.messageKind ? new Date().toISOString() : null
     };
     const response = await fetch(`${this.url}/rest/v1/shortcut_inbox_items`, {
       method: 'POST',

@@ -163,7 +163,11 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
     services.aiUsage,
     !hasPdf && !!route.confirmation_received_at && !!route.user_confirmed_at
   );
-  if (hasPdf) triage.triageStatus = 'pending';
+  if (hasPdf) {
+    triage.triageStatus = 'pending';
+    if (!['statement', 'financial_document'].includes(triage.messageKind))
+      triage.messageKind = 'uncertain';
+  }
   const receivedAt = new Date().toISOString();
   const externalId = await emailFingerprint(parsed);
   const write = await services.shortcutInbox.createForwardedPending({
@@ -172,7 +176,9 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
     externalId,
     receivedAt,
     rawText: triage.rawText,
-    triageStatus: triage.triageStatus
+    triageStatus: triage.triageStatus,
+    messageKind: triage.messageKind,
+    messageKindSource: triage.messageKindSource
   });
   if (hasPdf) {
     for (const attachment of pdfAttachments) {

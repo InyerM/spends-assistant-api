@@ -1,0 +1,9 @@
+# Email content labels and authorized inbox cleanup
+
+Content kind is independent from review status, sender authentication, and financial posting. Persist purchases/payments, transfers/withdrawals, income/refunds, statements, other financial documents, promotions, informational notices, security notices, possible spam, or uncertain content. Existing messages default to uncertain until classified. Rules handle explicit notices and advertised prices; ambiguous mail uses consent-gated, metered AI with validated kinds and confidence of at least 0.95. Possible spam remains a suggestion, never proof of sender authenticity.
+
+Keep statements and financial attachments available for review. Preserve security-code redaction. Do not treat a promotional price as an actual payment, nor label a bill-payment notification as disposable merely because its bank heading says informational. New arrivals receive a content label while financial creation still requires explicit user confirmation.
+
+Web gets a message-type selector using the shared Select component and translated, colored badges. Selecting a content type shows all review states so previously dismissed promotions remain discoverable. Mobile follows the web release, storing the same server labels locally and exposing the same copy and filters.
+
+The owner authorized classification of all inbox mail, dismissal of clear nonfinancial mail and verified duplicate copies, and filling missing OCR transaction times from matching emails. Audit every existing item. Require unique account/currency/amount/date candidates and corroborating original time and counterparty evidence before dismissing a duplicate. Retain unclear or conflicting items. Perform review changes as the authenticated owner and preserve financial rows, balances, reviewed creation links, and private source data. If current Lulo transactions already have times, do not overwrite them. Private exports and recovery plans stay outside Git.
