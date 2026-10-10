@@ -32,12 +32,13 @@ Apple's [Transaction trigger](https://support.apple.com/guide/shortcuts/apd65c67
 ## Production evidence
 
 - Initial web release: `dpl_JEHXje5XRM3sVuQpzH9vUAmHji7N`, Ready.
-- Charts/location web release: `dpl_2fS12eHHZ3tdP4ndWkaFvaVX1WMv`, Ready on `my.anotto.app`.
+- Initial charts/location web release: `dpl_2fS12eHHZ3tdP4ndWkaFvaVX1WMv`, Ready on `my.anotto.app`.
+- Final web release: `dpl_7tZBFVWc5ro9PdV3t8yiovutjq27`, Ready on `my.anotto.app`, source commit `617747e`.
 - Initial shortcut guide release: `dpl_C2yXjt2zrsqz9xS8ZiXnLqPKSkQZ`, Ready on `anotto.app`.
 - Final guide release: `dpl_6Ux1YhdDfSuiRZ2FTBWbWgmwxE2m`, Ready on `anotto.app`.
 - Worker version: `a1562380-c1f3-4703-806d-06872631c11f`; existing monthly and 15-minute schedules preserved.
 - Migrations 54–56 applied and registered. Production SQL verified the location RPC exists, anonymous execution is denied, and the posting processor is restricted to `service_role`.
-- Disposable production owner verified creation/edit screens at widths 1440 and 390, common expense prefilling, saved chart display, mobile bearer access to planning/locations and no ledger entries from planning setup. The actual scheduled-source ledger RPC was tested twice with the same request: one created transaction and an identical replay. Temporary owner was deleted.
+- Disposable production owner verified creation/edit screens at widths 1440 and 390, common expense prefilling, saved chart display, inactive account currency metadata without changing the active account selector, mobile bearer access to planning/locations and no ledger entries from planning setup. The actual scheduled-source ledger RPC was tested twice with the same request: one created transaction and an identical replay. Temporary owner was deleted.
 - Three signed shortcut downloads and all three guide locale routes returned HTTP 200. Guide mobile screenshot width was checked at 390 pixels.
 - Build artifacts and private test credentials remain outside Git. No existing user's transactions were modified during these tests.
 
@@ -47,6 +48,7 @@ Apple's [Transaction trigger](https://support.apple.com/guide/shortcuts/apd65c67
 - Web: **213 test files / 1,280 tests passed** with four workers; typecheck and lint passed with one existing React Hook Form compiler warning. Two legacy UI tests initially timed out under simultaneous suite saturation and passed on bounded rerun; no test expectations were weakened.
 - Mobile: **115 test suites / 318 tests passed**; typecheck and lint passed. This includes upgrades from schema versions 4, 8, 9, 10 and 11 to 12 with existing local records preserved, owner changes, biometric cancellation, voice draft isolation, quiet hours and Android picker dismissal.
 - Landing: **3 test files / 22 tests passed**; build, typecheck and lint passed; distinct canonical/language paths and three signed artifacts were checked.
+- Backend implementation source: commit `6847fdd` in `spends`.
 - Native source: commit `5e86b0b` in `spends-assistant-mobile`; guide source: commit `f2d2b45` in `anotto-landing`.
 - Native Release build and strict code signature verification passed; embedded bundle, version 1.1.0/build 2026101001 and microphone/speech permission keys were verified from the produced app.
 
