@@ -128,4 +128,20 @@ describe('forwarded email suggestion endpoint', () => {
     expect(response.status).toBe(428);
     expect(await response.json()).toMatchObject({ scope: 'forwarded_email' });
   });
+
+  it('distinguishes malformed response stages without logging financial content', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.suggest.mockRejectedValueOnce(new OpenRouterError(0, 'invalid_json', 'envelope'));
+    const response = await handleForwardedEmailSuggest(
+      request('Private synthetic financial content'),
+      createMockEnv()
+    );
+    expect(response.status).toBe(503);
+    expect(log).toHaveBeenCalledWith(
+      'forwarded_email_suggestion_failed',
+      expect.objectContaining({ reason: 'invalid_json', stage: 'envelope' })
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toContain('Private');
+    log.mockRestore();
+  });
 });

@@ -43,6 +43,7 @@ export async function handleForwardedEmailSuggest(request: Request, env: Env): P
       operation: 'triage_forwarded_email',
       model: env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
       reason: error instanceof OpenRouterError ? error.reason : 'internal',
+      ...(error instanceof OpenRouterError && error.stage ? { stage: error.stage } : {}),
       upstream_status: error instanceof OpenRouterError ? error.status : null
     });
     return Response.json({ error: 'Email suggestion unavailable' }, { status: 503 });

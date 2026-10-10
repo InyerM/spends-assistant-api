@@ -91,9 +91,38 @@ describe('completeJson', () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('private', { status: 401 }));
     vi.stubGlobal('fetch', fetchMock);
     await expect(
-      completeJson({ apiKey: 'key', model: 'model', system: 's', user: 'u' })
+      completeJson({
+        apiKey: 'key',
+        model: 'model',
+        system: 's',
+        user: 'u',
+        recoverMalformedOutput: true
+      })
     ).rejects.toThrow('(401)');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start output recovery after the total deadline is exhausted', async () => {
+    let now = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const fetchMock = vi.fn(async () => {
+      now = 45_000;
+      return new Response('invalid');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const meter = new AiUsageMeter();
+    await expect(
+      completeJson({
+        apiKey: 'key',
+        model: 'model',
+        system: 's',
+        user: 'u',
+        meter,
+        recoverMalformedOutput: true
+      })
+    ).rejects.toMatchObject({ reason: 'invalid_json', stage: 'envelope' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(meter.summary().billedCalls).toBe(1);
   });
 
   it('bounds optional output capacity without changing the default', async () => {
@@ -144,6 +173,141 @@ describe('completeJson', () => {
     await expect(
       completeJson({ apiKey: 'key', model: 'model', system: 's', user: 'u' })
     ).rejects.toThrow('truncated');
+  });
+
+  it.each(['envelope', 'content'] as const)(
+    'recovers malformed %s JSON for email analysis',
+    async (stage) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          stage === 'envelope'
+            ? new Response('private malformed response')
+            : Response.json({
+                choices: [{ message: { content: 'private invalid JSON' } }],
+                usage: { prompt_tokens: 10, completion_tokens: 5 }
+              })
+        )
+        .mockResolvedValueOnce(
+          Response.json({
+            choices: [{ message: { content: '{"ok":true}' } }],
+            usage: { prompt_tokens: 10, completion_tokens: 3 }
+          })
+        );
+      vi.stubGlobal('fetch', fetchMock);
+      const meter = new AiUsageMeter();
+      await expect(
+        completeJson({
+          apiKey: 'key',
+          model: 'model',
+          system: 's',
+          user: 'u',
+          meter,
+          recoverMalformedOutput: true
+        })
+      ).resolves.toMatchObject({ data: { ok: true } });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(meter.summary()).toMatchObject({
+        billedCalls: 2,
+        outputTokens: stage === 'envelope' ? 3 : 8
+      });
+    }
+  );
+
+  it('retries truncated email output with bounded extra capacity and meters discarded output', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          choices: [{ message: { content: '{"ok":' }, finish_reason: 'length' }],
+          usage: { prompt_tokens: 10, completion_tokens: 2048 }
+        })
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          choices: [{ message: { content: '{"ok":true}' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 10, completion_tokens: 15 }
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const meter = new AiUsageMeter();
+    await expect(
+      completeJson({
+        apiKey: 'key',
+        model: 'model',
+        system: 's',
+        user: 'u',
+        meter,
+        recoverMalformedOutput: true
+      })
+    ).resolves.toMatchObject({ data: { ok: true } });
+    expect(fetchMock.mock.calls.map((call) => JSON.parse(call[1].body).max_tokens)).toEqual([
+      2048, 4096
+    ]);
+    expect(meter.summary()).toMatchObject({ billedCalls: 2, outputTokens: 2063 });
+  });
+
+  it.each(['envelope', 'content'] as const)(
+    'bounds persistent malformed %s failures and reports their stage without private content',
+    async (stage) => {
+      const fetchMock = vi
+        .fn()
+        .mockImplementation(async () =>
+          stage === 'envelope'
+            ? new Response('private malformed response')
+            : Response.json({ choices: [{ message: { content: 'private invalid JSON' } }] })
+        );
+      vi.stubGlobal('fetch', fetchMock);
+      const meter = new AiUsageMeter();
+      await expect(
+        completeJson({
+          apiKey: 'key',
+          model: 'model',
+          system: 's',
+          user: 'private user',
+          meter,
+          recoverMalformedOutput: true
+        })
+      ).rejects.toMatchObject({
+        reason: 'invalid_json',
+        stage,
+        message: 'OpenRouter returned invalid JSON'
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(meter.summary().billedCalls).toBe(3);
+    }
+  );
+
+  it('does not retry malformed output without opting in', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('invalid'));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      completeJson({ apiKey: 'key', model: 'model', system: 's', user: 'u' })
+    ).rejects.toMatchObject({ reason: 'invalid_json', stage: 'envelope' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('caps recovered output at 8192 tokens and limits persistent truncation to three attempts', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(async () =>
+        Response.json({ choices: [{ message: { content: '{}' }, finish_reason: 'length' }] })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      completeJson({
+        apiKey: 'key',
+        model: 'model',
+        system: 's',
+        user: 'u',
+        maxOutputTokens: 8192,
+        recoverMalformedOutput: true
+      })
+    ).rejects.toMatchObject({ reason: 'truncated', stage: 'content' });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls.map((call) => JSON.parse(call[1].body).max_tokens)).toEqual([
+      8192, 8192, 8192
+    ]);
   });
 
   it('retries a rate limit response and returns the next successful result', async () => {

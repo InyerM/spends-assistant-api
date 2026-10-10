@@ -6,12 +6,14 @@ interface CompletionInput {
   user: string;
   meter?: AiUsageMeter;
   maxOutputTokens?: number;
+  recoverMalformedOutput?: boolean;
 }
 
 export class OpenRouterError extends Error {
   constructor(
     public readonly status: number,
-    public readonly reason: 'http' | 'network' | 'invalid_json' | 'empty' | 'truncated'
+    public readonly reason: 'http' | 'network' | 'invalid_json' | 'empty' | 'truncated',
+    public readonly stage?: 'envelope' | 'content'
   ) {
     super(
       reason === 'http'
@@ -44,40 +46,39 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
     throw new Error('Invalid output token limit');
   if (!input.apiKey) throw new Error('OpenRouter API key is not configured');
 
-  const request: RequestInit = {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${input.apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: input.model,
-      messages: [
-        { role: 'system', content: input.system },
-        { role: 'user', content: input.user }
-      ],
-      response_format: { type: 'json_object' },
-      usage: { include: true },
-      temperature: 0.1,
-      max_tokens: input.maxOutputTokens ?? 2048,
-      provider: {
-        zdr: true,
-        data_collection: 'deny',
-        max_price: { prompt: 0.4, completion: 1 }
-      }
-    })
+  let maxTokens = input.maxOutputTokens ?? 2048;
+  const payload = {
+    model: input.model,
+    messages: [
+      { role: 'system', content: input.system },
+      { role: 'user', content: input.user }
+    ],
+    response_format: { type: 'json_object' },
+    usage: { include: true },
+    temperature: 0.1,
+    provider: {
+      zdr: true,
+      data_collection: 'deny',
+      max_price: { prompt: 0.4, completion: 1 }
+    }
   };
 
-  // Bound total retry latency; never retain or expose an upstream error body.
+  // Bound all recovery attempts; never retain or expose an upstream error body.
   const deadline = Date.now() + 45_000;
   const transientStatuses = new Set([408, 429, 500, 502, 503, 504]);
-  let result: CompletionResponse | undefined;
   for (let attempt = 0; attempt < 3; attempt++) {
     let response: Response | undefined;
+    let result: CompletionResponse | undefined;
     let failure: OpenRouterError | undefined;
+    let metered = false;
     try {
       response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        ...request,
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${input.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ...payload, max_tokens: maxTokens }),
         signal: AbortSignal.timeout(Math.max(1, Math.min(30_000, deadline - Date.now())))
       });
     } catch {
@@ -89,61 +90,68 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
       } else {
         try {
           result = (await response.json()) as CompletionResponse;
-          if (!result || typeof result !== 'object')
-            failure = new OpenRouterError(0, 'invalid_json');
+          if (!result || typeof result !== 'object' || Array.isArray(result))
+            failure = new OpenRouterError(0, 'invalid_json', 'envelope');
           else if (result.error)
             failure = new OpenRouterError(
               Number.isInteger(result.error.code) ? result.error.code! : 502,
               'http'
             );
         } catch {
-          failure = new OpenRouterError(0, 'invalid_json');
+          failure = new OpenRouterError(0, 'invalid_json', 'envelope');
         }
       }
     }
-    if (!failure && result) break;
-    input.meter?.record(null);
-    const retryable = failure?.reason === 'network' || transientStatuses.has(failure?.status ?? 0);
+    if (!failure && result) {
+      const rawUsage = result.usage;
+      input.meter?.record(
+        rawUsage &&
+          Number.isSafeInteger(rawUsage.prompt_tokens) &&
+          Number.isSafeInteger(rawUsage.completion_tokens)
+          ? {
+              inputTokens: rawUsage.prompt_tokens!,
+              outputTokens: rawUsage.completion_tokens!,
+              costUsd: rawUsage.cost ?? undefined
+            }
+          : null
+      );
+      metered = true;
+      const choice = result.choices?.[0];
+      if (choice?.finish_reason === 'length')
+        failure = new OpenRouterError(0, 'truncated', 'content');
+      else if (!choice?.message?.content) failure = new OpenRouterError(0, 'empty', 'content');
+      else {
+        try {
+          const data = JSON.parse(choice.message.content) as T;
+          const usage =
+            result.usage?.prompt_tokens !== undefined &&
+            result.usage.completion_tokens !== undefined
+              ? {
+                  prompt_tokens: result.usage.prompt_tokens,
+                  completion_tokens: result.usage.completion_tokens
+                }
+              : null;
+          return { data, usage };
+        } catch {
+          failure = new OpenRouterError(0, 'invalid_json', 'content');
+        }
+      }
+    }
+    if (!metered) input.meter?.record(null);
+    const outputFailure = failure?.reason === 'invalid_json' || failure?.reason === 'truncated';
+    const retryable =
+      failure?.reason === 'network' ||
+      transientStatuses.has(failure?.status ?? 0) ||
+      (input.recoverMalformedOutput === true && outputFailure);
     const retryAfter = Number(response?.headers.get('Retry-After'));
     const delay =
       Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 500 * (attempt + 1);
     if (!retryable || attempt === 2 || Date.now() + delay >= deadline) {
       throw failure ?? new OpenRouterError(0, 'network');
     }
+    if (failure?.reason === 'truncated') maxTokens = Math.min(maxTokens * 2, 8192);
     await new Promise((resolve) => setTimeout(resolve, delay));
-    result = undefined;
+    if (Date.now() >= deadline) throw failure ?? new OpenRouterError(0, 'network');
   }
-  if (!result) throw new OpenRouterError(0, 'network');
-  const rawUsage = result.usage;
-  input.meter?.record(
-    rawUsage &&
-      Number.isSafeInteger(rawUsage.prompt_tokens) &&
-      Number.isSafeInteger(rawUsage.completion_tokens)
-      ? {
-          inputTokens: rawUsage.prompt_tokens!,
-          outputTokens: rawUsage.completion_tokens!,
-          costUsd: rawUsage.cost ?? undefined
-        }
-      : null
-  );
-  const choice = result.choices?.[0];
-  if (choice?.finish_reason === 'length') throw new OpenRouterError(0, 'truncated');
-  if (!choice?.message?.content) throw new OpenRouterError(0, 'empty');
-
-  let data: T;
-  try {
-    data = JSON.parse(choice.message.content) as T;
-  } catch {
-    throw new OpenRouterError(0, 'invalid_json');
-  }
-
-  const usage =
-    result.usage?.prompt_tokens !== undefined && result.usage.completion_tokens !== undefined
-      ? {
-          prompt_tokens: result.usage.prompt_tokens,
-          completion_tokens: result.usage.completion_tokens
-        }
-      : null;
-
-  return { data, usage };
+  throw new OpenRouterError(0, 'network');
 }

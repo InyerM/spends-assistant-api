@@ -58,6 +58,9 @@ describe('forwarded email suggestions', () => {
       expect.any(Function),
       'forwarded_email'
     );
+    expect(completeJson).toHaveBeenLastCalledWith(
+      expect.objectContaining({ recoverMalformedOutput: true })
+    );
   });
 
   it('does not select a foreign or low-confidence category', async () => {
