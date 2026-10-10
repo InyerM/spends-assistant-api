@@ -73,6 +73,20 @@ describe('statement text review endpoint', () => {
     ).toBe(429);
     expect(mocks.extract).not.toHaveBeenCalled();
   });
+  it('records a safe failure reason without statement text or credentials', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.extract.mockRejectedValueOnce(new Error('Ungrounded statement excerpt'));
+    const response = await handleStatementTextExtract(
+      request(['Synthetic Bank COP 42000']),
+      createMockEnv()
+    );
+    expect(response.status).toBe(502);
+    expect(log).toHaveBeenCalledWith('statement_text_extraction_failed', {
+      reason: 'Ungrounded statement excerpt'
+    });
+    expect(JSON.stringify(log.mock.calls)).not.toContain('Synthetic Bank');
+    log.mockRestore();
+  });
   it('fails closed for excessive pages, text or empty pages without consuming quota', async () => {
     for (const pages of [
       [],

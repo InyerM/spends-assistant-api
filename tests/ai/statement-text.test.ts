@@ -33,6 +33,25 @@ describe('grounded PDF statement drafts', () => {
       validateStatementChunk({ observations: [row], complete: false }, source)
     ).toThrow();
   });
+  it('retries an ungrounded model excerpt once while retaining exact original evidence', async () => {
+    const envelope = (observations: unknown[]) =>
+      Response.json({
+        choices: [
+          {
+            message: { content: JSON.stringify({ complete: true, observations }) },
+            finish_reason: 'stop'
+          }
+        ]
+      });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(envelope([{ ...row, source_excerpt: 'Rewritten row' }]))
+      .mockResolvedValueOnce(envelope([row]));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await extractStatementText({ pages: [source], apiKey: 'test' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.draft.observations[0].source_excerpt).toBe(row.source_excerpt);
+  });
   it('returns only drafts, meters each chunk, and never sends a password', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       Response.json({

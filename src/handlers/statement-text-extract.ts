@@ -1,3 +1,4 @@
+import { OpenRouterError } from '../ai/openrouter';
 import { extractStatementText, STATEMENT_TEXT_MODEL } from '../ai/statement-text';
 import { createSupabaseServices } from '../services/supabase';
 import type { Env } from '../types/env';
@@ -42,6 +43,26 @@ export async function handleStatementTextExtract(request: Request, env: Env): Pr
   } catch (error) {
     const consentError = aiConsentErrorResponse(error);
     if (consentError) return consentError;
+    const safeReasons = new Set([
+      'Invalid statement result',
+      'Incomplete statement result',
+      'Invalid statement observation',
+      'Ungrounded statement excerpt',
+      'Ungrounded statement amount',
+      'Statement line exceeds safe limit',
+      'Statement exceeds safe chunk limit',
+      'Statement draft exceeds safe observation limit',
+      'Statement extraction deadline exceeded'
+    ]);
+    console.error(
+      'statement_text_extraction_failed',
+      error instanceof OpenRouterError
+        ? { reason: error.reason, status: error.status, stage: error.stage ?? null }
+        : {
+            reason:
+              error instanceof Error && safeReasons.has(error.message) ? error.message : 'unknown'
+          }
+    );
     return Response.json(
       { error: 'Statement extraction failed' },
       { status: error instanceof SyntaxError ? 400 : 502 }
