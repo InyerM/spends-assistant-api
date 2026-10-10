@@ -15,6 +15,8 @@
 - Chromium checks at 375, 768 and 1440 pixel viewport widths showed dialog scroll widths equal to client widths, with long synthetic descriptions and categories.
 - The initial web regression run passed 1,271 tests across 205 files; the additional PDF inspector interaction test verifies unlocking, key clearing and preview without financial posting.
 - Focused inspection API tests verify owner scoping, short signed URL lifetime, foreign path rejection and unauthenticated rejection.
+- The backend suite passed 903 tests across 113 files with two workers after the initial highly concurrent run hit SQL test timeouts. Typechecks and targeted lint passed in both repositories.
+- Production verification confirmed migration `20261010000053` was applied and the contact detail function includes shared categories.
 - Shared-category SQL regression verifies translated system categories without exposing another owner's category.
 
 ## Remaining statement issue
