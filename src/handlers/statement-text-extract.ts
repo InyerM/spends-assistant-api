@@ -48,6 +48,7 @@ export async function handleStatementTextExtract(request: Request, env: Env): Pr
       'Incomplete statement result',
       'Invalid statement observation',
       'Ungrounded statement excerpt',
+      'Invalid statement source range',
       'Ungrounded statement amount',
       'Statement line exceeds safe limit',
       'Statement exceeds safe chunk limit',

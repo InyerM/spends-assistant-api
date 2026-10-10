@@ -28,6 +28,42 @@ describe('grounded PDF statement drafts', () => {
       )
     ).toThrow();
   });
+  it('builds exact source evidence from bounded line references instead of model quotations', () => {
+    const referenced = {
+      ...row,
+      source_excerpt: 'Paraphrased by the model',
+      source_line_start: 2,
+      source_line_end: 2
+    };
+    expect(
+      validateStatementChunk({ observations: [referenced], complete: true }, source).observations[0]
+        .source_excerpt
+    ).toBe(row.source_excerpt);
+    for (const bounds of [
+      [0, 2],
+      [2, 3],
+      [2, 1],
+      [1.5, 2]
+    ]) {
+      expect(() =>
+        validateStatementChunk(
+          {
+            observations: [
+              { ...referenced, source_line_start: bounds[0], source_line_end: bounds[1] }
+            ],
+            complete: true
+          },
+          source
+        )
+      ).toThrow();
+    }
+    expect(() =>
+      validateStatementChunk(
+        { observations: [{ ...referenced, amount: 999 }], complete: true },
+        source
+      )
+    ).toThrow('Ungrounded statement amount');
+  });
   it('fails the whole draft when the model truncates or declares incomplete coverage', () => {
     expect(() =>
       validateStatementChunk({ observations: [row], complete: false }, source)
