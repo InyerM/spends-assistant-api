@@ -21,6 +21,12 @@ it('audits statement links without posting, isolates owners and invalidates chan
       readFileSync('supabase/migrations/20261009000050_statement_reconciliation.sql', 'utf8')
     );
     await db.exec(
+      readFileSync(
+        'supabase/migrations/20261009000051_statement_reconciliation_commands.sql',
+        'utf8'
+      )
+    );
+    await db.exec(
       `SET request.jwt.claim.sub='00000000-0000-4000-8000-000000000001'; SET ROLE authenticated;`
     );
     await db.query(
@@ -32,6 +38,8 @@ it('audits statement links without posting, isolates owners and invalidates chan
         `SELECT confirm_statement_reconciliation('20000000-0000-4000-8000-000000000001','30000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000002')`
       )
     ).rejects.toThrow(/not found/);
+    const queuedCall = `SELECT apply_statement_reconciliation_command('50000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','{"action":"confirm","observation_id":"30000000-0000-4000-8000-000000000001","transaction_id":"40000000-0000-4000-8000-000000000001"}')`;
+    await db.query(queuedCall);
     const first = await db.query(call);
     await expect(
       db.query(
@@ -67,11 +75,14 @@ it('audits statement links without posting, isolates owners and invalidates chan
       `SELECT undo_statement_reconciliation('${(first.rows[0] as { id: string }).id}')`
     );
     expect((await db.query(`SELECT * FROM statement_reconciliation_proofs`)).rows).toEqual([]);
+    await db.query(queuedCall);
+    expect((await db.query(`SELECT * FROM statement_reconciliation_proofs`)).rows).toEqual([]);
     await db.exec(`RESET ROLE;`);
     expect((await db.query(`SELECT balance FROM accounts`)).rows).toEqual([{ balance: '500' }]);
     await db.exec(
       `SET ROLE authenticated; SET request.jwt.claim.sub='00000000-0000-4000-8000-000000000002';`
     );
+    expect((await db.query(`SELECT * FROM statement_reconciliation_proofs`)).rows).toEqual([]);
     expect((await db.query(`SELECT * FROM statement_reconciliation_proofs`)).rows).toEqual([]);
     await expect(db.query(call)).rejects.toThrow(/not found/i);
   } finally {
