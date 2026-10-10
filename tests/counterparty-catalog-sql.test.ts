@@ -86,6 +86,39 @@ it('scans every confirmed transaction idempotently without changing financial ro
     expect((await db.query('SELECT custom_name FROM counterparties')).rows[0]).toEqual({
       custom_name: 'Lunch provider'
     });
+    await db.exec(readFileSync('supabase/migrations/20261009000052_counterparty_sort.sql', 'utf8'));
+    await db.exec(
+      `INSERT INTO transactions(id,user_id,type,raw_text,description,date,amount,currency) VALUES ('00000000-0000-4000-8000-000000000014',auth.uid(),'expense','Realizaste una compra en ACME SHOP por $45,000','Shop','2026-10-09',45000,'COP');`
+    );
+    await db.query('SELECT public.scan_counterparty_catalog(null,200)');
+    const most = (
+      await db.query<{ result: { items: Array<{ name: string; movement_count: number }> } }>(
+        "SELECT list_counterparties_sorted('',0,1,'most_transactions') result"
+      )
+    ).rows[0].result;
+    expect(most.items.map((item) => item.movement_count)).toEqual([2]);
+    const next = (
+      await db.query<{ result: { items: Array<{ movement_count: number }> } }>(
+        "SELECT list_counterparties_sorted('',1,1,'most_transactions') result"
+      )
+    ).rows[0].result;
+    expect(next.items.map((item) => item.movement_count)).toEqual([1]);
+    const fewest = (
+      await db.query<{ result: { items: Array<{ movement_count: number }> } }>(
+        "SELECT list_counterparties_sorted('',0,50,'fewest_transactions') result"
+      )
+    ).rows[0].result;
+    expect(fewest.items.map((item) => item.movement_count)).toEqual([1, 2]);
+    await db.exec(
+      "UPDATE transactions SET deleted_at=now() WHERE id='00000000-0000-4000-8000-000000000012'"
+    );
+    const changed = (
+      await db.query<{
+        result: { items: Array<{ movement_count: number; last_activity: string }> };
+      }>("SELECT list_counterparties_sorted('',0,50,'most_transactions') result")
+    ).rows[0].result;
+    expect(changed.items.map((item) => item.movement_count)).toEqual([1, 1]);
+    expect(changed.items[0].last_activity).toBe('2026-10-09');
     await db.exec(
       `SELECT set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false); SET ROLE authenticated;`
     );
