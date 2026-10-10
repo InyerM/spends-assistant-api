@@ -7,6 +7,9 @@ interface CompletionInput {
   meter?: AiUsageMeter;
   maxOutputTokens?: number;
   recoverMalformedOutput?: boolean;
+  publicWebSearch?: boolean;
+  timeoutMs?: number;
+  disableReasoning?: boolean;
 }
 
 export class OpenRouterError extends Error {
@@ -27,7 +30,10 @@ export class OpenRouterError extends Error {
 interface CompletionResponse {
   error?: { code?: number };
   choices?: Array<{
-    message?: { content?: string | null };
+    message?: {
+      content?: string | null;
+      annotations?: Array<{ type?: string; url_citation?: { url?: string } }>;
+    };
     finish_reason?: string | null;
   }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number | null };
@@ -36,6 +42,7 @@ interface CompletionResponse {
 export async function completeJson<T>(input: CompletionInput): Promise<{
   data: T;
   usage: { prompt_tokens: number; completion_tokens: number } | null;
+  citations?: string[];
 }> {
   if (
     input.maxOutputTokens !== undefined &&
@@ -46,6 +53,11 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
     throw new Error('Invalid output token limit');
   if (!input.apiKey) throw new Error('OpenRouter API key is not configured');
 
+  if (
+    input.timeoutMs !== undefined &&
+    (!Number.isInteger(input.timeoutMs) || input.timeoutMs < 1000 || input.timeoutMs > 45000)
+  )
+    throw new Error('Invalid completion timeout');
   let maxTokens = input.maxOutputTokens ?? 2048;
   const payload = {
     model: input.model,
@@ -56,6 +68,23 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
     response_format: { type: 'json_object' },
     usage: { include: true },
     temperature: 0.1,
+    ...(input.disableReasoning ? { reasoning: { enabled: false } } : {}),
+    ...(input.publicWebSearch
+      ? {
+          tools: [
+            {
+              type: 'openrouter:web_search',
+              parameters: {
+                engine: 'exa',
+                max_results: 3,
+                max_total_results: 3,
+                max_uses: 1,
+                search_context_size: 'low'
+              }
+            }
+          ]
+        }
+      : {}),
     provider: {
       zdr: true,
       data_collection: 'deny',
@@ -64,9 +93,9 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
   };
 
   // Bound all recovery attempts; never retain or expose an upstream error body.
-  const deadline = Date.now() + 45_000;
+  const deadline = Date.now() + (input.timeoutMs ?? 45_000);
   const transientStatuses = new Set([408, 429, 500, 502, 503, 504]);
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < (input.publicWebSearch ? 1 : 3); attempt++) {
     let response: Response | undefined;
     let result: CompletionResponse | undefined;
     let failure: OpenRouterError | undefined;
@@ -131,7 +160,15 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
                   completion_tokens: result.usage.completion_tokens
                 }
               : null;
-          return { data, usage };
+          const citations = [
+            ...new Set(
+              (choice.message.annotations ?? [])
+                .filter((annotation) => annotation.type === 'url_citation')
+                .map((annotation) => annotation.url_citation?.url)
+                .filter((url): url is string => typeof url === 'string' && /^https:\/\//u.test(url))
+            )
+          ];
+          return { data, usage, ...(input.publicWebSearch ? { citations } : {}) };
         } catch {
           failure = new OpenRouterError(0, 'invalid_json', 'content');
         }
@@ -146,7 +183,7 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
     const retryAfter = Number(response?.headers.get('Retry-After'));
     const delay =
       Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 500 * (attempt + 1);
-    if (!retryable || attempt === 2 || Date.now() + delay >= deadline) {
+    if (!retryable || input.publicWebSearch || attempt === 2 || Date.now() + delay >= deadline) {
       throw failure ?? new OpenRouterError(0, 'network');
     }
     if (failure?.reason === 'truncated') maxTokens = Math.min(maxTokens * 2, 8192);

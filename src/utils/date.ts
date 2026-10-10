@@ -149,8 +149,8 @@ export function validateEmailEventTime(
     !/(?:\$|\bCOP\b|\bUSD\b)\s*\d/iu.test(quote)
   )
     return null;
-  if (/\b(?:horario|atenci[oó]n|soporte|copyright|factura|vencimiento)\b/iu.test(quote))
-    return null;
+  if (/\b(?:horario|atenci[oó]n|soporte|copyright|vencimiento)\b/iu.test(quote)) return null;
+  if (/\bfactura\b/iu.test(quote) && !/\b(?:pago|pagaste|pagada)\b/iu.test(quote)) return null;
   const parsed = new Date(`${date}T00:00:00Z`);
   if (
     !Number.isFinite(parsed.getTime()) ||

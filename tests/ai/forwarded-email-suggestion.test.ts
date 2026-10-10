@@ -51,7 +51,10 @@ describe('forwarded email suggestions', () => {
       categorySource: 'catalog',
       description: 'Curso en CEA Practicar del Eje',
       notes: 'Compra con tarjeta terminada en 8456; verificar en el extracto.',
-      bankEventAt: null
+      bankEventAt: null,
+      amount: '1550000.00',
+      eventDate: null,
+      sourceLastFour: null
     });
     expect(usage.track).toHaveBeenCalledWith(
       expect.objectContaining({ operation: 'triage_forwarded_email' }),

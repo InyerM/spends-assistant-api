@@ -378,3 +378,47 @@ describe('completeJson', () => {
     expect(meter.summary()).toMatchObject({ billedCalls: 3, costSource: 'unknown' });
   });
 });
+
+it('bounds public merchant search, disables unnecessary reasoning and retains upstream citations', async () => {
+  const fetchMock = vi.fn().mockResolvedValue(
+    Response.json({
+      choices: [
+        {
+          message: {
+            content: '{"ok":true}',
+            annotations: [
+              { type: 'url_citation', url_citation: { url: 'https://example.com/about' } }
+            ]
+          }
+        }
+      ],
+      usage: { prompt_tokens: 100, completion_tokens: 40, cost: 0.005 }
+    })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  const result = await completeJson({
+    apiKey: 'key',
+    model: 'model',
+    system: 'Public merchant',
+    user: '{"merchant":"PUBLIC STORE"}',
+    publicWebSearch: true,
+    disableReasoning: true,
+    timeoutMs: 10000
+  });
+  const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+  expect(body.tools).toEqual([
+    {
+      type: 'openrouter:web_search',
+      parameters: {
+        engine: 'exa',
+        max_results: 3,
+        max_total_results: 3,
+        max_uses: 1,
+        search_context_size: 'low'
+      }
+    }
+  ]);
+  expect(body.reasoning).toEqual({ enabled: false });
+  expect(body.provider.zdr).toBe(true);
+  expect(result.citations).toEqual(['https://example.com/about']);
+});

@@ -3,6 +3,12 @@ import { detectEmailMessageKind } from '../../src/utils/email-message-kind';
 
 describe('email message labels', () => {
   it.each([
+    ['Generic notification', 'Payment completed. Amount: USD 19.99. Date: 2026-09-11.', 'purchase'],
+    [
+      'Generic notification',
+      'Pago completado. Valor: 33.812,00 COP. Fecha: 11/09/2026.',
+      'purchase'
+    ],
     ['Alertas', 'Actualizaste tus topes en Sucursal Virtual.', 'security'],
     ['Pago rechazado', 'No fue posible realizar el pago por $15000000.', 'informational'],
     ['Tu viaje Uber del domingo', 'Total COP 10330. Pagos Mastercard 9989.', 'purchase'],

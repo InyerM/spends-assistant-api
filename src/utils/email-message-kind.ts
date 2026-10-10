@@ -1,3 +1,5 @@
+import { extractEmailEventEvidence } from './email-event-evidence';
+
 export const EMAIL_MESSAGE_KINDS = [
   'purchase',
   'transfer',
@@ -25,6 +27,17 @@ export function detectEmailMessageKind(subject: string, text: string): EmailMess
   )
     return 'security';
   if (/rechazad[ao]|no pudimos hacer tu pago/iu.test(subject)) return 'informational';
+  const event = extractEmailEventEvidence(text);
+  if (event.amount && !event.ambiguous) {
+    if (event.type === 'income') return 'income';
+    if (
+      /\b(?:transferiste|transferencia realizada|enviaste|transfer completed|retiraste)\b/iu.test(
+        text
+      )
+    )
+      return 'transfer';
+    return 'purchase';
+  }
   const amount = /(?:\$|\bCOP|\bUSD)\s*[\d.,]+|\d[\d.,]*\s*(?:pesos?|d[oó]lares?|dollars?)/iu.test(
     text
   );

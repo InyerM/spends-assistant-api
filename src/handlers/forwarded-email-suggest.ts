@@ -29,12 +29,18 @@ export async function handleForwardedEmailSuggest(request: Request, env: Env): P
       services.aiUsage
     );
     return Response.json({
+      ...(suggestion.merchantSourceUrl
+        ? { merchant_source_url: suggestion.merchantSourceUrl }
+        : {}),
       type: suggestion.type,
       category_id: suggestion.categoryId,
       category_source: suggestion.categorySource,
       description: suggestion.description,
       notes: suggestion.notes,
-      bank_event_at: suggestion.bankEventAt ?? null
+      bank_event_at: suggestion.bankEventAt ?? null,
+      amount: suggestion.amount ?? null,
+      event_date: suggestion.eventDate ?? null,
+      source_last_four: suggestion.sourceLastFour ?? null
     });
   } catch (error) {
     const consentResponse = aiConsentErrorResponse(error);

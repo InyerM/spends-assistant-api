@@ -59,7 +59,10 @@ describe('forwarded email suggestion endpoint', () => {
       category_source: 'catalog',
       description: 'Course at CEA Practicar del Eje',
       notes: 'Card ending 8456.',
-      bank_event_at: null
+      bank_event_at: null,
+      amount: null,
+      event_date: null,
+      source_last_four: null
     });
     expect(mocks.suggest).toHaveBeenCalledWith(
       expect.any(String),
