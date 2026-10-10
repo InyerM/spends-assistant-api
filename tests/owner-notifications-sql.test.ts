@@ -326,3 +326,36 @@ describe('persistent owner notifications SQL', () => {
     }
   }, 30_000);
 });
+it('keeps notification pagination and unread counts consistent with in-app preferences', async () => {
+  const db = await database();
+  try {
+    await db.exec(`CREATE TABLE product_preferences(user_id uuid PRIMARY KEY,payload jsonb);
+ INSERT INTO email_forwarding_routes VALUES('${owner}',now(),now());`);
+    await db.exec(
+      readFileSync(
+        new URL(
+          '../supabase/migrations/20261010000058_in_app_notification_preferences.sql',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    );
+    await asOwner(db);
+    const first = await refresh(db);
+    expect(first.data.some((notice) => notice.kind === 'email_received')).toBe(true);
+    await db.exec(
+      `RESET ROLE; INSERT INTO product_preferences VALUES('${owner}','{"in_app_notifications":{"email":false}}');`
+    );
+    await asOwner(db);
+    const disabled = await refresh(db);
+    expect(disabled.data.some((notice) => notice.kind === 'email_received')).toBe(false);
+    expect(disabled.unread_count).toBe(disabled.data.filter((notice) => !notice.read_at).length);
+    expect(disabled.total_count).toBe(disabled.data.length);
+    expect(disabled.pending_email_count).toBe(1);
+    await db.exec(`RESET ROLE; UPDATE product_preferences SET payload='{}';`);
+    await asOwner(db);
+    expect((await refresh(db)).data.some((notice) => notice.kind === 'email_received')).toBe(true);
+  } finally {
+    await db.close();
+  }
+});
