@@ -1,3 +1,4 @@
+import { handleAudioTranscribe } from './handlers/audio-transcribe';
 import { handleStatementTextExtract } from './handlers/statement-text-extract';
 import { handleFinancialChat } from './handlers/financial-chat';
 import {
@@ -94,6 +95,9 @@ export default {
     if (url.pathname === '/parse' && request.method === 'POST') {
       return handleParse(request, env);
     }
+
+    if (url.pathname === '/audio/transcribe' && request.method === 'POST')
+      return handleAudioTranscribe(request, env);
 
     if (url.pathname === '/documents/extract-text' && request.method === 'POST') {
       return handleStatementTextExtract(request, env);

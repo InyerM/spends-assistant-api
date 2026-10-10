@@ -17,7 +17,7 @@ The October 10 review prioritizes the web application. Preserve the approved Voi
 
 ## Visual navigation proposals
 
-The three interactive proposals are available in the web repository at `public/design/navigation-options.html` and, after release, at `https://my.anotto.app/design/navigation-options.html`.
+The original public preview was retired on October 10 at the owner's request. Five interactive proposals now live in the web repository at `docs/design/navigation-options.html`, served only at `http://localhost:4317` by `scripts/design-preview.ts`. Never publish these explorations in public routes.
 
 1. **Fixed actions and collapsible spaces — recommended:** Home, Transactions and Assistant remain visible; Review, Organize and Wealth contain related modules; Settings contains help and integrations.
 2. **Areas:** My money, Review and Tools provide fewer top-level decisions, with one extra click for common actions.

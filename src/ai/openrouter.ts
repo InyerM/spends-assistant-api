@@ -4,6 +4,7 @@ interface CompletionInput {
   model: string;
   system: string;
   user: string;
+  audio?: { data: string; format: string };
   meter?: AiUsageMeter;
   maxOutputTokens?: number;
   recoverMalformedOutput?: boolean;
@@ -63,7 +64,15 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
     model: input.model,
     messages: [
       { role: 'system', content: input.system },
-      { role: 'user', content: input.user }
+      {
+        role: 'user',
+        content: input.audio
+          ? [
+              { type: 'text', text: input.user },
+              { type: 'input_audio', input_audio: input.audio }
+            ]
+          : input.user
+      }
     ],
     response_format: { type: 'json_object' },
     usage: { include: true },

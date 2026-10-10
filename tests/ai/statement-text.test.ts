@@ -110,6 +110,77 @@ describe('grounded PDF statement drafts', () => {
       ).toEqual([]);
     }
   });
+  it('ignores numeric summaries and recognizes a grounded credit independently of model direction', () => {
+    for (const label of [
+      'Saldo anterior',
+      'Cuota transacciones',
+      'Cuota avances',
+      'Compras del mes',
+      'Otros cargos',
+      'Pagos / abonos',
+      'En mora',
+      'A favor',
+      'Previous balance',
+      'Saldo anterior em reais'
+    ]) {
+      const excerpt = `${label} 18.495,00`;
+      expect(
+        validateStatementChunk(
+          {
+            complete: true,
+            observations: [
+              {
+                ...row,
+                description: label,
+                source_excerpt: excerpt,
+                occurred_at: null,
+                amount_text: '18.495,00',
+                direction: 'outgoing'
+              }
+            ]
+          },
+          excerpt
+        ).observations
+      ).toEqual([]);
+    }
+    const excerpt = '2026-09-01 ABONO SUCURSAL VIRTUAL 625.156,00';
+    const credit = validateStatementChunk(
+      {
+        complete: true,
+        observations: [
+          {
+            ...row,
+            description: 'ABONO SUCURSAL VIRTUAL',
+            source_excerpt: excerpt,
+            occurred_at: '2026-09-01',
+            amount_text: '625.156,00',
+            direction: 'outgoing'
+          }
+        ]
+      },
+      `Bancolombia COP\n${excerpt}`
+    );
+    expect(credit.observations[0].amount).toBe(625156);
+    const fee = '2026-09-15 CUOTA DE MANEJO 18.495,00';
+    expect(
+      validateStatementChunk(
+        {
+          complete: true,
+          observations: [
+            {
+              ...row,
+              description: 'CUOTA DE MANEJO',
+              source_excerpt: fee,
+              occurred_at: '2026-09-15',
+              amount_text: '18.495,00',
+              direction: 'outgoing'
+            }
+          ]
+        },
+        `Bancolombia COP\n${fee}`
+      ).observations[0].amount
+    ).toBe(-18495);
+  });
   it('fails the whole draft when the model truncates or declares incomplete coverage', () => {
     expect(() =>
       validateStatementChunk({ observations: [row], complete: false }, source)
