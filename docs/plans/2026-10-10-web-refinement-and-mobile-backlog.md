@@ -41,6 +41,20 @@ Frequent expenses are reusable presets containing an account, amount and categor
 - Browser speech-service availability cannot be guaranteed by microphone permission. Real microphone recognition in the user's browser requires a separate device check. The browser now reports service, language, microphone, permission and silence errors separately.
 - The screenshots do not prove every page of the user's encrypted statement is empty. No password was stored or requested. The new inspection reads all PDF pages when the user unlocks the file and retains unknown states for review.
 
+## Published release and browser verification
+
+- Web source: `ea76c1b` (main feature commit `1882ae8`, preference-loading protection `7e28d5d`).
+- Backend SQL source: `2bf04ba`.
+- Production deployment: `dpl_8fmxMseFN4fmBG7YgktcbgKqnkFK`, READY on October 10, aliased to [my.anotto.app](https://my.anotto.app). Deployment URL: `https://spends-assistant-nlrhteagg-inyerms-projects.vercel.app`.
+- Migrations 57 and 58 were applied transactionally and registered in migration history before web release.
+- Final targeted production checks passed: complete-history contact spending/counts; explicit statement period/account/empty-text inspection; guided-tour action releasing the account form; drag ordering persisted to owner preferences; server filtering of disabled notices; all three interactive navigation proposals.
+- An earlier browser batch verified pre-extraction PDF viewing at 1440 and 390 px and captured contacts/editor layouts without horizontal page overflow. The final follow-up changed only tour action handling and repeated its behavior check. A transient local network change interrupted one run; its disposable owner was cleaned up before retry.
+- Disposable QA owners and synthetic uploaded files were removed. No production-user financial record was changed by these checks.
+- Mechanical design detector returned an empty findings list. Typecheck, lint and production build passed; lint retains the existing React Hook Form compiler warning in `transaction-form.tsx`.
+- Private local verification artifacts: `/tmp/anotto-refinement-core-report.json`, `/tmp/anotto-refinement-web-release-inspect.log`, `/tmp/anotto-refine-contacts-{1440,390}.png`, `/tmp/anotto-refine-editor-{1440,390}.png`. These artifacts are not committed.
+
+Technical sources: [Driver.js configuration](https://driverjs.com/docs/configuration) and [browser speech recognition errors](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognitionErrorEvent/error).
+
 ## Acceptance plan
 
 1. Open Contacts at desktop width. Check the three compact panels. Open the leaders and ranked contacts; the detail must match their confirmed history. Currency totals must remain separate.
