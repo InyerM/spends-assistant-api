@@ -59,3 +59,27 @@ it('uses the stronger audio model and returns relevance without inventing missin
   });
   vi.unstubAllGlobals();
 });
+it('treats a spoken item and amount as financial shorthand without inventing a verb', async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValue(
+      Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({ text: 'papas diez mil', relevance: 'financial' })
+            },
+            finish_reason: 'stop'
+          }
+        ]
+      })
+    );
+  vi.stubGlobal('fetch', fetchMock);
+  expect(
+    await transcribeAudio({ data: 'UklGRg==', format: 'wav', language: 'es', apiKey: 'test' })
+  ).toEqual({ text: 'papas diez mil', relevance: 'financial' });
+  const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).messages[0].content;
+  expect(prompt).toContain('papas diez mil');
+  expect(prompt).toContain('item plus an amount');
+  vi.unstubAllGlobals();
+});

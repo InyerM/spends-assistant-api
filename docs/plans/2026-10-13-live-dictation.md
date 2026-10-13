@@ -42,3 +42,9 @@ Say a real amount and destination, watch the provisional text, then pause. Verif
 - https://openrouter.ai/google/gemini-2.5-flash
 - https://openrouter.ai/docs/guides/overview/multimodal/audio
 - https://vercel.com/docs/deployments/vercel-ignore
+
+## Short-dictation follow-up
+
+On 2026-10-13, the prompt was extended to accept an item plus an amount without requiring a payment verb. Live synthetic fixtures for potatoes, coffee and taxi were financial; the unrelated weather fixture remained unrelated. Both WAV input and a finalized Chrome MediaRecorder WebM preserved the short potatoes/10,000 example. Each four-dictation check consumed four quota units and deleted its synthetic owner. Worker version: `8a0c0df1-f80a-43f5-a908-198d24442806`.
+
+The corresponding web update starts MediaRecorder before AudioWorklet initialization, sends the complete finalized container for the final request, and retains WAV snapshots for prefix updates. Successful status and permanent help copy were removed from the composer; privacy and quota details remain in the microphone tooltip. Physical microphone accuracy still needs an owner-device check.
