@@ -76,7 +76,7 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
     ],
     response_format: { type: 'json_object' },
     usage: { include: true },
-    temperature: 0.1,
+    temperature: input.audio ? 0 : 0.1,
     ...(input.disableReasoning ? { reasoning: { enabled: false } } : {}),
     ...(input.publicWebSearch
       ? {
@@ -97,7 +97,7 @@ export async function completeJson<T>(input: CompletionInput): Promise<{
     provider: {
       zdr: true,
       data_collection: 'deny',
-      max_price: { prompt: 0.4, completion: 1 }
+      max_price: input.audio ? { prompt: 1, completion: 2.5 } : { prompt: 0.4, completion: 1 }
     }
   };
 

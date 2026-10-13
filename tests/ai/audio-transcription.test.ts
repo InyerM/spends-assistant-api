@@ -5,7 +5,12 @@ it('sends bounded audio through private OpenRouter routing and returns transcrip
     Response.json({
       choices: [
         {
-          message: { content: JSON.stringify({ text: 'Paid twenty dollars for lunch' }) },
+          message: {
+            content: JSON.stringify({
+              text: 'Paid twenty dollars for lunch',
+              relevance: 'financial'
+            })
+          },
           finish_reason: 'stop'
         }
       ],
@@ -15,7 +20,7 @@ it('sends bounded audio through private OpenRouter routing and returns transcrip
   vi.stubGlobal('fetch', fetchMock);
   expect(
     await transcribeAudio({ data: 'UklGRg==', format: 'wav', language: 'en', apiKey: 'test' })
-  ).toBe('Paid twenty dollars for lunch');
+  ).toEqual({ text: 'Paid twenty dollars for lunch', relevance: 'financial' });
   const body = JSON.parse(fetchMock.mock.calls[0][1].body);
   expect(body.provider).toMatchObject({ zdr: true, data_collection: 'deny' });
   expect(body.messages[1].content[1]).toMatchObject({
@@ -23,5 +28,34 @@ it('sends bounded audio through private OpenRouter routing and returns transcrip
     input_audio: { data: 'UklGRg==', format: 'wav' }
   });
   expect(body.tools).toBeUndefined();
+  vi.unstubAllGlobals();
+});
+it('uses the stronger audio model and returns relevance without inventing missing fields', async () => {
+  const fetchMock = vi.fn().mockResolvedValue(
+    Response.json({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              text: 'Transferí cincuenta mil a Nequi',
+              relevance: 'financial'
+            })
+          },
+          finish_reason: 'stop'
+        }
+      ]
+    })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  expect(
+    await transcribeAudio({ data: 'UklGRg==', format: 'wav', language: 'es', apiKey: 'test' })
+  ).toEqual({ text: 'Transferí cincuenta mil a Nequi', relevance: 'financial' });
+  const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+  expect(body.model).toBe('google/gemini-2.5-flash');
+  expect(body.provider).toMatchObject({
+    zdr: true,
+    data_collection: 'deny',
+    max_price: { prompt: 1, completion: 2.5 }
+  });
   vi.unstubAllGlobals();
 });

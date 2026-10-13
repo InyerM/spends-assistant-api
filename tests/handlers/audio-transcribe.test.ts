@@ -6,13 +6,14 @@ const mocks = vi.hoisted(() => ({
   consent: vi.fn(),
   quota: vi.fn(),
   track: vi.fn(),
-  transcribe: vi.fn()
+  transcribe: vi.fn(),
+  session: vi.fn()
 }));
 vi.mock('../../src/services/supabase', () => ({
   createSupabaseServices: () => ({
     apiKeys: {},
     aiConsent: { require: mocks.consent },
-    usage: { incrementAiParses: mocks.quota },
+    usage: { incrementAiParses: mocks.quota, reserveAudioTranscription: mocks.session },
     aiUsage: { track: mocks.track }
   })
 }));
@@ -37,14 +38,14 @@ beforeEach(() => {
   mocks.consent.mockResolvedValue(undefined);
   mocks.quota.mockResolvedValue({ allowed: true });
   mocks.track.mockImplementation((_meta, callback) => callback({ record: vi.fn() }));
-  mocks.transcribe.mockResolvedValue('A spoken transaction');
+  mocks.transcribe.mockResolvedValue({ text: 'A spoken transaction', relevance: 'financial' });
 });
 it('authenticates, checks consent and quota and only returns a transient transcript', async () => {
   expect((await handleAudioTranscribe(request(valid, false), createMockEnv())).status).toBe(401);
   expect(mocks.quota).not.toHaveBeenCalled();
   const response = await handleAudioTranscribe(request(valid), createMockEnv());
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ text: 'A spoken transaction' });
+  expect(await response.json()).toEqual({ text: 'A spoken transaction', relevance: 'financial' });
   expect(mocks.consent).toHaveBeenCalledWith('owner', 'financial_text');
   expect(mocks.track).toHaveBeenCalledWith(
     expect.objectContaining({ operation: 'parse_expense' }),
@@ -61,4 +62,18 @@ it('rejects unsupported media, exhausted quota and revoked consent before callin
   mocks.quota.mockResolvedValueOnce({ allowed: false });
   expect((await handleAudioTranscribe(request(valid), createMockEnv())).status).toBe(429);
   expect(mocks.transcribe).not.toHaveBeenCalled();
+});
+
+it('reserves session quota using the authenticated owner and rejects unbounded sequence numbers', async () => {
+  const session = { session_id: '12345678-1234-4321-8123-123456789abc', sequence: 0, final: false };
+  mocks.session.mockResolvedValue({ allowed: true, used: 1, limit: 15 });
+  expect(
+    (await handleAudioTranscribe(request({ ...valid, ...session }), createMockEnv())).status
+  ).toBe(200);
+  expect(mocks.session).toHaveBeenCalledWith('owner', session.session_id, 0, false);
+  expect(mocks.quota).not.toHaveBeenCalled();
+  expect(
+    (await handleAudioTranscribe(request({ ...valid, ...session, sequence: 4 }), createMockEnv()))
+      .status
+  ).toBe(400);
 });

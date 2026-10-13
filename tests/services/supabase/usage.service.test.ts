@@ -7,7 +7,7 @@ const KEY = 'test-service-key';
 function jsonResponse(data: unknown): Response {
   return new Response(JSON.stringify(data), {
     status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' }
   });
 }
 
@@ -23,7 +23,7 @@ function mockFetchByUrl(routes: Record<string, unknown>): void {
         if (url.includes(pattern)) return jsonResponse(data);
       }
       return jsonResponse([]);
-    }),
+    })
   );
   (globalThis as Record<string, unknown>).__patchBodies = patchBodies;
 }
@@ -38,7 +38,7 @@ const makeUsage = (overrides: Partial<Record<string, unknown>> = {}): Record<str
   transactions_limit: 50,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
-  ...overrides,
+  ...overrides
 });
 
 describe('UsageService', () => {
@@ -78,7 +78,7 @@ describe('UsageService', () => {
           }
           // POST usage_tracking
           return jsonResponse([created]);
-        }),
+        })
       );
 
       const result = await service.getOrCreateMonthlyUsage('user-1');
@@ -108,14 +108,19 @@ describe('UsageService', () => {
     it('fails closed when the database rejects a reservation', async () => {
       vi.stubGlobal(
         'fetch',
-        vi.fn(async () => new Response('RPC unavailable', { status: 503, statusText: 'Unavailable' }))
+        vi.fn(
+          async () => new Response('RPC unavailable', { status: 503, statusText: 'Unavailable' })
+        )
       );
 
       await expect(service.incrementAiParses('user-1')).rejects.toThrow('API Error: Unavailable');
     });
 
     it('fails closed when the reservation response is malformed', async () => {
-      vi.stubGlobal('fetch', vi.fn(async () => jsonResponse([])));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => jsonResponse([]))
+      );
       await expect(service.incrementAiParses('user-1')).rejects.toThrow(
         'Invalid AI parse reservation response'
       );
@@ -134,7 +139,7 @@ describe('UsageService', () => {
             patchBodies.push(options.body as string);
           }
           return jsonResponse([usage]);
-        }),
+        })
       );
 
       await service.incrementTransactions('user-1');
@@ -143,4 +148,28 @@ describe('UsageService', () => {
       expect(body.transactions_count).toBe(11);
     });
   });
+});
+
+it('uses an owner-bound audio reservation and validates malformed responses', async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValue(jsonResponse([{ allowed: true, used: 1, limit: 15 }]));
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new UsageService(URL, KEY);
+  expect(await service.reserveAudioTranscription('owner', 'session', 2, false)).toEqual({
+    allowed: true,
+    used: 1,
+    limit: 15
+  });
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+    p_user_id: 'owner',
+    p_session_id: 'session',
+    p_sequence: 2,
+    p_final: false
+  });
+  fetchMock.mockResolvedValueOnce(jsonResponse([{ allowed: true, used: 'one', limit: 15 }]));
+  await expect(service.reserveAudioTranscription('owner', 'session', 3, true)).rejects.toThrow(
+    'Invalid audio reservation'
+  );
+  vi.unstubAllGlobals();
 });
