@@ -1,3 +1,4 @@
+import { handleCategoryReview } from './handlers/category-review';
 import { handleAudioTranscribe } from './handlers/audio-transcribe';
 import { handleStatementTextExtract } from './handlers/statement-text-extract';
 import { handleFinancialChat } from './handlers/financial-chat';
@@ -105,6 +106,9 @@ export default {
     if (url.pathname === '/vision/extract' && request.method === 'POST') {
       return handleVisionExtract(request, env);
     }
+
+    if (url.pathname === '/category/review' && request.method === 'POST')
+      return handleCategoryReview(request, env);
 
     if (url.pathname === '/merchant/suggest' && request.method === 'POST') {
       return handleMerchantSuggest(request, env);
