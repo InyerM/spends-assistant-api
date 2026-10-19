@@ -231,3 +231,47 @@ describe('grounded PDF statement drafts', () => {
     expect(JSON.stringify(request)).not.toContain('password');
   });
 });
+
+it('uses the local dollar section rather than the first pesos page for currency grounding', () => {
+  const excerpt = '2026-09-01 ABONO SUCURSAL VIRTUAL -5,00';
+  const result = validateStatementChunk(
+    {
+      complete: true,
+      observations: [
+        {
+          ...row,
+          currency: 'USD',
+          description: 'ABONO SUCURSAL VIRTUAL',
+          occurred_at: '2026-09-01',
+          source_excerpt: excerpt,
+          amount_text: '-5,00',
+          direction: 'incoming'
+        }
+      ]
+    },
+    `ESTADO DE CUENTA EN: DOLARES\n${excerpt}`,
+    'Bancolombia Moneda: PESOS 2026'
+  );
+  expect(result.observations[0]).toMatchObject({ amount: 5, currency: 'USD' });
+});
+it('excludes summary cells even when the model expands their descriptions', () => {
+  const excerpt = 'Abonos (-) Pagos / abonos $ 18.495,00';
+  expect(
+    validateStatementChunk(
+      {
+        complete: true,
+        observations: [
+          {
+            ...row,
+            amount_text: '18.495,00',
+            direction: 'outgoing',
+            description: 'Otros cargos del periodo (posible cuota)',
+            occurred_at: null,
+            source_excerpt: excerpt
+          }
+        ]
+      },
+      `Moneda: PESOS\n${excerpt}`
+    ).observations
+  ).toEqual([]);
+});

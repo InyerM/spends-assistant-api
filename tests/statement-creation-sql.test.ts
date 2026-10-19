@@ -31,6 +31,13 @@ it('creates and reconciles one explicitly reviewed statement movement atomically
     await db.exec(
       readFileSync('supabase/migrations/20261019000000_statement_transaction_creation.sql', 'utf8')
     );
+    await db.exec("ALTER TABLE documents ADD COLUMN mime_type text DEFAULT 'application/pdf';");
+    await db.exec(
+      readFileSync(
+        'supabase/migrations/20261019000020_statement_currency_scopes_and_metadata.sql',
+        'utf8'
+      )
+    );
     await db.exec(`SET request.jwt.claim.sub='${owner}'; SET ROLE authenticated;`);
     await db.query(
       `SELECT set_statement_reconciliation_scope('${doc}','${account}','2026-09-01','2026-09-30')`
@@ -95,6 +102,28 @@ it('creates and reconciles one explicitly reviewed statement movement atomically
       { valid: true },
       { valid: true }
     ]);
+    await db.exec(`INSERT INTO accounts VALUES('10000000-0000-4000-8000-000000000003','${owner}','COP',null,true,10000);
+      INSERT INTO document_observations VALUES('30000000-0000-4000-8000-000000000003','${owner}','${doc}',-1000,'COP','2026-09-12','pending','COP fee','12/09 Fee 1000'); SET ROLE authenticated;`);
+    await db.query(
+      `SELECT set_statement_currency_scope('${doc}','10000000-0000-4000-8000-000000000003','2026-09-01','2026-09-30','COP')`
+    );
+    await db.query(
+      `SELECT create_statement_transaction('40000000-0000-4000-8000-000000000004','${doc}','30000000-0000-4000-8000-000000000003',null,'COP fee')`
+    );
+    expect((await db.query('SELECT valid FROM statement_reconciliation_proofs')).rows).toEqual([
+      { valid: true },
+      { valid: true },
+      { valid: true }
+    ]);
+    await expect(
+      db.query(
+        `SELECT set_statement_currency_scope('${doc}','${account}','2026-09-01','2026-09-30','COP')`
+      )
+    ).rejects.toThrow(/currency/i);
+    await expect(
+      db.query(`SELECT cache_statement_metadata('${doc}','${owner}','{}')`)
+    ).rejects.toThrow(/permission denied/i);
+    await db.exec('RESET ROLE;');
     await db.exec(`UPDATE document_observations SET amount=null;`);
     await db.exec(`SET ROLE authenticated;`);
     await expect(
