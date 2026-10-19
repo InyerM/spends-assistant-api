@@ -12,7 +12,7 @@ async function setup(applyMigration = true): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(`CREATE ROLE authenticated; CREATE ROLE anon; CREATE ROLE service_role;
     CREATE SCHEMA auth; CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
-    CREATE TABLE public.accounts(id uuid PRIMARY KEY, user_id uuid NOT NULL, name text, type text, institution text, last_four text, bank_account_last_four text, is_active boolean DEFAULT true, deleted_at timestamptz);
+    CREATE TABLE public.accounts(id uuid PRIMARY KEY, user_id uuid NOT NULL, name text, type text, institution text, last_four text, bank_account_last_four text, currency text DEFAULT 'COP', is_active boolean DEFAULT true, deleted_at timestamptz);
     CREATE TABLE public.automation_rules(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL, name text NOT NULL, is_active boolean DEFAULT true, priority integer DEFAULT 0, rule_type text DEFAULT 'general', condition_logic text DEFAULT 'or', conditions jsonb NOT NULL, actions jsonb NOT NULL, deleted_at timestamptz, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
     INSERT INTO public.automation_rules(user_id,name,conditions,actions,rule_type) VALUES ('${owner}','Custom detection','{}','{"set_account":"${account}"}','account_detection');
     ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
@@ -33,6 +33,22 @@ async function createAccount(db: PGlite): Promise<void> {
     `INSERT INTO public.accounts(id,user_id,name,type,institution,last_four,identifiers) VALUES ('${account}','${owner}','Savings','savings','Bancolombia','2651','[{"kind":"bank_account","last_four":"2651","is_active":true,"is_primary":true},{"kind":"debit_card","last_four":"9989","is_active":true,"is_primary":false},{"kind":"debit_card","last_four":"7799","is_active":false,"is_primary":false}]')`
   );
 }
+it('does not generate ambiguous alias-only rules for a USD ledger', async () => {
+  const db = await setup();
+  try {
+    await createAccount(db);
+    await db.exec(
+      readFileSync('supabase/migrations/20261019000100_currency_safe_account_detection.sql', 'utf8')
+    );
+    await db.exec(`UPDATE accounts SET currency='USD',name=name WHERE id='${account}'`);
+    expect(
+      (await db.query(`SELECT name FROM automation_rules WHERE deleted_at IS NULL`)).rows
+    ).toEqual([{ name: 'Custom detection' }]);
+  } finally {
+    await db.close();
+  }
+}, 15000);
+
 describe('managed account detection rules', () => {
   it('creates one AND rule per active alias, updates idempotently and preserves custom rules', async () => {
     const db = await setup();
