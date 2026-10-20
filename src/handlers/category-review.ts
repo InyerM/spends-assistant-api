@@ -1,4 +1,5 @@
 import { reviewCategory, type CategoryReviewInput } from '../ai/category-review';
+import { OpenRouterError } from '../ai/openrouter';
 import { createSupabaseServices } from '../services/supabase';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
 import { aiConsentErrorResponse } from '../utils/ai-consent-response';
@@ -53,9 +54,14 @@ export async function handleCategoryReview(request: Request, env: Env): Promise<
     );
     return Response.json(result, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
-    return (
-      aiConsentErrorResponse(error) ??
-      Response.json({ error: 'Category review unavailable' }, { status: 503 })
-    );
+    const consentResponse = aiConsentErrorResponse(error);
+    if (consentResponse) return consentResponse;
+    console.error('category_review_failed', {
+      model: env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
+      reason: error instanceof OpenRouterError ? error.reason : 'internal',
+      ...(error instanceof OpenRouterError && error.stage ? { stage: error.stage } : {}),
+      upstream_status: error instanceof OpenRouterError ? error.status : null
+    });
+    return Response.json({ error: 'Category review unavailable' }, { status: 503 });
   }
 }

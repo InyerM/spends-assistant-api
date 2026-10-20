@@ -58,7 +58,8 @@ export async function reviewCategory(
       }))
     }),
     meter,
-    maxOutputTokens: 1100,
+    maxOutputTokens: 2048,
+    recoverMalformedOutput: true,
     disableReasoning: true
   });
   if (!data || typeof data !== 'object' || Array.isArray(data))

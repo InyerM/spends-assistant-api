@@ -23,6 +23,7 @@ vi.mock('../src/services/supabase', () => ({
 import { handleCategoryReview } from '../src/handlers/category-review';
 import { createMockEnv } from './__test-helpers__/factories';
 import { AiConsentRequiredError } from '../src/services/supabase/ai-consent.service';
+import { OpenRouterError } from '../src/ai/openrouter';
 const request = (body: unknown) =>
   new Request('https://worker/category/review', { method: 'POST', body: JSON.stringify(body) });
 const input = { locale: 'es', type: 'expense', description: 'Lunch', history: [] };
@@ -56,4 +57,25 @@ it('checks consent and quota then tracks a read-only explanation', async () => {
   expect((await handleCategoryReview(request(input), createMockEnv())).status).toBe(428);
   mocks.quota.mockResolvedValueOnce({ allowed: false });
   expect((await handleCategoryReview(request(input), createMockEnv())).status).toBe(429);
+});
+it('logs provider failure metadata without private financial context', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  try {
+    mocks.review.mockRejectedValueOnce(new OpenRouterError(0, 'truncated', 'content'));
+    const response = await handleCategoryReview(
+      request({ ...input, description: 'Private merchant detail' }),
+      createMockEnv()
+    );
+    expect(response.status).toBe(503);
+    expect(log).toHaveBeenCalledWith('category_review_failed', {
+      model: 'deepseek/deepseek-v4.1-flash',
+      reason: 'truncated',
+      stage: 'content',
+      upstream_status: 0
+    });
+    expect(JSON.stringify(log.mock.calls)).not.toContain('Private merchant detail');
+    expect(await response.json()).toEqual({ error: 'Category review unavailable' });
+  } finally {
+    log.mockRestore();
+  }
 });
