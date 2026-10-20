@@ -75,9 +75,52 @@ it('applies only a confirmed unchanged owner expense category and audits without
         after_state: { category_id: category, description: 'YouTube Premium', notes: null }
       }
     ]);
+    await db.exec(
+      readFileSync('supabase/migrations/20261020000090_expense_review_metadata.sql', 'utf8')
+    );
+    const snapshot = { ...expected, category_id: category };
+    const review = (changes: unknown, context: unknown = snapshot) =>
+      db.query('SELECT review_expense_metadata($1,$2,$3)', [
+        id,
+        JSON.stringify(changes),
+        JSON.stringify(context)
+      ]);
+    await expect(review({ amount: 1 })).rejects.toThrow(/Invalid review changes/);
+    await expect(review({ description: '' })).rejects.toThrow(/description/i);
+    await expect(review({ notes: 'x'.repeat(1501) })).rejects.toThrow(/notes/i);
+    await expect(
+      review({ description: 'Video subscription' }, { ...snapshot, notes: 'Stale' })
+    ).rejects.toThrow(/Movement changed/);
+    await db.exec(`SELECT set_config('test.uid','${other}',false)`);
+    await expect(review({ description: 'Video subscription' })).rejects.toThrow(
+      /Transaction not found/
+    );
+    await db.exec(`SELECT set_config('test.uid','${owner}',false)`);
+    await review({ description: 'Video subscription', notes: 'Monthly video service' });
+    expect(
+      (
+        await db.query(
+          'SELECT description,notes,category_id,amount,date::text,raw_text,account_id FROM transactions'
+        )
+      ).rows
+    ).toEqual([
+      {
+        description: 'Video subscription',
+        notes: 'Monthly video service',
+        category_id: category,
+        amount: '10000',
+        date: '2026-10-19',
+        raw_text: 'Original bank message',
+        account_id: account
+      }
+    ]);
+    await expect(review({ description: 'Stale overwrite' })).rejects.toThrow(/Movement changed/);
+    const next = { ...snapshot, description: 'Video subscription', notes: 'Monthly video service' };
+    await review({ notes: null }, next);
+    expect((await db.query('SELECT notes FROM transactions')).rows).toEqual([{ notes: null }]);
     await expect(apply()).rejects.toThrow('Movement changed');
     expect((await db.query('SELECT count(*) FROM transaction_review_metadata_edits')).rows).toEqual(
-      [{ count: 1 }]
+      [{ count: 3 }]
     );
   } finally {
     await db.close();
