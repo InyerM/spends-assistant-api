@@ -79,3 +79,37 @@ it('reviews wording on an existing transfer without assigning an expense or inco
   expect(result.kind).toBe('own_transfer');
   expect(result.category_id).toBeNull();
 });
+it('uses localized category names in the explanation context and prior-history labels', async () => {
+  vi.mocked(completeJson).mockResolvedValue({
+    data: {
+      category_id: 'food',
+      description: 'Almuerzo',
+      notes: '',
+      explanation: 'Corresponde a Restaurantes.',
+      kind: 'expense',
+      evidence_ids: []
+    }
+  } as never);
+  await reviewCategory(
+    {
+      locale: 'es',
+      type: 'expense',
+      description: 'Lunch',
+      history: [{ id: 'old', description: 'Lunch', category: 'Restaurants' }]
+    },
+    [
+      {
+        ...categories[0],
+        translations: { en: 'Restaurants', es: 'Restaurantes', pt: 'Restaurantes' }
+      }
+    ] as never,
+    'key',
+    'model'
+  );
+  const body = JSON.parse(vi.mocked(completeJson).mock.calls[0][0].user) as {
+    categories: Array<{ name: string }>;
+    history: Array<{ category: string }>;
+  };
+  expect(body.categories[0].name).toBe('Restaurantes');
+  expect(body.history[0].category).toBe('Restaurantes');
+});

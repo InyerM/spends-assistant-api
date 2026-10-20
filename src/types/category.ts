@@ -4,6 +4,7 @@ export interface Category {
   id: string;
   user_id: string;
   name: string;
+  translations?: Record<string, string> | null;
   slug: string;
   type: 'expense' | 'income' | 'transfer';
   parent_id: string | null;
