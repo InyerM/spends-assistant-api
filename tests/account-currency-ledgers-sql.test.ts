@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { expect, it } from 'vitest';
 it('enables a separate currency balance once, with owner isolation and immutable grouping', async () => {
@@ -19,6 +19,11 @@ it('enables a separate currency balance once, with owner isolation and immutable
     await db.exec(
       readFileSync('supabase/migrations/20261019000090_account_currency_group_metadata.sql', 'utf8')
     );
+    await db.exec(
+      `UPDATE accounts SET bank_account_last_four='1234' WHERE id='${id}'; CREATE UNIQUE INDEX accounts_owner_bank_account_suffix_idx ON accounts(user_id,lower(institution),bank_account_last_four) WHERE bank_account_last_four IS NOT NULL AND deleted_at IS NULL;`
+    );
+    const suffixMigration = 'supabase/migrations/20261020000050_currency_ledger_identifiers.sql';
+    if (existsSync(suffixMigration)) await db.exec(readFileSync(suffixMigration, 'utf8'));
     await db.exec(`SET request.jwt.claim.sub='${owner}'; SET ROLE authenticated;`);
     const enable = () =>
       db.query<{
