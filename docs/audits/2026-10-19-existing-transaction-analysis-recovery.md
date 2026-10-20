@@ -26,3 +26,11 @@ The category review requested a maximum of 1,100 output tokens and did not enabl
 ## Limits
 
 The provider can still fail after bounded recovery. No partial suggestion is returned or automatically saved in that case. This change does not claim that an external AI service will always be available.
+
+## Production release
+
+- Source commit: `294b02b`.
+- Worker version: `f3022796-8c9b-4fae-aef2-7f5a127bc860`, deployed October 19, 2026 at approximately 23:31 America/Bogota.
+- Full backend suite: 134 files, 944 tests passed (`/tmp/anotto-review-recovery-full.log`). Worker dry-run bundle passed.
+- Real-provider production smoke: Spanish expense, existing own-account transfer, and Portuguese expense with long notes all returned HTTP 200 with valid bounded proposals. Category ownership and transfer semantics were checked. Disposable-owner cleanup succeeded (`/tmp/anotto-review-recovery-production-report.json`).
+- Historical customer transactions were not re-saved or modified by verification.
