@@ -421,16 +421,16 @@
   },
   {
     "slug": "delivery",
-    "name": "Delivery",
+    "name": "Food delivery",
     "type": "expense",
     "parent_slug": "food-drinks",
     "icon": "🛵",
     "color": "#FF9F43",
     "spending_nature": "want",
     "translations": {
-      "en": "Delivery",
-      "es": "Domicilios",
-      "pt": "Delivery"
+      "en": "Food delivery",
+      "es": "Comida a domicilio",
+      "pt": "Entrega de refeições"
     },
     "legacy": {
       "slug": "delivery",
@@ -757,16 +757,16 @@
   },
   {
     "slug": "property-insurance",
-    "name": "Property Insurance",
+    "name": "Home insurance",
     "type": "expense",
     "parent_slug": "housing",
     "icon": "🛡️",
     "color": "#95E1D3",
     "spending_nature": "must",
     "translations": {
-      "en": "Property Insurance",
-      "es": "Seguro de Propiedad",
-      "pt": "Seguro de Propriedade"
+      "en": "Home insurance",
+      "es": "Seguro del hogar",
+      "pt": "Seguro residencial"
     },
     "legacy": {
       "slug": "property-insurance",
@@ -1009,14 +1009,14 @@
   },
   {
     "slug": "public-transport",
-    "name": "Public Transport",
+    "name": "Public transport",
     "type": "expense",
     "parent_slug": "transportation",
     "icon": "🚌",
     "color": "#F38181",
     "spending_nature": "need",
     "translations": {
-      "en": "Public Transport",
+      "en": "Public transport",
       "es": "Transporte público",
       "pt": "Transporte público"
     },
@@ -1037,16 +1037,16 @@
   },
   {
     "slug": "leasing",
-    "name": "Leasing",
+    "name": "Vehicle leasing",
     "type": "expense",
     "parent_slug": "vehicle",
     "icon": "📋",
     "color": "#AA96DA",
     "spending_nature": "must",
     "translations": {
-      "en": "Leasing",
-      "es": "Leasing",
-      "pt": "Leasing"
+      "en": "Vehicle leasing",
+      "es": "Arrendamiento financiero de vehículo",
+      "pt": "Arrendamento mercantil de veículo"
     },
     "legacy": {
       "slug": "leasing",
@@ -1065,16 +1065,16 @@
   },
   {
     "slug": "vehicle-insurance",
-    "name": "Vehicle Insurance",
+    "name": "Vehicle insurance",
     "type": "expense",
     "parent_slug": "vehicle",
     "icon": "🛡️",
     "color": "#AA96DA",
     "spending_nature": "must",
     "translations": {
-      "en": "Vehicle Insurance",
-      "es": "Seguro de Vehículo",
-      "pt": "Seguro de Veículo"
+      "en": "Vehicle insurance",
+      "es": "Seguro del vehículo",
+      "pt": "Seguro do veículo"
     },
     "legacy": {
       "slug": "vehicle-insurance",
@@ -1297,21 +1297,21 @@
     "spending_nature": "want",
     "translations": {
       "en": "Subscriptions and streaming",
-      "es": "Suscripciones y streaming",
-      "pt": "Assinaturas e streaming"
+      "es": "Suscripciones y entretenimiento digital",
+      "pt": "Assinaturas e entretenimento digital"
     },
     "legacy": {
       "slug": "subscriptions",
-      "name": "Subscriptions & Streaming",
+      "name": "Subscriptions and streaming",
       "type": "expense",
       "parent_slug": "entertainment",
       "icon": "📺",
       "color": "#FCBAD3",
       "spending_nature": "want",
       "translations": {
-        "en": "Subscriptions & Streaming",
-        "es": "Suscripciones y Streaming",
-        "pt": "Assinaturas e Streaming"
+        "en": "Subscriptions and streaming",
+        "es": "Suscripciones y streaming",
+        "pt": "Assinaturas e streaming"
       }
     }
   },
@@ -1354,7 +1354,7 @@
     "translations": {
       "en": "Hobbies",
       "es": "Pasatiempos",
-      "pt": "Hobbies"
+      "pt": "Passatempos"
     },
     "legacy": {
       "slug": "hobbies",
@@ -1577,21 +1577,21 @@
     "spending_nature": "want",
     "translations": {
       "en": "Software and apps",
-      "es": "Software y aplicaciones",
-      "pt": "Software e aplicativos"
+      "es": "Aplicaciones y programas",
+      "pt": "Programas e aplicativos"
     },
     "legacy": {
       "slug": "software",
-      "name": "Software, Apps, Games",
+      "name": "Software and apps",
       "type": "expense",
       "parent_slug": "technology",
       "icon": "🎮",
       "color": "#FFFFD2",
       "spending_nature": "want",
       "translations": {
-        "en": "Software, Apps, Games",
-        "es": "Software, Apps, Juegos",
-        "pt": "Software, Apps, Jogos"
+        "en": "Software and apps",
+        "es": "Software y aplicaciones",
+        "pt": "Software e aplicativos"
       }
     }
   },
@@ -1961,14 +1961,14 @@
   },
   {
     "slug": "financial-investments",
-    "name": "Financial Investments",
+    "name": "Financial investments",
     "type": "expense",
     "parent_slug": "investments",
     "icon": "📈",
     "color": "#845EC2",
     "spending_nature": "none",
     "translations": {
-      "en": "Financial Investments",
+      "en": "Financial investments",
       "es": "Inversiones financieras",
       "pt": "Investimentos financeiros"
     },
@@ -2017,14 +2017,14 @@
   },
   {
     "slug": "realty",
-    "name": "Realty",
+    "name": "Real estate",
     "type": "expense",
     "parent_slug": "investments",
     "icon": "🏢",
     "color": "#845EC2",
     "spending_nature": "none",
     "translations": {
-      "en": "Realty",
+      "en": "Real estate",
       "es": "Bienes raíces",
       "pt": "Imóveis"
     },

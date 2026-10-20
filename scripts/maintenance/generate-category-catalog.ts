@@ -3,8 +3,8 @@ const destination = process.argv[2];
 if (!destination) throw new Error('Pass a new migration path');
 const catalog = JSON.parse(readFileSync('data/default-categories.json', 'utf8')) as unknown;
 const sql = `-- Generated from data/default-categories.json. Preserve IDs, custom names and financial assignments.
-CREATE FUNCTION public.default_category_catalog() RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path='' AS $catalog$ SELECT '${JSON.stringify(catalog).replaceAll("'", "''")}'::jsonb $catalog$;
-CREATE FUNCTION public.seed_default_categories(p_user uuid) RETURNS void
+CREATE OR REPLACE FUNCTION public.default_category_catalog() RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path='' AS $catalog$ SELECT '${JSON.stringify(catalog).replaceAll("'", "''")}'::jsonb $catalog$;
+CREATE OR REPLACE FUNCTION public.seed_default_categories(p_user uuid) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE item jsonb; existing public.categories; parent uuid; legacy_parent text;
 BEGIN
@@ -25,6 +25,9 @@ BEGIN
    UPDATE public.categories SET name=item->>'name',translations=item->'translations',
     parent_id=CASE WHEN legacy_parent IS NOT DISTINCT FROM item->'legacy'->>'parent_slug' THEN parent ELSE existing.parent_id END
    WHERE id=existing.id AND user_id=p_user;
+  ELSIF NOT existing.is_default AND existing.deleted_at IS NULL AND existing.type=item->>'type'
+   AND existing.name=item->'legacy'->>'name' AND existing.translations=item->'legacy'->'translations' THEN
+   UPDATE public.categories SET translations=item->'translations' WHERE id=existing.id AND user_id=p_user;
   END IF;
  END LOOP;
 END $$;
