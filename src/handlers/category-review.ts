@@ -17,6 +17,13 @@ function validInput(value: unknown): value is CategoryReviewInput {
     (v.account_type === undefined ||
       (typeof v.account_type === 'string' && v.account_type.length <= 30)) &&
     (v.category_id === undefined || typeof v.category_id === 'string') &&
+    (v.transaction_id === undefined ||
+      (typeof v.transaction_id === 'string' && /^[0-9a-f-]{36}$/i.test(v.transaction_id))) &&
+    (v.amount === undefined ||
+      (typeof v.amount === 'number' && Number.isFinite(v.amount) && v.amount > 0)) &&
+    (v.account_id === undefined ||
+      (typeof v.account_id === 'string' && /^[0-9a-f-]{36}$/i.test(v.account_id))) &&
+    (v.source === undefined || (typeof v.source === 'string' && v.source.length <= 40)) &&
     Array.isArray(v.history) &&
     v.history.length <= 12 &&
     v.history.every(
@@ -44,13 +51,67 @@ export async function handleCategoryReview(request: Request, env: Env): Promise<
     if (!validInput(input))
       return Response.json({ error: 'Invalid review context' }, { status: 400 });
     await services.aiUsage.requireConsent(userId, 'financial_text');
-    const categories = await services.categories.getCategories(userId);
+    const [categories, history, rules] = await Promise.all([
+      services.categories.getCategories(userId),
+      services.categoryReviewContext.history(
+        userId,
+        input.description,
+        input.type,
+        input.transaction_id
+      ),
+      services.automationRules.getAutomationRules(userId)
+    ]);
+    const categoryRule = rules.find(
+      (rule) =>
+        rule.rule_type !== 'account_detection' &&
+        !rule.conditions.to_account &&
+        (!rule.conditions.category || rule.conditions.category === input.category_id) &&
+        rule.actions.set_category &&
+        (!rule.actions.set_type || rule.actions.set_type === input.type) &&
+        categories.some(
+          (category) => category.id === rule.actions.set_category && category.type === input.type
+        ) &&
+        services.automationRules.matchesConditions(
+          {
+            description: input.description,
+            raw_text: input.excerpt,
+            amount: input.amount,
+            account_id: input.account_id,
+            source: input.source,
+            category_id: input.category_id
+          },
+          rule.conditions,
+          rule.condition_logic
+        )
+    );
+    const context = {
+      preferences: rules
+        .map((rule) => rule.prompt_text?.slice(0, 1000))
+        .filter((value): value is string => Boolean(value))
+        .slice(0, 12),
+      ...(categoryRule?.actions.set_category
+        ? {
+            categoryRule: {
+              category_id: categoryRule.actions.set_category,
+              name: categoryRule.name.slice(0, 100)
+            }
+          }
+        : {})
+    };
     const quota = await services.usage.incrementAiParses(userId);
     if (!quota.allowed) return Response.json({ error: 'Parse limit reached' }, { status: 429 });
     const model = env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash';
     const result = await services.aiUsage.track(
       { userId, operation: 'parse_expense', model },
-      (meter) => reviewCategory(input, categories, env.OPENROUTER_API_KEY, model, meter)
+      (meter) =>
+        reviewCategory(
+          { ...input, history },
+          categories,
+          env.OPENROUTER_API_KEY,
+          model,
+          meter,
+          context
+        )
     );
     return Response.json(result, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {

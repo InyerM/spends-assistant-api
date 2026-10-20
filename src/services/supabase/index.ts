@@ -1,3 +1,4 @@
+import { CategoryReviewContextService } from './category-review-context.service';
 import { PlanningService } from './planning.service';
 import { EmailAttachmentsService } from './email-attachments.service';
 import { FinancialChatService } from './financial-chat.service';
@@ -16,6 +17,7 @@ import { EmailForwardingRoutesService } from './email-forwarding-routes.service'
 import { ForwardedEmailAutoPostService } from './forwarded-email-auto-post.service';
 
 export interface SupabaseServices {
+  categoryReviewContext: CategoryReviewContextService;
   planning: PlanningService;
   emailAttachments: EmailAttachmentsService;
   financialChat: FinancialChatService;
@@ -36,6 +38,7 @@ export interface SupabaseServices {
 export function createSupabaseServices(url: string, serviceKey: string): SupabaseServices {
   const aiConsent = new AiConsentService(url, serviceKey);
   return {
+    categoryReviewContext: new CategoryReviewContextService(url, serviceKey),
     planning: new PlanningService(url, serviceKey),
     emailAttachments: new EmailAttachmentsService(url, serviceKey),
     financialChat: new FinancialChatService(url, serviceKey),

@@ -113,3 +113,58 @@ it('uses localized category names in the explanation context and prior-history l
   expect(body.categories[0].name).toBe('Restaurantes');
   expect(body.history[0].category).toBe('Restaurantes');
 });
+it('offers Shopping for an unspecified marketplace purchase and never invents an item', async () => {
+  vi.mocked(completeJson).mockResolvedValue({
+    data: {
+      category_id: null,
+      description: 'Mercado Libre',
+      notes: '',
+      explanation: 'Unknown item',
+      kind: 'expense',
+      evidence_ids: []
+    }
+  } as never);
+  const result = await reviewCategory(
+    { locale: 'es', type: 'expense', description: 'Mercado Libre — item unverified', history: [] },
+    [
+      {
+        id: 'shopping',
+        slug: 'shopping',
+        name: 'Shopping',
+        translations: { es: 'Compras' },
+        type: 'expense',
+        is_active: true
+      }
+    ] as never,
+    'key',
+    'model'
+  );
+  expect(result.category_id).toBe('shopping');
+  expect(result.explanation).toContain('Compras');
+  const prompt = vi.mocked(completeJson).mock.calls[0][0].system;
+  expect(prompt).toContain('automation');
+  expect(prompt).toContain('technical');
+});
+it('honors a matching owned category rule even when the model abstains about purpose', async () => {
+  vi.mocked(completeJson).mockResolvedValue({
+    data: {
+      category_id: null,
+      description: 'Purchase',
+      notes: '',
+      explanation: 'Unknown',
+      kind: 'unknown',
+      evidence_ids: []
+    }
+  } as never);
+  const result = await reviewCategory(
+    { locale: 'es', type: 'expense', description: 'My purchase', history: [] },
+    categories as never,
+    'key',
+    'model',
+    undefined,
+    { preferences: [], categoryRule: { category_id: 'food', name: 'Lunch rule' } }
+  );
+  expect(result.category_id).toBe('food');
+  expect(result.kind).toBe('expense');
+  expect(result.explanation).toContain('Lunch rule');
+});

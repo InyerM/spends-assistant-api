@@ -16,6 +16,8 @@ vi.mock('../../src/utils/auth', () => ({
 vi.mock('../../src/services/supabase', () => ({
   createSupabaseServices: () => ({
     apiKeys: {},
+    categoryReviewContext: { history: vi.fn().mockResolvedValue([]) },
+    automationRules: { getAutomationRules: vi.fn().mockResolvedValue([]) },
     categories: { getCategories: mocks.getCategories },
     aiUsage: {}
   })
@@ -70,7 +72,8 @@ describe('forwarded email suggestion endpoint', () => {
       'test-openrouter-key',
       'deepseek/deepseek-v4.1-flash',
       'owner',
-      expect.any(Object)
+      expect.any(Object),
+      { history: [], rules: [] }
     );
   });
 

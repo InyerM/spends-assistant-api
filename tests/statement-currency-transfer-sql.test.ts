@@ -105,6 +105,78 @@ UPDATE document_observations SET amount=5,occurred_at_text='2026-09-01',descript
     await expect(db.exec('UPDATE transactions SET amount=21000')).rejects.toThrow(
       /Converted transfer/i
     );
+    await db.exec(
+      readFileSync('supabase/migrations/20261020000080_statement_funding_correction.sql', 'utf8')
+    );
+    await db.exec('SET ROLE authenticated;');
+    const correctionKey = '40000000-0000-4000-8000-000000000002';
+    const correct = (expected = 20000, actual = 21000) =>
+      db.query(
+        'SELECT correct_statement_funding_amount($1,(SELECT id FROM transactions LIMIT 1),$2,$3) AS result',
+        [correctionKey, expected, actual]
+      );
+    await expect(correct(19000)).rejects.toThrow(/changed/i);
+    await expect(correct(20000, 0)).rejects.toThrow(/Invalid/i);
+    await db.exec(`SET request.jwt.claim.sub='${other}';`);
+    await expect(correct()).rejects.toThrow(/not found/i);
+    await db.exec(
+      `SET request.jwt.claim.sub='${owner}'; RESET ROLE; CREATE TRIGGER fail_conversion_balance BEFORE UPDATE ON accounts FOR EACH ROW EXECUTE FUNCTION fail_conversion_balance(); SET ROLE authenticated;`
+    );
+    await expect(correct()).rejects.toThrow(/Synthetic conversion failure/);
+    await db.exec('RESET ROLE; DROP TRIGGER fail_conversion_balance ON accounts;');
+    expect((await db.query('SELECT count(*) FROM statement_funding_corrections')).rows).toEqual([
+      { count: 0 }
+    ]);
+    expect((await db.query('SELECT count(*) FROM statement_reconciliation_links')).rows).toEqual([
+      { count: 1 }
+    ]);
+    await db.exec('SET ROLE authenticated;');
+    await db.exec(`BEGIN; RESET ROLE;
+      INSERT INTO documents VALUES('20000000-0000-4000-8000-000000000002','${owner}','statement','extracted',null,'Funding.pdf','application/pdf');
+      INSERT INTO document_observations VALUES('30000000-0000-4000-8000-000000000002','${owner}','20000000-0000-4000-8000-000000000002',-20000,'COP','2026-09-01','pending','Card payment','CARD PAYMENT 20000 COP');
+      SET ROLE authenticated;`);
+    await db.query(
+      `SELECT set_statement_currency_scope('20000000-0000-4000-8000-000000000002','${funding}','2026-09-01','2026-09-30','COP')`
+    );
+    await db.query(
+      `SELECT confirm_statement_reconciliation('20000000-0000-4000-8000-000000000002','30000000-0000-4000-8000-000000000002',(SELECT id FROM transactions LIMIT 1))`
+    );
+    await expect(correct()).rejects.toThrow(/existing funding reconciliation/i);
+    await db.exec('ROLLBACK;');
+    const corrected = await correct();
+    expect((await correct()).rows).toEqual(corrected.rows);
+    await expect(correct(20000, 22000)).rejects.toThrow(/key/i);
+    await db.exec('RESET ROLE;');
+    expect((await db.query('SELECT balance FROM accounts ORDER BY id')).rows).toEqual([
+      { balance: '505' },
+      { balance: '79000' }
+    ]);
+    expect(
+      (
+        await db.query(
+          'SELECT amount,destination_amount,source_amount,fx_rate::float8 AS rate FROM transactions'
+        )
+      ).rows
+    ).toEqual([{ amount: '21000', destination_amount: '5', source_amount: '5', rate: 4200 }]);
+    expect(
+      (
+        await db.query('SELECT valid FROM statement_reconciliation_proofs ORDER BY created_at,id')
+      ).rows
+        .map((proof) => proof.valid)
+        .sort()
+    ).toEqual([true]);
+    expect((await db.query('SELECT count(*) FROM statement_reconciliation_links')).rows).toEqual([
+      { count: 2 }
+    ]);
+    expect(
+      (await db.query('SELECT count(*) FROM statement_reconciliation_reversals')).rows
+    ).toEqual([{ count: 1 }]);
+    expect((await db.query('SELECT count(*) FROM statement_funding_corrections')).rows).toEqual([
+      { count: 1 }
+    ]);
+    await expect(db.exec('UPDATE transactions SET amount=22000,fx_rate=4400')).rejects.toThrow(
+      /Converted transfer/i
+    );
     await db.exec(`SET request.jwt.claim.sub='${other}'; SET ROLE authenticated;`);
     await expect(call()).rejects.toThrow(/not found/i);
     await db.exec(`SET request.jwt.claim.sub='${owner}';`);

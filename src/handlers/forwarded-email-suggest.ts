@@ -19,14 +19,19 @@ export async function handleForwardedEmailSuggest(request: Request, env: Env): P
     return Response.json({ error: 'Invalid email text' }, { status: 400 });
   }
   try {
-    const categories = await services.categories.getCategories(userId);
+    const [categories, history, rules] = await Promise.all([
+      services.categories.getCategories(userId),
+      services.categoryReviewContext.history(userId, message, ''),
+      services.automationRules.getAutomationRules(userId)
+    ]);
     const suggestion = await suggestForwardedEmail(
       message,
       categories,
       env.OPENROUTER_API_KEY,
       env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
       userId,
-      services.aiUsage
+      services.aiUsage,
+      { history, rules }
     );
     return Response.json({
       ...(suggestion.merchantSourceUrl

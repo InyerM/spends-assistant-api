@@ -5,7 +5,10 @@ const mocks = vi.hoisted(() => ({
   categories: vi.fn(),
   consent: vi.fn(),
   quota: vi.fn(),
-  track: vi.fn()
+  track: vi.fn(),
+  history: vi.fn(),
+  rules: vi.fn(),
+  matches: vi.fn()
 }));
 vi.mock('../src/utils/auth', () => ({
   resolveUserId: mocks.auth,
@@ -15,6 +18,11 @@ vi.mock('../src/ai/category-review', () => ({ reviewCategory: mocks.review }));
 vi.mock('../src/services/supabase', () => ({
   createSupabaseServices: () => ({
     apiKeys: {},
+    categoryReviewContext: { history: mocks.history },
+    automationRules: {
+      getAutomationRules: mocks.rules,
+      matchesConditions: mocks.matches
+    },
     categories: { getCategories: mocks.categories },
     usage: { incrementAiParses: mocks.quota },
     aiUsage: { requireConsent: mocks.consent, track: mocks.track }
@@ -30,6 +38,9 @@ const input = { locale: 'es', type: 'expense', description: 'Lunch', history: []
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.auth.mockResolvedValue('owner');
+  mocks.history.mockResolvedValue([]);
+  mocks.rules.mockResolvedValue([]);
+  mocks.matches.mockReturnValue(false);
   mocks.categories.mockResolvedValue([]);
   mocks.quota.mockResolvedValue({ allowed: true });
   mocks.consent.mockResolvedValue(undefined);
@@ -78,4 +89,36 @@ it('logs provider failure metadata without private financial context', async () 
   } finally {
     log.mockRestore();
   }
+});
+
+it('supplies authoritative owner history and category rules to every review without trusting client history', async () => {
+  const history = [{ id: 'owned', description: 'Previous purchase', category: 'Shopping' }];
+  mocks.history.mockResolvedValueOnce(history);
+  mocks.categories.mockResolvedValueOnce([{ id: 'shopping', type: 'expense' }]);
+  mocks.rules.mockResolvedValueOnce([
+    {
+      name: 'My shopping rule',
+      rule_type: 'general',
+      conditions: { description_contains: ['Mercado'] },
+      actions: { set_category: 'shopping' }
+    }
+  ]);
+  mocks.matches.mockReturnValueOnce(true);
+  await handleCategoryReview(
+    request({
+      ...input,
+      description: 'Mercado Libre',
+      history: [{ id: 'untrusted', description: 'Other', category: 'Other' }]
+    }),
+    createMockEnv()
+  );
+  expect(mocks.history).toHaveBeenCalledWith('owner', 'Mercado Libre', 'expense', undefined);
+  expect(mocks.review).toHaveBeenCalledWith(
+    expect.objectContaining({ history }),
+    expect.any(Array),
+    expect.any(String),
+    expect.any(String),
+    expect.any(Object),
+    { preferences: [], categoryRule: { category_id: 'shopping', name: 'My shopping rule' } }
+  );
 });

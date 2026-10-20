@@ -123,14 +123,21 @@ async function processExpense(
     ctx.sendChatAction('typing');
 
     // Fetch dynamic prompts and rules for this user.
-    const [activePrompts, transferRules, allRules, accountDetectionRules, categories] =
-      await Promise.all([
-        services.automationRules.getActivePrompts(userId),
-        services.automationRules.getTransferRules(userId),
-        services.automationRules.getAutomationRules(userId),
-        services.automationRules.getAccountDetectionRules(userId),
-        services.categories.getCategories(userId)
-      ]);
+    const [
+      activePrompts,
+      transferRules,
+      allRules,
+      accountDetectionRules,
+      categories,
+      historyPrompt
+    ] = await Promise.all([
+      services.automationRules.getActivePrompts(userId),
+      services.automationRules.getTransferRules(userId),
+      services.automationRules.getAutomationRules(userId),
+      services.automationRules.getAccountDetectionRules(userId),
+      services.categories.getCategories(userId),
+      services.categoryReviewContext.prompt(userId, text)
+    ]);
 
     // Pre-parse account detection: check raw text against account_detection rules
     const generalRules = allRules.filter((r) => r.rule_type !== 'account_detection');
@@ -146,6 +153,7 @@ async function processExpense(
     // Build dynamic prompts including transfer rules and automation rules
     const dynamicPrompts = [
       accountHint,
+      historyPrompt,
       ...activePrompts,
       buildTransferPromptSection(transferRules),
       buildAutomationRulesPromptSection(generalRules)
