@@ -8,7 +8,7 @@ function validInput(value: unknown): value is CategoryReviewInput {
   const v = value as Record<string, unknown>;
   return (
     ['es', 'en', 'pt'].includes(String(v.locale)) &&
-    ['expense', 'income'].includes(String(v.type)) &&
+    ['expense', 'income', 'transfer'].includes(String(v.type)) &&
     typeof v.description === 'string' &&
     v.description.length <= 500 &&
     (v.notes === undefined || (typeof v.notes === 'string' && v.notes.length <= 1500)) &&

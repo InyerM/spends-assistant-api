@@ -59,3 +59,23 @@ it('does not invent an income category for a credit card payment or accept forei
   expect(result.category_id).toBeNull();
   expect(result.kind).toBe('own_transfer');
 });
+it('reviews wording on an existing transfer without assigning an expense or income category', async () => {
+  vi.mocked(completeJson).mockResolvedValue({
+    data: {
+      category_id: 'food',
+      description: 'Payment between my accounts',
+      notes: 'Reviewed note',
+      explanation: 'Existing transfer keeps its financial meaning.',
+      kind: 'expense',
+      evidence_ids: []
+    }
+  } as never);
+  const result = await reviewCategory(
+    { locale: 'es', type: 'transfer', description: 'Bank transfer', history: [] } as never,
+    categories as never,
+    'key',
+    'model'
+  );
+  expect(result.kind).toBe('own_transfer');
+  expect(result.category_id).toBeNull();
+});
