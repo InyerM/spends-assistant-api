@@ -59,6 +59,7 @@ OUTPUT (strict JSON without markdown):
   "skip_reason": string | null,
   "amount": number,
   "description": string,
+  "notes": string | null,
   "category": "slug-from-list-below",
   "bank": "bancolombia|nequi|daviplata|cash|other",
   "payment_type": "debit|credit|cash|transfer|qr|unknown",
@@ -185,6 +186,12 @@ CATEGORIZATION RULES:
 3. If the evidence is insufficient, choose "missing"; do not infer a merchant or purpose from the payment channel alone
 
 PARSING RULES:
+
+Description and notes:
+- Description is a concise useful title, at most 150 characters, preserving the explicitly named merchant or recipient. Do not append technical uncertainty labels.
+- Notes are optional extra purpose or context, at most 500 characters. Copy a short verbatim excerpt from the CURRENT input; normalize whitespace only. Return null when no useful additional context is stated. Never invent purchased items, companions, reasons or history details.
+- Never include passwords, security or verification codes, card or account numbers in notes. Do not repeat amounts, dates or bank identifiers as notes.
+- Explicit current purpose takes precedence over the merchant's usual business and historical patterns: a pharmacy delivery from an app is not necessarily a restaurant purchase, and an explicitly described gift can differ from ordinary merchant shopping.
 
 Merchant evidence:
 - Recognize the named business, app, or service from its name and ordinary business identity for any merchant, not only the examples in this prompt. Match that identity to the active user category catalog. A shop or app name can support a business category; a bank or payment processor name alone cannot establish the goods or service purchased.

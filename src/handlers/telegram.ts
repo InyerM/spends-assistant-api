@@ -23,12 +23,67 @@ import {
   buildTransferPromptSection,
   buildAutomationRulesPromptSection
 } from '../services/transfer-processor';
+import { resolveSupabaseJwtUserId, unauthorizedResponse } from '../utils/auth';
+import {
+  readTelegramJson,
+  telegramCanonicalWebhookUrl,
+  telegramError,
+  telegramSecretMatches,
+  telegramWebhookConfig,
+  validateTelegramOwnerMessage
+} from '../utils/telegram-webhook';
+
+export async function handleTelegramSetup(request: Request, env: Env): Promise<Response> {
+  if (request.method !== 'POST') return telegramError(405, 'Method not allowed');
+  const userId = await resolveSupabaseJwtUserId(request, env);
+  if (!userId) return unauthorizedResponse();
+  if (userId !== env.DEFAULT_USER_ID) return telegramError(403, 'Forbidden');
+  const config = telegramWebhookConfig(env);
+  const webhook = telegramCanonicalWebhookUrl(env);
+  if (!config || !webhook) return telegramError(503, 'Telegram is not configured');
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${config.botToken}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: webhook,
+        secret_token: config.secret,
+        allowed_updates: ['message']
+      }),
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!response.ok) return telegramError(502, 'Webhook registration failed');
+    const result: unknown = await response.json();
+    if (
+      typeof result !== 'object' ||
+      result === null ||
+      !('ok' in result) ||
+      result.ok !== true ||
+      !('result' in result) ||
+      result.result !== true
+    )
+      return telegramError(502, 'Webhook registration failed');
+    return Response.json({ status: 'ok', webhook });
+  } catch {
+    return telegramError(502, 'Webhook registration failed');
+  }
+}
 
 export async function handleTelegram(request: Request, env: Env): Promise<Response> {
-  const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
+  if (request.method !== 'POST') return telegramError(405, 'Method not allowed');
+  const config = telegramWebhookConfig(env);
+  if (!config) return telegramError(503, 'Telegram is not configured');
+  if (!telegramSecretMatches(request.headers.get('X-Telegram-Bot-Api-Secret-Token'), config.secret))
+    return unauthorizedResponse();
+  const body = await readTelegramJson(request);
+  if (body.response) return body.response;
+  const refused = validateTelegramOwnerMessage(body.value, config);
+  if (refused) return refused;
+
+  const bot = new Telegraf(config.botToken);
   const services = createSupabaseServices(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
   const cache = new CacheService(env.REDIS_URL, env.REDIS_PASSWORD);
-  const userId = env.DEFAULT_USER_ID;
+  const userId = config.ownerId;
 
   bot.catch((err, ctx) => {
     console.error(`Telegraf error for ${ctx.updateType}`, err);
@@ -101,9 +156,7 @@ Questions? Contact your admin.`;
   });
 
   try {
-    const body = await request.json();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await bot.handleUpdate(body as any);
+    await bot.handleUpdate(body.value as Parameters<typeof bot.handleUpdate>[0]);
     return new Response('OK');
   } catch (e) {
     console.error('Error handling update:', e);

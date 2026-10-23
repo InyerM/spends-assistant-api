@@ -16,6 +16,27 @@ export interface ParseExpenseOptions {
   beforeExternalCall?: () => Promise<void>;
 }
 
+function preserveSupportedNotes(expense: ParsedExpense, text: string): ParsedExpense {
+  const notes: unknown = expense.notes;
+  delete expense.notes;
+  if (typeof notes !== 'string') return expense;
+  const normalized = notes.normalize('NFKC').trim().replace(/\s+/gu, ' ');
+  const source = text.normalize('NFKC').replace(/\s+/gu, ' ').toLowerCase();
+  if (
+    !normalized ||
+    normalized.length > 500 ||
+    expense.is_transaction === false ||
+    /(?:\p{Nd}[\s.*-]*){4}/u.test(normalized) ||
+    /\b(?:otp|cvv|cvc|pin|password|passcode|contrase[ñn]a|clave|c[oó]digo|verification|verificaci[oó]n)\b/iu.test(
+      normalized
+    ) ||
+    !source.includes(normalized.normalize('NFKC').toLowerCase())
+  )
+    return expense;
+  expense.notes = normalized;
+  return expense;
+}
+
 function incomingBankReview(text: string): ParsedExpense | null {
   const received = text.match(
     /^(?:\[[^\]]+\]\s*)?(?:(?:SMS from\s+)?(Bancolombia|Nequi)\s*:\s*)?(?:[\p{L}]+,\s*)?recibiste\s+(?:un(?:a)?|la)\s+(pago|transferencia|devoluci[oó]n)\b/iu
@@ -68,7 +89,7 @@ async function parseExpenseCore(
 
   if (cache && cacheKey) {
     const cached = await cache.get(cacheKey);
-    if (cached) return JSON.parse(cached) as ParsedExpense;
+    if (cached) return preserveSupportedNotes(JSON.parse(cached) as ParsedExpense, text);
   }
 
   if (!options?.telemetry) throw new AiConsentUnavailableError();
@@ -83,13 +104,16 @@ async function parseExpenseCore(
     meter
   });
 
+  preserveSupportedNotes(expense, text);
   if (expense.is_transaction === false) return expense;
   expense.is_transaction = true;
 
   if (!Number.isFinite(expense.amount) || expense.amount <= 0) {
     throw new Error('Invalid amount');
   }
-  if (!expense.description?.trim()) throw new Error('Missing description');
+  if (typeof expense.description !== 'string' || !expense.description.trim())
+    throw new Error('Missing description');
+  expense.description = expense.description.trim().slice(0, 150);
   if (!expense.category) throw new Error('Missing category');
 
   if (

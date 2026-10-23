@@ -1,3 +1,4 @@
+import type { InboxAnalysisQueueJob } from './inbox-analysis';
 import type { ForwardedEmailJob } from './forwarded-email-job';
 
 export interface Env {
@@ -11,6 +12,10 @@ export interface Env {
 
   // Telegram
   TELEGRAM_BOT_TOKEN: string;
+  TELEGRAM_WEBHOOK_SECRET?: string;
+  TELEGRAM_OWNER_CHAT_ID?: string;
+  TELEGRAM_OWNER_USER_ID?: string;
+  TELEGRAM_WEBHOOK_URL?: string;
 
   // API Authentication
   API_KEY: string;
@@ -27,7 +32,7 @@ export interface Env {
   EMAIL_AUTO_POST_AFTER?: string;
   CLOUDFLARE_ANALYTICS_TOKEN?: string;
   CLOUDFLARE_EMAIL_ZONE_ID?: string;
-  EMAIL_AUTH_QUEUE?: Queue<ForwardedEmailJob>;
+  EMAIL_AUTH_QUEUE?: Queue<ForwardedEmailJob | InboxAnalysisQueueJob>;
 
   // Optional
   APP_URL?: string;

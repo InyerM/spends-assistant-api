@@ -7,6 +7,8 @@ import {
   createMockCategory
 } from '../__test-helpers__/factories';
 
+vi.mock('../../src/services/cache.service', () => ({ CacheService: vi.fn() }));
+
 vi.mock('../../src/parsers/expense', () => ({
   parseExpense: vi.fn()
 }));
@@ -269,5 +271,31 @@ describe('handleParse', () => {
     expect(
       vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/rpc/reserve_ai_parse'))
     ).toBe(false);
+  });
+  it('returns validated optional purpose notes in resolved fields without adding absent notes', async () => {
+    const { parseExpense } = await import('../../src/parsers/expense');
+    stubFetchDefault();
+    const parsed = {
+      amount: 12000,
+      description: 'Coffee',
+      category: 'missing',
+      bank: 'cash',
+      payment_type: 'cash',
+      source: 'manual',
+      confidence: 90
+    };
+    vi.mocked(parseExpense).mockResolvedValueOnce({ ...parsed, notes: 'Team meeting' });
+    const request = (): Request =>
+      new Request('http://localhost/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.API_KEY}` },
+        body: JSON.stringify({ text: 'Coffee for Team meeting' })
+      });
+    const response = await handleParse(request(), env);
+    expect(response.status).toBe(200);
+    expect((await response.json()).resolved.notes).toBe('Team meeting');
+    vi.mocked(parseExpense).mockResolvedValueOnce(parsed);
+    const legacy = await handleParse(request(), env);
+    expect((await legacy.json()).resolved).not.toHaveProperty('notes');
   });
 });

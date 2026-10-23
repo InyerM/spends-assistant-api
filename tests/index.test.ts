@@ -3,7 +3,8 @@ import worker from '../src/index';
 
 // Mock all handlers
 vi.mock('../src/handlers/telegram', () => ({
-  handleTelegram: vi.fn(async () => new Response('telegram ok'))
+  handleTelegram: vi.fn(async () => new Response('telegram ok')),
+  handleTelegramSetup: vi.fn(async () => new Response('Unauthorized', { status: 401 }))
 }));
 vi.mock('../src/handlers/email', () => ({
   handleEmail: vi.fn(async () => new Response('email ok'))
@@ -32,11 +33,23 @@ const scheduledMocks = vi.hoisted(() => ({
   aiCleanup: vi.fn(),
   planning: vi.fn(),
   forward: vi.fn(),
-  queued: vi.fn()
+  queued: vi.fn(),
+  analyze: vi.fn(async () => new Response('analysis ok')),
+  dispatchHandler: vi.fn(async () => new Response('dispatch ok')),
+  dispatch: vi.fn(),
+  analysisJob: vi.fn()
 }));
 vi.mock('../src/handlers/forwarded-email-scheduled', () => ({
   handleScheduledForwardedEmails: scheduledMocks.forward,
   handleQueuedForwardedEmail: scheduledMocks.queued
+}));
+vi.mock('../src/handlers/inbox-analysis', () => ({
+  handleInboxAnalyze: scheduledMocks.analyze,
+  handleInboxAnalysisDispatch: scheduledMocks.dispatchHandler
+}));
+vi.mock('../src/services/inbox-analysis', () => ({
+  dispatchInboxAnalysis: scheduledMocks.dispatch,
+  processInboxAnalysisJob: scheduledMocks.analysisJob
 }));
 vi.mock('../src/services/supabase', () => ({
   createSupabaseServices: () => ({
@@ -188,4 +201,38 @@ it('acknowledges completed email jobs and retries unavailable authentication evi
   expect(done.retry).not.toHaveBeenCalled();
   expect(pending.retry).toHaveBeenCalledWith({ delaySeconds: 60 });
   expect(pending.ack).not.toHaveBeenCalled();
+});
+
+it('routes inbox analysis and arrival dispatch to authenticated handlers', async () => {
+  const analyze = new Request('https://example.test/inbox/analyze', { method: 'POST' });
+  const dispatch = new Request('https://example.test/inbox/analysis-dispatch', { method: 'POST' });
+  await worker.fetch(analyze, env, ctx);
+  await worker.fetch(dispatch, env, ctx);
+  expect(scheduledMocks.analyze).toHaveBeenCalledWith(analyze, env);
+  expect(scheduledMocks.dispatchHandler).toHaveBeenCalledWith(dispatch, env, ctx);
+});
+it('recovers durable inbox suggestions every minute without financial posting', async () => {
+  vi.clearAllMocks();
+  await worker.scheduled({ cron: '*/1 * * * *' } as ScheduledEvent, env, ctx);
+  expect(scheduledMocks.dispatch).toHaveBeenCalledWith(env);
+  expect(scheduledMocks.forward).not.toHaveBeenCalled();
+  expect(scheduledMocks.planning).not.toHaveBeenCalled();
+});
+it('routes analysis jobs independently of legacy email posting and rejects malformed IDs', async () => {
+  vi.clearAllMocks();
+  const good = {
+    body: { kind: 'inbox_analysis', inboxItemId: '11111111-1111-4111-8111-111111111111' },
+    ack: vi.fn(),
+    retry: vi.fn()
+  };
+  const bad = {
+    body: { kind: 'inbox_analysis', inboxItemId: 'bad' },
+    ack: vi.fn(),
+    retry: vi.fn()
+  };
+  await worker.queue({ messages: [good, bad] } as unknown as MessageBatch<unknown>, env, ctx);
+  expect(scheduledMocks.analysisJob).toHaveBeenCalledExactlyOnceWith(good.body, env);
+  expect(scheduledMocks.queued).not.toHaveBeenCalled();
+  expect(good.ack).toHaveBeenCalledOnce();
+  expect(bad.ack).toHaveBeenCalledOnce();
 });

@@ -28,6 +28,6 @@ max_batch_timeout = 1
 max_retries = 30
 retry_delay = 60
 
-# Monthly usage cleanup and authenticated forwarded-email review.
+# Monthly usage cleanup, authenticated email review, and durable inbox suggestions.
 [triggers]
-crons = ["0 3 1 * *", "*/15 * * * *"]
+crons = ["0 3 1 * *", "*/15 * * * *", "*/1 * * * *"]

@@ -94,6 +94,37 @@ describe('AutomationRulesService', () => {
     });
   });
 
+  describe('restricted category and destination conditions', () => {
+    it.each([
+      ['category-match', true],
+      ['category-other', false],
+      [undefined, false]
+    ] as const)('matches category %s only when it is exact', (categoryId, expected) => {
+      expect(
+        service.matchesConditions({ category_id: categoryId }, { category: 'category-match' })
+      ).toBe(expected);
+    });
+
+    it.each([
+      ['account-match', true],
+      ['account-other', false],
+      [undefined, false]
+    ] as const)('matches destination %s only when it is exact', (destinationId, expected) => {
+      expect(
+        service.matchesConditions(
+          { transfer_to_account_id: destinationId },
+          { to_account: 'account-match' }
+        )
+      ).toBe(expected);
+    });
+
+    it('refuses malformed regular expressions without interrupting rule processing', () => {
+      expect(
+        service.matchesConditions({ description: 'Synthetic purchase' }, { description_regex: '[' })
+      ).toBe(false);
+    });
+  });
+
   describe('findTransferRule', () => {
     it('returns matching rule for phone', async () => {
       const rule = createMockAutomationRule({ match_phone: '3104633357' });

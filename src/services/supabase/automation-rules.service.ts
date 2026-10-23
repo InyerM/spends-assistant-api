@@ -184,8 +184,12 @@ export class AutomationRulesService extends BaseService {
     }
 
     if (conditions.description_regex) {
-      const regex = new RegExp(conditions.description_regex, 'i');
-      if (!regex.test(transaction.description ?? '')) return false;
+      try {
+        const regex = new RegExp(conditions.description_regex, 'i');
+        if (!regex.test(transaction.description ?? '')) return false;
+      } catch {
+        return false;
+      }
     }
 
     if (conditions.raw_text_contains) {
@@ -222,6 +226,14 @@ export class AutomationRulesService extends BaseService {
       if (transaction.account_id !== conditions.from_account) {
         return false;
       }
+    }
+
+    if (conditions.to_account && transaction.transfer_to_account_id !== conditions.to_account) {
+      return false;
+    }
+
+    if (conditions.category && transaction.category_id !== conditions.category) {
+      return false;
     }
 
     if (conditions.source) {

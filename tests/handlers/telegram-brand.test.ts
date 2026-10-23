@@ -5,6 +5,31 @@ import { parseExpense } from '../../src/parsers/expense';
 import { AiConsentRequiredError } from '../../src/services/supabase/ai-consent.service';
 
 const { reply } = vi.hoisted(() => ({ reply: vi.fn() }));
+const webhookSecret = 'unit-webhook-secret-with-at-least-32-characters';
+const authorizedEnv = () => ({
+  ...createMockEnv(),
+  TELEGRAM_WEBHOOK_SECRET: webhookSecret,
+  TELEGRAM_OWNER_CHAT_ID: '12345',
+  TELEGRAM_OWNER_USER_ID: '12345'
+});
+const ownerMessage = (text: string) =>
+  new Request('https://worker.test/telegram', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Telegram-Bot-Api-Secret-Token': webhookSecret
+    },
+    body: JSON.stringify({
+      update_id: 1,
+      message: {
+        message_id: 1,
+        date: 1_700_000_000,
+        text,
+        chat: { id: 12345, type: 'private' },
+        from: { id: 12345, is_bot: false, first_name: 'Test' }
+      }
+    })
+  });
 
 vi.mock('telegraf', () => ({
   Telegraf: class {
@@ -44,13 +69,7 @@ describe('Telegram customer-facing brand', () => {
   ])(
     'uses Anotto in /%s without parsing or posting a transaction',
     async (command, title, example) => {
-      const response = await handleTelegram(
-        new Request('https://worker.test/telegram', {
-          method: 'POST',
-          body: JSON.stringify({ message: { text: `/${command}` } })
-        }),
-        createMockEnv()
-      );
+      const response = await handleTelegram(ownerMessage(`/${command}`), authorizedEnv());
 
       expect(response.status).toBe(200);
       expect(reply).toHaveBeenCalledOnce();
@@ -68,13 +87,7 @@ describe('Telegram customer-facing brand', () => {
       'fetch',
       vi.fn(async () => Response.json([]))
     );
-    await handleTelegram(
-      new Request('https://worker.test/telegram', {
-        method: 'POST',
-        body: JSON.stringify({ message: { text: '/gasto private purchase details' } })
-      }),
-      createMockEnv()
-    );
+    await handleTelegram(ownerMessage('/gasto private purchase details'), authorizedEnv());
     expect(reply).toHaveBeenCalledWith(expect.stringContaining('AI data sharing'));
     expect(JSON.stringify(reply.mock.calls)).not.toContain('private purchase details');
     vi.unstubAllGlobals();

@@ -1,6 +1,7 @@
 export interface ParsedExpense {
   amount: number;
   description: string;
+  notes?: string;
   category: string;
   bank: string;
   payment_type: string;

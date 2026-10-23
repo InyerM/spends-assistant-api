@@ -399,4 +399,68 @@ describe('parseExpense', () => {
     });
     expect(result.category).toBe('missing');
   });
+  it.each([
+    ['Rappi: medicamentos para tratamiento', 'medicamentos para tratamiento', 'health-care'],
+    ['Crepes: almuerzo del equipo', 'almuerzo del equipo', 'restaurant'],
+    ['Amazon: regalo de cumpleaños para Ana', 'regalo de cumpleaños para Ana', 'gifts']
+  ])(
+    'preserves supported purpose notes without changing financial extraction: %s',
+    async (text, notes, category) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          Response.json(
+            createOpenRouterResponse({ ...validExpense, category, notes: `  ${notes}  ` })
+          )
+        )
+      );
+      const result = await parseExpense(text, API_KEY);
+      expect(result).toMatchObject({
+        amount: validExpense.amount,
+        description: validExpense.description,
+        category,
+        notes
+      });
+    }
+  );
+
+  it.each([
+    null,
+    123,
+    { purpose: 'invented' },
+    'x'.repeat(501),
+    'Invented purchase purpose',
+    'clave 123',
+    'cuenta 1234567890',
+    'tarjeta 1234'
+  ])('discards unsafe or unsupported optional notes: %j', async (notes) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json(createOpenRouterResponse({ ...validExpense, notes })))
+    );
+    const result = await parseExpense(
+      'Compra de almuerzo. clave 123, cuenta 1234567890, tarjeta 1234',
+      API_KEY
+    );
+    expect(result).not.toHaveProperty('notes');
+    expect(result.amount).toBe(validExpense.amount);
+  });
+
+  it('sanitizes optional cached notes as well as new provider output', async () => {
+    const cache = {
+      hashKey: vi.fn().mockReturnValue('key'),
+      get: vi.fn().mockResolvedValue(JSON.stringify({ ...validExpense, notes: 'Invented detail' })),
+      set: vi.fn()
+    } as unknown as CacheService;
+    expect(await parseExpense('Lunch', API_KEY, cache)).not.toHaveProperty('notes');
+  });
+  it.each(['１２３４', '١٢٣٤'])('rejects copied Unicode account digits: %s', async (digits) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json(createOpenRouterResponse({ ...validExpense, notes: `tarjeta ${digits}` }))
+      )
+    );
+    expect(await parseExpense(`Compra con tarjeta ${digits}`, API_KEY)).not.toHaveProperty('notes');
+  });
 });

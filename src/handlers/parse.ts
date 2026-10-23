@@ -152,7 +152,8 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
         parsed: expense,
         resolved: {
           account_id: accountId,
-          category_id: categoryId
+          category_id: categoryId,
+          ...(expense.notes ? { notes: expense.notes } : {})
         }
       }),
       {
