@@ -1,6 +1,6 @@
 # Inbox pipeline audit — 11 November 2026
 
-Latest delivery: [12 November OCR and audit release](../plans/2026-11-12-mistral-deepseek-review-release.md). Final backend suite now passes 1,154 tests; the historical counts below remain dated intermediate evidence.
+Latest delivery: [12 November Home, OCR and security follow-up](../plans/2026-11-12-home-ocr-native-followup.md). The later backend suite passed 1,176 tests; the historical counts below remain dated intermediate evidence.
 
 ## Final coordinated validation
 
