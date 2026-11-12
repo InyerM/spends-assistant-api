@@ -1,5 +1,8 @@
 import { expect, it } from 'vitest';
-import { buildInboxAnalysisProposal } from '../../src/utils/inbox-analysis-proposal';
+import {
+  buildDeterministicInboxAnalysisProposal,
+  buildInboxAnalysisProposal
+} from '../../src/utils/inbox-analysis-proposal';
 import { AutomationRulesService } from '../../src/services/supabase/automation-rules.service';
 import {
   createMockAccount,
@@ -170,11 +173,242 @@ it('evaluates category and destination conditions against each evolving suggesti
     rulesService
   );
   expect(result.notes).toBe('Plan familiar\nOwn payment');
-  expect(result.analysis_details.financial_type).toBe('income');
-  expect(result.analysis_details.transfer_to_account_id).toBeNull();
+  expect(result.analysis_details.financial_type).toBe('transfer');
+  expect(result.analysis_details.transfer_to_account_id).toBe('destination');
   expect(result.analysis_details.applied_rules.map((row) => row.rule_id)).toEqual([
     'link',
-    'destination',
-    'reclassify'
+    'destination'
   ]);
+});
+
+it('resolves an explicit event and owned rule category without model output', () => {
+  const result = buildDeterministicInboxAnalysisProposal(
+    { ...item, raw_text: item.raw_text + ' a las 14:30' },
+    [createMockAccount({ id: 'account', user_id: owner })],
+    [createMockCategory({ id: 'category', user_id: owner })],
+    [
+      createMockRule({
+        user_id: owner,
+        conditions: { raw_text_contains: ['Spotify'] },
+        actions: { set_category: 'category' }
+      })
+    ],
+    rulesService
+  );
+  expect(result).toMatchObject({
+    status: 'parsed',
+    amount: 20000,
+    account_id: 'account',
+    category_id: 'category',
+    bank_event_at: '2026-10-02T14:30:00-05:00'
+  });
+  expect(result?.analysis_details.analysis_source).toBe('automation');
+});
+
+it.each([
+  { label: 'missing timestamp', text: item.raw_text, account: '2651', categoryOwner: owner },
+  {
+    label: 'unresolved account',
+    text: item.raw_text + ' a las 14:30',
+    account: '9999',
+    categoryOwner: owner
+  },
+  {
+    label: 'foreign category',
+    text: item.raw_text + ' a las 14:30',
+    account: '2651',
+    categoryOwner: 'other'
+  },
+  {
+    label: 'conflicting amount',
+    text: item.raw_text + ' a las 14:30 y pagaste $50.000',
+    account: '2651',
+    categoryOwner: owner
+  }
+])('leaves $label for the existing unresolved workflow', ({ text, account, categoryOwner }) => {
+  expect(
+    buildDeterministicInboxAnalysisProposal(
+      { ...item, raw_text: text },
+      [createMockAccount({ user_id: owner, last_four: account })],
+      [createMockCategory({ id: 'category', user_id: categoryOwner })],
+      [
+        createMockRule({
+          user_id: owner,
+          conditions: { raw_text_contains: ['Spotify'] },
+          actions: { set_category: 'category' }
+        })
+      ],
+      rulesService
+    )
+  ).toBeNull();
+});
+
+it('keeps cross-currency transfers unresolved for exchange-rate review', () => {
+  expect(
+    buildDeterministicInboxAnalysisProposal(
+      { ...item, raw_text: item.raw_text + ' a las 14:30' },
+      [
+        createMockAccount({ id: 'source', user_id: owner }),
+        createMockAccount({ id: 'destination', user_id: owner, last_four: '9999', currency: 'USD' })
+      ],
+      [],
+      [
+        createMockRule({
+          user_id: owner,
+          conditions: { raw_text_contains: ['Spotify'] },
+          actions: { link_to_account: 'destination' }
+        })
+      ],
+      rulesService
+    )
+  ).toBeNull();
+});
+
+it.each([false, true])('keeps highest valid category write including null clear (%s)', (clear) => {
+  const rules = [
+    createMockRule({
+      id: 'foreign',
+      user_id: owner,
+      priority: 200,
+      conditions: {},
+      actions: { set_category: 'foreign' }
+    }),
+    createMockRule({
+      id: 'a',
+      user_id: owner,
+      priority: 100,
+      conditions: {},
+      actions: { set_category: clear ? null : 'high' }
+    }),
+    createMockRule({
+      id: 'b',
+      user_id: owner,
+      priority: 10,
+      conditions: {},
+      actions: { set_category: 'low' }
+    })
+  ];
+  const result = buildInboxAnalysisProposal(
+    item,
+    suggestion,
+    [],
+    ['high', 'low'].map((id) => createMockCategory({ id, user_id: owner })),
+    rules,
+    rulesService
+  );
+  expect(result.category_id).toBe(clear ? null : 'high');
+});
+
+it('does not let a lower transfer link erase a higher expense or category decision', () => {
+  const accounts = [
+    createMockAccount({ id: 'source', user_id: owner, last_four: '2651' }),
+    createMockAccount({ id: 'dest', user_id: owner, last_four: '8888' })
+  ];
+  const rules = [
+    createMockRule({
+      id: 'high',
+      user_id: owner,
+      priority: 100,
+      conditions: {},
+      actions: { set_type: 'expense', set_category: 'high' }
+    }),
+    createMockRule({
+      id: 'low',
+      user_id: owner,
+      priority: 10,
+      conditions: {},
+      actions: { link_to_account: 'dest' }
+    })
+  ];
+  const result = buildInboxAnalysisProposal(
+    item,
+    suggestion,
+    accounts,
+    [createMockCategory({ id: 'high', user_id: owner })],
+    rules,
+    rulesService
+  );
+  expect(result.category_id).toBe('high');
+  expect(result.analysis_details.financial_type).toBe('expense');
+  expect(result.analysis_details.transfer_to_account_id).toBeNull();
+});
+
+it('resolves same-priority inbox category conflicts by ID rather than input order', () => {
+  const rules = ['b', 'a'].map((id) =>
+    createMockRule({
+      id,
+      user_id: owner,
+      priority: 100,
+      conditions: {},
+      actions: { set_category: id }
+    })
+  );
+  const result = buildInboxAnalysisProposal(
+    item,
+    suggestion,
+    [],
+    ['a', 'b'].map((id) => createMockCategory({ id, user_id: owner })),
+    rules,
+    rulesService
+  );
+  expect(result.category_id).toBe('a');
+});
+
+it('keeps first valid account/type/destination writes and continues notes after conflicts', () => {
+  const accounts = ['source', 'chosen', 'destination', 'other'].map((id, i) =>
+    createMockAccount({ id, user_id: owner, last_four: i === 0 ? '2651' : String(8000 + i) })
+  );
+  const rules = [
+    createMockRule({
+      id: 'invalid',
+      user_id: owner,
+      priority: 200,
+      conditions: {},
+      actions: { set_account: 'foreign' }
+    }),
+    createMockRule({
+      id: 'high',
+      user_id: owner,
+      priority: 100,
+      conditions: {},
+      actions: { set_account: 'chosen', link_to_account: 'destination', add_note: 'First' }
+    }),
+    createMockRule({
+      id: 'low',
+      user_id: owner,
+      priority: 10,
+      conditions: { from_account: 'chosen', to_account: 'destination' },
+      actions: {
+        set_account: 'other',
+        set_type: 'income',
+        link_to_account: 'other',
+        add_note: 'Second'
+      }
+    })
+  ];
+  const result = buildInboxAnalysisProposal(item, suggestion, accounts, [], rules, rulesService);
+  expect(result.account_id).toBe('chosen');
+  expect(result.analysis_details.financial_type).toBe('transfer');
+  expect(result.analysis_details.transfer_to_account_id).toBe('destination');
+  expect(result.notes).toBe('Plan familiar\nFirst\nSecond');
+});
+
+it('leaves a transfer without an owned distinct destination unresolved', () => {
+  const result = buildInboxAnalysisProposal(
+    item,
+    suggestion,
+    [createMockAccount({ id: 'source', user_id: owner, last_four: '2651' })],
+    [],
+    [
+      createMockRule({
+        user_id: owner,
+        conditions: {},
+        actions: { set_type: 'transfer', link_to_account: 'foreign' }
+      })
+    ],
+    rulesService
+  );
+  expect(result.analysis_details.financial_type).toBeNull();
+  expect(result.analysis_details.transfer_to_account_id).toBeNull();
+  expect(result.status).toBe('needs_review');
 });

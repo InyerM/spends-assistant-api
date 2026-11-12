@@ -6,12 +6,89 @@ interface HistoryRow {
   notes: string | null;
   category: { name: string };
 }
+export class ReviewTransactionNotFoundError extends Error {
+  constructor() {
+    super('Review transaction not found');
+  }
+}
 export class CategoryReviewContextService extends BaseService {
+  async reviewHistory(
+    userId: string,
+    description: string,
+    type: string,
+    transactionId?: string,
+    notes?: string
+  ): Promise<CategoryReviewInput['history']> {
+    if (!transactionId) return this.history(userId, description, type, undefined, notes);
+    const sourceParams = new URLSearchParams({
+      id: `eq.${transactionId}`,
+      user_id: `eq.${userId}`,
+      deleted_at: 'is.null',
+      select: 'id,user_id',
+      limit: '1'
+    });
+    const sources = await this.fetch<Array<{ id: string; user_id: string }>>(
+      `/rest/v1/transactions?${sourceParams}`
+    );
+    if (!sources.some((row) => row.id === transactionId && row.user_id === userId))
+      throw new ReviewTransactionNotFoundError();
+    const linkParams = new URLSearchParams({
+      transaction_id: `eq.${transactionId}`,
+      user_id: `eq.${userId}`,
+      select:
+        'contact_id,user_id,contact:counterparties!transaction_counterparties_contact_id_user_id_fkey!inner(user_id)',
+      'contact.user_id': `eq.${userId}`,
+      limit: '1'
+    });
+    const links = await this.fetch<Array<{ contact_id: string; user_id: string }>>(
+      `/rest/v1/transaction_counterparties?${linkParams}`
+    );
+    const contactId = links.find((row) => row.user_id === userId)?.contact_id;
+    const contactHistory = async (): Promise<CategoryReviewInput['history']> => {
+      if (!contactId) return [];
+      const params = new URLSearchParams({
+        user_id: `eq.${userId}`,
+        deleted_at: 'is.null',
+        type: `eq.${type}`,
+        id: `neq.${transactionId}`,
+        select:
+          'id,description,notes,category:categories!transactions_category_id_fkey!inner(name),contact_link:transaction_counterparties!transaction_counterparties_transaction_id_user_id_fkey!inner(user_id,contact_id)',
+        'contact_link.user_id': `eq.${userId}`,
+        'contact_link.contact_id': `eq.${contactId}`,
+        'category.or': `(user_id.eq.${userId},user_id.is.null)`,
+        'category.is_active': 'eq.true',
+        'category.deleted_at': 'is.null',
+        'category.slug': 'not.in.(uncategorized,uncategorized-income,missing)',
+        order: 'date.desc,id.desc',
+        limit: '8'
+      });
+      const rows = await this.fetch<HistoryRow[]>(`/rest/v1/transactions?${params}`);
+      return rows
+        .filter(
+          (row) => row.id !== transactionId && row.category?.name && row.description && row.id
+        )
+        .map((row) => ({
+          id: row.id,
+          description: row.description.slice(0, 500),
+          notes: row.notes?.slice(0, 1500) ?? null,
+          category: row.category.name.slice(0, 150)
+        }));
+    };
+    const [contact, lexical] = await Promise.all([
+      contactHistory(),
+      this.history(userId, description, type, transactionId, notes)
+    ]);
+    const merged = new Map<string, CategoryReviewInput['history'][number]>();
+    for (const row of [...contact, ...lexical])
+      if (row.id !== transactionId && !merged.has(row.id)) merged.set(row.id, row);
+    return [...merged.values()].slice(0, 12);
+  }
   async history(
     userId: string,
     description: string,
     type: string,
-    excludeId?: string
+    excludeId?: string,
+    notes?: string
   ): Promise<CategoryReviewInput['history']> {
     const ignored = new Set([
       'transferencia',
@@ -39,11 +116,47 @@ export class CategoryReviewContextService extends BaseService {
       'usd',
       'deb',
       'cred',
-      'una'
+      'una',
+      'the',
+      'and',
+      'for',
+      'from',
+      'this',
+      'that',
+      'los',
+      'las',
+      'del',
+      'password',
+      'secret',
+      'token',
+      'verification',
+      'codigo',
+      'código',
+      'autorizacion',
+      'autorización',
+      'transaction',
+      'transaccion',
+      'transacción',
+      'exitosa',
+      'successful'
     ]);
-    const words = [...new Set(description.toLowerCase().match(/[\p{L}]{3,}/gu) ?? [])]
-      .filter((word) => !ignored.has(word))
-      .slice(0, 6);
+    // Strip ordinary edge punctuation, then reject syntax/credential-like chunks whole.
+    const tokens = (text: string): string[] =>
+      [
+        ...new Set(
+          text
+            .slice(0, 1500)
+            .toLowerCase()
+            .split(/\s+/)
+            .map((word) => word.replace(/^[«¿¡("']+|[»),.!?;:"']+$/gu, ''))
+        )
+      ].filter((word) => /^[\p{L}]{3,40}$/u.test(word) && !ignored.has(word));
+    const noteWords = tokens(notes ?? '');
+    const descriptionWords = tokens(description);
+    const words = [...new Set([...noteWords.slice(0, 3), ...descriptionWords, ...noteWords])].slice(
+      0,
+      6
+    );
     if (!words.length) return [];
     const params = new URLSearchParams({
       user_id: `eq.${userId}`,
@@ -54,14 +167,15 @@ export class CategoryReviewContextService extends BaseService {
       'category.user_id': `eq.${userId}`,
       'category.is_active': 'eq.true',
       'category.deleted_at': 'is.null',
-      or: `(${words.map((word) => `description.ilike.*${word}*`).join(',')})`,
-      order: 'date.desc',
+      or: `(${words.flatMap((word) => [`description.ilike.*${word}*`, `notes.ilike.*${word}*`]).join(',')})`,
+      order: 'date.desc,id.desc',
       limit: '12',
       ...(excludeId ? { id: `neq.${excludeId}` } : {})
     });
     const rows = await this.fetch<HistoryRow[]>(`/rest/v1/transactions?${params.toString()}`);
     return rows
-      .filter((row) => row.category?.name && row.description && row.id)
+      .filter((row) => row.id !== excludeId && row.category?.name && row.description && row.id)
+      .slice(0, 12)
       .map((row) => ({
         id: row.id,
         description: row.description.slice(0, 500),

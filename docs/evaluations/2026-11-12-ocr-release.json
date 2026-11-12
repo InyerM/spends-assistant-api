@@ -1,0 +1,322 @@
+{
+  "runAt": "2026-11-12T17:35:05.166Z",
+  "syntheticOnly": true,
+  "originalSha256": "112f4feb3c689a70550be770917d36c1fee31f77534bfeef588e141de90cc46f",
+  "model": "deepseek/deepseek-v4.1-flash",
+  "pathway": "mistral-ocr-per-page-production-adapter",
+  "scope": "Real adapter on immutable synthetic split pages, not a live database/HTTP end-to-end test",
+  "results": [
+    {
+      "fixture": "receipt-es-skew",
+      "sourceSha256": "936e67672d5861c923c665232d74a38f67b40ad9a18f09b161f87f52503c5987",
+      "expectedRows": 4,
+      "actualRows": 4,
+      "exactNormalizedRows": 4,
+      "duplicateReferences": 0,
+      "documentType": "receipt",
+      "strictJson": true,
+      "requiresReview": true,
+      "reservedUsd": 0.43352640000000003,
+      "usage": {
+        "prompt_tokens": 405,
+        "completion_tokens": 1702,
+        "cost": 0.003062915
+      },
+      "durationMs": 16274,
+      "observations": [
+        {
+          "amount": -12345.67,
+          "printed_amount": "12.345,67",
+          "direction": "outgoing",
+          "currency": "COP",
+          "occurred_at": "2026-11-01",
+          "description": "Debito",
+          "counterparty": null,
+          "reference": "CAFE-01",
+          "source_excerpt": "CAFE-01 | 12.345,67 | COP | Debito",
+          "confidence": 0.98
+        },
+        {
+          "amount": 2345.67,
+          "printed_amount": "-2.345,67",
+          "direction": "incoming",
+          "currency": "COP",
+          "occurred_at": "2026-11-01",
+          "description": "Credito",
+          "counterparty": null,
+          "reference": "CAFE-02",
+          "source_excerpt": "CAFE-02 | -2.345,67 | COP | Credito",
+          "confidence": 0.98
+        },
+        {
+          "amount": -12.5,
+          "printed_amount": "+12,50",
+          "direction": "outgoing",
+          "currency": "USD",
+          "occurred_at": "2026-11-01",
+          "description": "Debito",
+          "counterparty": null,
+          "reference": "CAFE-03",
+          "source_excerpt": "CAFE-03 | +12,50 | USD | Debito",
+          "confidence": 0.98
+        },
+        {
+          "amount": 0.99,
+          "printed_amount": "-0,99",
+          "direction": "incoming",
+          "currency": "USD",
+          "occurred_at": "2026-11-01",
+          "description": "Credito",
+          "counterparty": null,
+          "reference": "CAFE-04",
+          "source_excerpt": "CAFE-04 | -0,99 | USD | Credito",
+          "confidence": 0.98
+        }
+      ]
+    },
+    {
+      "fixture": "statement-mixed-low-contrast",
+      "sourceSha256": "b78bf5c7c4363220f437a4188a580fb551a35a939e7a09d390074a2843b46abb",
+      "expectedRows": 5,
+      "actualRows": 5,
+      "exactNormalizedRows": 5,
+      "duplicateReferences": 0,
+      "documentType": "statement",
+      "strictJson": true,
+      "requiresReview": true,
+      "reservedUsd": 0.43352640000000003,
+      "usage": {
+        "prompt_tokens": 474,
+        "completion_tokens": 1429,
+        "cost": 0.00299047
+      },
+      "durationMs": 8321,
+      "observations": [
+        {
+          "amount": -1234.56,
+          "printed_amount": "1.234,56",
+          "direction": "outgoing",
+          "currency": "COP",
+          "occurred_at": "2026-11-02",
+          "description": "MIX-01 movement",
+          "counterparty": null,
+          "reference": "MIX-01",
+          "source_excerpt": "MIX-01 | 02/11/2026 | 1.234,56 | COP | Debito",
+          "confidence": 0.98
+        },
+        {
+          "amount": 1234.56,
+          "printed_amount": "-1,234.56",
+          "direction": "incoming",
+          "currency": "USD",
+          "occurred_at": "2026-11-03",
+          "description": "MIX-02 movement",
+          "counterparty": null,
+          "reference": "MIX-02",
+          "source_excerpt": "MIX-02 | 03/11/2026 | -1,234.56 | USD | Credit",
+          "confidence": 0.98
+        },
+        {
+          "amount": -9876.54,
+          "printed_amount": "+9,876.54",
+          "direction": "outgoing",
+          "currency": "USD",
+          "occurred_at": "2026-11-04",
+          "description": "MIX-03 movement",
+          "counterparty": null,
+          "reference": "MIX-03",
+          "source_excerpt": "MIX-03 | 04/11/2026 | +9,876.54 | USD | Debit",
+          "confidence": 0.98
+        },
+        {
+          "amount": 9876.54,
+          "printed_amount": "-9.876,54",
+          "direction": "incoming",
+          "currency": "COP",
+          "occurred_at": "2026-11-05",
+          "description": "MIX-04 movement",
+          "counterparty": null,
+          "reference": "MIX-04",
+          "source_excerpt": "MIX-04 | 05/11/2026 | -9.876,54 | COP | Credito",
+          "confidence": 0.98
+        },
+        {
+          "amount": -0.01,
+          "printed_amount": "0,01",
+          "direction": "outgoing",
+          "currency": "COP",
+          "occurred_at": "2026-11-06",
+          "description": "MIX-05 movement",
+          "counterparty": null,
+          "reference": "MIX-05",
+          "source_excerpt": "MIX-05 | 06/11/2026 | 0,01 | COP | Debito",
+          "confidence": 0.98
+        }
+      ]
+    },
+    {
+      "fixture": "dense-bilingual-blur",
+      "sourceSha256": "0e1edb85fc874828243dfd74e1777f5b68dcb4ad5dfadfb09577505ef922254b",
+      "expectedRows": 12,
+      "actualRows": 12,
+      "exactNormalizedRows": 12,
+      "duplicateReferences": 0,
+      "documentType": "statement",
+      "strictJson": true,
+      "requiresReview": true,
+      "reservedUsd": 0.43352640000000003,
+      "usage": {
+        "prompt_tokens": 620,
+        "completion_tokens": 3130,
+        "cost": 0.00380633
+      },
+      "durationMs": 14863,
+      "observations": [
+        {
+          "amount": -1001.01,
+          "printed_amount": "-1.001,01",
+          "direction": "outgoing",
+          "currency": "COP",
+          "occurred_at": "2026-10-01",
+          "description": "DENSE-01",
+          "counterparty": null,
+          "reference": "DENSE-01",
+          "source_excerpt": "DENSE-01 | 01/10/2026 | -1.001,01 | COP | Debito",
+          "confidence": 0.95
+        },
+        {
+          "amount": 2001.02,
+          "printed_amount": "+2.001,02",
+          "direction": "incoming",
+          "currency": "USD",
+          "occurred_at": "2026-10-02",
+          "description": "DENSE-02",
+          "counterparty": null,
+          "reference": "DENSE-02",
+          "source_excerpt": "DENSE-02 | 02/10/2026 | +2.001,02 | USD | Credit",
+          "confidence": 0.95
+        },
+        {
+          "amount": -3001.03,
+          "printed_amount": "3.001,03",
+          "direction": "outgoing",
+          "currency": "COP",
+          "occurred_at": "2026-10-03",
+          "description": "DENSE-03",
+          "counterparty": null,
+          "reference": "DENSE-03",
+          "source_excerpt": "DENSE-03 | 03/10/2026 | 3.001,03 | COP | Debito",
+          "confidence": 0.95
+        },
+        {
+          "amount": 4001.04,
+          "printed_amount": "-4.001,04",
+          "direction": "incoming",
+          "currency": "USD",
+          "occurred_at": "2026-10-04",
+          "description": "DENSE-04",
+          "counterparty": null,
+          "reference": "DENSE-04",
+          "source_excerpt": "DENSE-04 | 04/10/2026 | -4.001,04 | USD | Credit",
+          "confidence": 0.95
+        },
+        {
+          "amount": -5001.05,
+          "printed_amount": "+5.001,05",
+          "direction": "outgoing",
+          "currency": "COP",
+          "occurred_at": "2026-10-05",
+          "description": "DENSE-05",
+          "counterparty": null,
+          "reference": "DENSE-05",
+          "source_excerpt": "DENSE-05 | 05/10/2026 | +5.001,05 | COP | Debito",
+          "confidence": 0.95
+        },
+        {
+          "amount": 6001.06,
+          "printed_amount": "6.001,06",
+          "direction": "incoming",
+          "currency": "USD",
+          "occurred_at": "2026-10-06",
+          "description": "DENSE-06",
+          "counterparty": null,
+          "reference": "DENSE-06",
+          "source_excerpt": "DENSE-06 | 06/10/2026 | 6.001,06 | USD | Credit",
+          "confidence": 0.95
+        },
+        {
+          "amount": -7001.07,
+          "printed_amount": "-7.001,07",
+          "direction": "outgoing",
+          "currency": "COP",
+          "occurred_at": "2026-10-07",
+          "description": "DENSE-07",
+          "counterparty": null,
+          "reference": "DENSE-07",
+          "source_excerpt": "DENSE-07 | 07/10/2026 | -7.001,07 | COP | Debito",
+          "confidence": 0.95
+        },
+        {
+          "amount": 8001.08,
+          "printed_amount": "+8.001,08",
+          "direction": "incoming",
+          "currency": "USD",
+          "occurred_at": "2026-10-08",
+          "description": "DENSE-08",
+          "counterparty": null,
+          "reference": "DENSE-08",
+          "source_excerpt": "DENSE-08 | 08/10/2026 | +8.001,08 | USD | Credit",
+          "confidence": 0.95
+        },
+        {
+          "amount": -9001.09,
+          "printed_amount": "9.001,09",
+          "direction": "outgoing",
+          "currency": "COP",
+          "occurred_at": "2026-10-09",
+          "description": "DENSE-09",
+          "counterparty": null,
+          "reference": "DENSE-09",
+          "source_excerpt": "DENSE-09 | 09/10/2026 | 9.001,09 | COP | Debito",
+          "confidence": 0.95
+        },
+        {
+          "amount": 10001.1,
+          "printed_amount": "-10.001,10",
+          "direction": "incoming",
+          "currency": "USD",
+          "occurred_at": "2026-10-10",
+          "description": "DENSE-10",
+          "counterparty": null,
+          "reference": "DENSE-10",
+          "source_excerpt": "DENSE-10 | 10/10/2026 | -10.001,10 | USD | Credit",
+          "confidence": 0.95
+        },
+        {
+          "amount": -11001.11,
+          "printed_amount": "+11.001,11",
+          "direction": "outgoing",
+          "currency": "COP",
+          "occurred_at": "2026-10-11",
+          "description": "DENSE-11",
+          "counterparty": null,
+          "reference": "DENSE-11",
+          "source_excerpt": "DENSE-11 | 11/10/2026 | +11.001,11 | COP | Debito",
+          "confidence": 0.95
+        },
+        {
+          "amount": 12001.12,
+          "printed_amount": "12.001,12",
+          "direction": "incoming",
+          "currency": "USD",
+          "occurred_at": "2026-10-12",
+          "description": "DENSE-12",
+          "counterparty": null,
+          "reference": "DENSE-12",
+          "source_excerpt": "DENSE-12 | 12/10/2026 | 12.001,12 | USD | Credit",
+          "confidence": 0.95
+        }
+      ]
+    }
+  ]
+}

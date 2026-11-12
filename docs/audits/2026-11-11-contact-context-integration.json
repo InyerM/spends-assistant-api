@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-11",
+  "scope": "local synthetic Docker only",
+  "postgresImage": "postgres:16-alpine",
+  "postgrestImage": "public.ecr.aws/supabase/postgrest:v16.5",
+  "fixture": "fixtures/2026-11-11-contact-context.sql",
+  "result": {
+    "actualHistoryIds": ["contact-old", "shared-old"],
+    "foreignSourceRejected": true,
+    "currentExcluded": true,
+    "deletedExcluded": true,
+    "wrongTypeExcluded": true,
+    "foreignCategoryExcluded": true
+  },
+  "transport": "Actual HTTP to local PostgREST; Supabase /rest/v1 prefix stripped for standalone server; synthetic JWT role context_reader",
+  "limitations": "Minimal synthetic schema mirrors named composite FKs; not all production migrations or deployed schema tested."
+}

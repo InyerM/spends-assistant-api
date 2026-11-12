@@ -244,6 +244,120 @@ describe('buildTransferPromptSection', () => {
 });
 
 describe('buildAutomationRulesPromptSection', () => {
+  it('omits impossible malformed regex rules instead of exposing them as overrides', () => {
+    expect(
+      buildAutomationRulesPromptSection([
+        createMockAutomationRule({
+          match_phone: null,
+          conditions: { description_regex: '[' },
+          actions: { set_type: 'income' }
+        })
+      ])
+    ).toBe('');
+  });
+
+  it('breaks priority ties by ID independently of input order', () => {
+    const a = createMockAutomationRule({
+      id: 'a',
+      name: 'First',
+      match_phone: null,
+      conditions: { description_contains: ['DEMO'] },
+      actions: { set_type: 'income' }
+    });
+    const b = createMockAutomationRule({ ...a, id: 'b', name: 'Second' });
+    expect(buildAutomationRulesPromptSection([b, a])).toBe(
+      buildAutomationRulesPromptSection([a, b])
+    );
+  });
+
+  it.each(['and', 'or'] as const)('handles empty keyword groups consistently for %s', (logic) => {
+    const result = buildAutomationRulesPromptSection([
+      createMockAutomationRule({
+        match_phone: null,
+        condition_logic: logic,
+        conditions: { description_contains: [], source: ['forwarded_email'] },
+        actions: { set_type: 'income' }
+      })
+    ]);
+    if (logic === 'or') expect(result).toBe('');
+    else expect(result).toContain('source is [forwarded_email]');
+  });
+  it('preserves every restriction instead of broadening a rule for the model', () => {
+    const result = buildAutomationRulesPromptSection([
+      createMockAutomationRule({
+        match_phone: null,
+        conditions: {
+          description_contains: ['DEMO store'],
+          raw_text_contains: ['purchase', 'confirmed'],
+          amount_equals: 25000,
+          from_account: 'source-account',
+          to_account: 'destination-account',
+          category: 'current-category',
+          source: ['forwarded_email']
+        },
+        actions: { set_category: 'reviewed-category' }
+      })
+    ]);
+    for (const restriction of [
+      'raw text',
+      'purchase',
+      'confirmed',
+      'amount equals 25000',
+      'source-account',
+      'destination-account',
+      'current-category'
+    ])
+      expect(result).toContain(restriction);
+    expect(result).toContain('Do not assume missing condition evidence');
+  });
+
+  it('uses OR only within keyword groups and requires all condition groups', () => {
+    const result = buildAutomationRulesPromptSection([
+      createMockAutomationRule({
+        match_phone: null,
+        condition_logic: 'or',
+        conditions: { description_contains: ['coffee', 'cafe'], source: ['forwarded_email'] },
+        actions: { set_type: 'expense' }
+      })
+    ]);
+    expect(result).toContain('contains ANY of');
+    expect(result).toContain(' AND source is');
+    expect(result).not.toContain(' OR source is');
+  });
+
+  it('does not send a partially understood condition to the model', () => {
+    const result = buildAutomationRulesPromptSection([
+      createMockAutomationRule({
+        match_phone: null,
+        conditions: Object.assign({ description_contains: ['DEMO'] }, { unsupported_limit: 10 }),
+        actions: { set_type: 'income' }
+      })
+    ]);
+    expect(result).toBe('');
+  });
+
+  it('retains explicit category clearing and deterministic priority order', () => {
+    const base = { match_phone: null, conditions: { description_contains: ['DEMO'] } };
+    const result = buildAutomationRulesPromptSection([
+      createMockAutomationRule({
+        ...base,
+        id: 'b',
+        name: 'Second',
+        priority: 10,
+        actions: { set_type: 'income' }
+      }),
+      createMockAutomationRule({
+        ...base,
+        id: 'a',
+        name: 'First',
+        priority: 100,
+        actions: { set_category: null }
+      })
+    ]);
+    expect(result).toContain('category→null');
+    expect(result.indexOf('First')).toBeLessThan(result.indexOf('Second'));
+  });
+
   it('returns empty string for no rules', () => {
     expect(buildAutomationRulesPromptSection([])).toBe('');
   });

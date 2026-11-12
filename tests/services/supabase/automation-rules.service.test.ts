@@ -440,3 +440,83 @@ describe('automation explanation service', () => {
     });
   });
 });
+
+describe('ordered field precedence', () => {
+  it.each([false, true])(
+    'keeps the first category write including clear, while chaining other fields (clear=%s)',
+    async (clear) => {
+      const high = createMockAutomationRule({
+        id: 'a',
+        priority: 100,
+        conditions: {},
+        actions: { set_category: clear ? null : 'high', set_account: 'chained', add_note: 'first' }
+      });
+      const low = createMockAutomationRule({
+        id: 'b',
+        priority: 10,
+        conditions: { from_account: 'chained' },
+        actions: { set_category: 'low', set_type: 'income', add_note: 'second' }
+      });
+      const service = new AutomationRulesService(URL, KEY);
+      vi.spyOn(service, 'getAutomationRules').mockResolvedValue([low, high]);
+      const result = await service.applyAutomationRules(createMockTransactionInput());
+      expect(result.category_id).toBe(clear ? undefined : 'high');
+      expect(result.type).toBe(clear ? 'income' : 'expense');
+      expect(result.notes).toBe('first\nsecond');
+    }
+  );
+  it('breaks priority ties by rule identity independent of input order', async () => {
+    const service = new AutomationRulesService(URL, KEY);
+    const a = createMockAutomationRule({
+      id: 'a',
+      priority: 10,
+      conditions: {},
+      actions: { set_category: 'a' }
+    });
+    const b = createMockAutomationRule({
+      id: 'b',
+      priority: 10,
+      conditions: {},
+      actions: { set_category: 'b' }
+    });
+    for (const rules of [
+      [a, b],
+      [b, a]
+    ]) {
+      vi.spyOn(service, 'getAutomationRules').mockResolvedValue(rules);
+      expect((await service.applyAutomationRules(createMockTransactionInput())).category_id).toBe(
+        'a'
+      );
+    }
+  });
+});
+
+it('keeps a claimed category compatible with type and leaves rejected type unclaimed', async () => {
+  const service = new AutomationRulesService(URL, KEY);
+  vi.spyOn(service, 'getAutomationRules').mockResolvedValue([
+    createMockAutomationRule({
+      id: 'high',
+      priority: 100,
+      conditions: {},
+      actions: { set_category: 'expense-category' }
+    }),
+    createMockAutomationRule({
+      id: 'incompatible',
+      priority: 50,
+      conditions: {},
+      actions: { set_type: 'income' }
+    }),
+    createMockAutomationRule({
+      id: 'compatible',
+      priority: 10,
+      conditions: {},
+      actions: { set_type: 'expense' }
+    })
+  ]);
+  const result = await service.applyAutomationRules(
+    createMockTransactionInput({ type: 'expense' })
+  );
+  expect(result.type).toBe('expense');
+  expect(result.category_id).toBe('expense-category');
+  expect(result.applied_rules?.map((rule) => rule.rule_id)).toEqual(['high', 'compatible']);
+});

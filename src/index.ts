@@ -1,3 +1,4 @@
+import { handleDocumentPdfOcrExtract } from './handlers/document-pdf-ocr-extract';
 import { handleInboxAnalyze, handleInboxAnalysisDispatch } from './handlers/inbox-analysis';
 import { dispatchInboxAnalysis, processInboxAnalysisJob } from './services/inbox-analysis';
 import type { InboxAnalysisQueueJob } from './types/inbox-analysis';
@@ -90,6 +91,9 @@ export default {
     if (url.pathname === '/audio/transcribe' && request.method === 'POST')
       return handleAudioTranscribe(request, env);
 
+    if (url.pathname === '/documents/extract-pdf-ocr' && request.method === 'POST') {
+      return handleDocumentPdfOcrExtract(request, env);
+    }
     if (url.pathname === '/documents/extract-text' && request.method === 'POST') {
       return handleStatementTextExtract(request, env);
     }

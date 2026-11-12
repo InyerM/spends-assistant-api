@@ -18,7 +18,7 @@ vi.mock('../src/ai/category-review', () => ({ reviewCategory: mocks.review }));
 vi.mock('../src/services/supabase', () => ({
   createSupabaseServices: () => ({
     apiKeys: {},
-    categoryReviewContext: { history: mocks.history },
+    categoryReviewContext: { reviewHistory: mocks.history },
     automationRules: {
       getAutomationRules: mocks.rules,
       matchesConditions: mocks.matches
@@ -112,7 +112,13 @@ it('supplies authoritative owner history and category rules to every review with
     }),
     createMockEnv()
   );
-  expect(mocks.history).toHaveBeenCalledWith('owner', 'Mercado Libre', 'expense', undefined);
+  expect(mocks.history).toHaveBeenCalledWith(
+    'owner',
+    'Mercado Libre',
+    'expense',
+    undefined,
+    undefined
+  );
   expect(mocks.review).toHaveBeenCalledWith(
     expect.objectContaining({ history }),
     expect.any(Array),
@@ -120,5 +126,61 @@ it('supplies authoritative owner history and category rules to every review with
     expect.any(String),
     expect.any(Object),
     { preferences: [], categoryRule: { category_id: 'shopping', name: 'My shopping rule' } }
+  );
+});
+
+it('rejects a foreign review identity before quota or model inference', async () => {
+  const { ReviewTransactionNotFoundError } = await import(
+    '../src/services/supabase/category-review-context.service'
+  );
+  mocks.history.mockRejectedValueOnce(new ReviewTransactionNotFoundError());
+  const response = await handleCategoryReview(
+    request({
+      ...input,
+      transaction_id: '00000000-0000-4000-8000-000000000099',
+      history: [{ id: 'forged', description: 'Fake', category: 'Fake' }]
+    }),
+    createMockEnv()
+  );
+  expect(response.status).toBe(404);
+  expect(mocks.quota).not.toHaveBeenCalled();
+  expect(mocks.review).not.toHaveBeenCalled();
+});
+
+it('uses the verified transaction identity for lookup while retaining editable description and notes', async () => {
+  const transactionId = '00000000-0000-4000-8000-000000000001';
+  const history = [
+    { id: 'contact-owned', description: 'School support', notes: 'Tuition', category: 'Education' }
+  ];
+  mocks.history.mockResolvedValueOnce(history);
+  await handleCategoryReview(
+    request({
+      ...input,
+      transaction_id: transactionId,
+      description: 'Edited merchant',
+      notes: 'Explicit current purpose',
+      history: [{ id: 'forged', description: 'Forged', category: 'Wrong' }]
+    }),
+    createMockEnv()
+  );
+  expect(mocks.history).toHaveBeenCalledWith(
+    'owner',
+    'Edited merchant',
+    'expense',
+    transactionId,
+    'Explicit current purpose'
+  );
+  expect(mocks.review).toHaveBeenCalledWith(
+    expect.objectContaining({
+      transaction_id: transactionId,
+      description: 'Edited merchant',
+      notes: 'Explicit current purpose',
+      history
+    }),
+    expect.any(Array),
+    expect.any(String),
+    expect.any(String),
+    expect.any(Object),
+    expect.any(Object)
   );
 });

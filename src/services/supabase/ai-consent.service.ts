@@ -1,7 +1,12 @@
 import { BaseService } from './base.service';
 
 export const AI_CONSENT_VERSION = 'external-ai-v1';
-export const AI_CONSENT_SCOPES = ['financial_text', 'document_images', 'forwarded_email'] as const;
+export const AI_CONSENT_SCOPES = [
+  'financial_text',
+  'document_images',
+  'forwarded_email',
+  'document_ocr'
+] as const;
 export type AiConsentScope = (typeof AI_CONSENT_SCOPES)[number];
 
 interface ConsentRow {
@@ -48,7 +53,8 @@ export class AiConsentService extends BaseService {
     const consents: AiConsentState['consents'] = {
       financial_text: false,
       document_images: false,
-      forwarded_email: false
+      forwarded_email: false,
+      document_ocr: false
     };
     for (const row of rows) {
       if (AI_CONSENT_SCOPES.includes(row.scope)) {

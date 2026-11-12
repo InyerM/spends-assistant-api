@@ -1,0 +1,1863 @@
+{
+  "generatedAt": "2026-11-12T03:22:52.104Z",
+  "mode": "live",
+  "privacy": "built-in synthetic only; provider data_collection=deny; no ZDR claim",
+  "catalog": [
+    {
+      "id": "mistralai/mistral-small-2603",
+      "canonical_slug": "mistralai/mistral-small-2603",
+      "hugging_face_id": "mistralai/Mistral-Small-4-119B-2603",
+      "name": "Mistral: Mistral Small 4",
+      "created": 1773695685,
+      "description": "Mistral Small 4 is the next major release in the Mistral Small family, unifying the capabilities of several flagship Mistral models into a single system. It combines strong reasoning from...",
+      "context_length": 262144,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
+        "tokenizer": "Mistral",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.0000006",
+        "input_cache_read": "0.000000015"
+      },
+      "top_provider": {
+        "context_length": 262144,
+        "max_completion_tokens": 209715,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/mistralai/mistral-small-2603/endpoints"
+      },
+      "endpoints": [
+        "/api/v1/chat/completions",
+        "/api/v1/completions",
+        "/api/v1/messages",
+        "/api/v1/responses"
+      ],
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": 4.3,
+          "coding_index": 26.6,
+          "agentic_index": 0.8
+        }
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": false,
+        "supported_efforts": ["high", "none"],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "amazon/nova-2-lite-v1",
+      "canonical_slug": "amazon/nova-2-lite-v1",
+      "hugging_face_id": "",
+      "name": "Amazon: Nova 2 Lite",
+      "created": 1764696672,
+      "description": "Nova 2 Lite is a fast, cost-effective reasoning model for everyday workloads that can process text, images, and videos to generate text. Nova 2 Lite demonstrates standout capabilities in processing...",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file+video->text",
+        "input_modalities": ["text", "image", "video", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Nova",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000003",
+        "completion": "0.0000025"
+      },
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 65535,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "stop",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "frequency_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/amazon/nova-2-lite-v1/endpoints"
+      },
+      "endpoints": [
+        "/api/v1/chat/completions",
+        "/api/v1/completions",
+        "/api/v1/messages",
+        "/api/v1/responses"
+      ],
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": null,
+          "coding_index": 23,
+          "agentic_index": null
+        }
+      },
+      "reasoning": {
+        "mandatory": false
+      }
+    },
+    {
+      "id": "qwen/qwen3-vl-30b-a3b-instruct",
+      "canonical_slug": "qwen/qwen3-vl-30b-a3b-instruct",
+      "hugging_face_id": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+      "name": "Qwen: Qwen3 VL 30B A3B Instruct",
+      "created": 1759794476,
+      "description": "Qwen3-VL-30B-A3B-Instruct is a multimodal model that unifies strong text generation with visual understanding for images and videos. Its Instruct variant optimizes instruction-following for general multimodal tasks. It excels in perception...",
+      "context_length": 262144,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
+        "tokenizer": "Qwen3",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.0000006"
+      },
+      "top_provider": {
+        "context_length": 262144,
+        "max_completion_tokens": 16384,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "frequency_penalty",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "min_p",
+        "presence_penalty",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "default_parameters": {
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": 1
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": "2025-03-31",
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/qwen/qwen3-vl-30b-a3b-instruct/endpoints"
+      },
+      "endpoints": [
+        "/api/v1/chat/completions",
+        "/api/v1/completions",
+        "/api/v1/messages",
+        "/api/v1/responses"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v4.1-flash",
+      "canonical_slug": "deepseek/deepseek-v4.1-flash-20260910",
+      "hugging_face_id": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "name": "DeepSeek: DeepSeek V4.1 Flash",
+      "created": 1789021285,
+      "description": "DeepSeek V4.1 Flash is a sparse mixture-of-experts model from DeepSeek, and the first built on the company's Causal Encoder-Decoder (CED) architecture. It activates 8B parameters on input and 16B on...",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
+        "tokenizer": "DeepSeek",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000000022",
+        "completion": "0.0000004",
+        "input_cache_read": "0.000000004"
+      },
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 943718,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "min_p",
+        "parallel_tool_calls",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_a",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/deepseek/deepseek-v4.1-flash-20260910/endpoints"
+      },
+      "endpoints": [
+        "/api/v1/chat/completions",
+        "/api/v1/completions",
+        "/api/v1/messages",
+        "/api/v1/responses"
+      ],
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": ["max", "high", "low", "none"],
+        "default_effort": "high"
+      }
+    }
+  ],
+  "reservedWorstCaseUsd": 0.3995416,
+  "knownCostUsd": 0.018841359999999998,
+  "costComplete": true,
+  "verdict": {
+    "winner": null,
+    "reason": "One repetition and synthetic-only fixtures cannot establish production superiority."
+  },
+  "records": [
+    {
+      "model": "mistralai/mistral-small-2603",
+      "task": "image-page-1",
+      "pathway": "chat-image",
+      "latencyMs": 1838,
+      "costUsd": 0.00029505,
+      "inputTokens": 1611,
+      "outputTokens": 89,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-101",
+            "amount": 12345,
+            "currency": "COP",
+            "date": "2026-09-01"
+          },
+          {
+            "reference": "REF-102",
+            "amount": 6789,
+            "currency": "COP",
+            "date": "2026-09-02"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 2,
+        "returned": 2,
+        "coverage": 2,
+        "exact": 2,
+        "correct": {
+          "amount": 2,
+          "currency": 2,
+          "date": 2
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "task": "image-page-2",
+      "pathway": "chat-image",
+      "latencyMs": 1507,
+      "costUsd": 0.00029565,
+      "inputTokens": 1611,
+      "outputTokens": 90,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-201",
+            "amount": -12345,
+            "currency": "COP",
+            "date": "2026-09-01"
+          },
+          {
+            "reference": "REF-202",
+            "amount": 22222,
+            "currency": "COP",
+            "date": "2026-09-03"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 2,
+        "returned": 2,
+        "coverage": 2,
+        "exact": 1,
+        "correct": {
+          "amount": 1,
+          "currency": 2,
+          "date": 2
+        },
+        "pass": false
+      }
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "task": "image-page-3",
+      "pathway": "chat-image",
+      "latencyMs": 882,
+      "costUsd": 0.00024525,
+      "inputTokens": 1611,
+      "outputTokens": 6,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": []
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 0,
+        "returned": 0,
+        "coverage": 0,
+        "exact": 0,
+        "correct": {
+          "amount": 0,
+          "currency": 0,
+          "date": 0
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "task": "image-page-4",
+      "pathway": "chat-image",
+      "latencyMs": 3847,
+      "costUsd": 0.00061425,
+      "inputTokens": 1611,
+      "outputTokens": 621,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-401",
+            "amount": 3000,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-402",
+            "amount": 3037,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-403",
+            "amount": 3074,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-404",
+            "amount": 3111,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-405",
+            "amount": 3148,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-406",
+            "amount": 3185,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-407",
+            "amount": 3222,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-408",
+            "amount": 3259,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-409",
+            "amount": 3296,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-410",
+            "amount": 3333,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-411",
+            "amount": 3370,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-412",
+            "amount": 3407,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-413",
+            "amount": 3444,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-414",
+            "amount": 3481,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-415",
+            "amount": 3518,
+            "currency": "COP",
+            "date": "2026-09-04"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 15,
+        "returned": 15,
+        "coverage": 15,
+        "exact": 15,
+        "correct": {
+          "amount": 15,
+          "currency": 15,
+          "date": 15
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "task": "image-page-5",
+      "pathway": "chat-image",
+      "latencyMs": 1362,
+      "costUsd": 0.00029565,
+      "inputTokens": 1611,
+      "outputTokens": 90,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-501",
+            "amount": -45555,
+            "currency": "COP",
+            "date": "2026-09-05"
+          },
+          {
+            "reference": "REF-502",
+            "amount": 98765,
+            "currency": "COP",
+            "date": "2026-09-06"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 2,
+        "returned": 2,
+        "coverage": 2,
+        "exact": 1,
+        "correct": {
+          "amount": 1,
+          "currency": 2,
+          "date": 2
+        },
+        "pass": false
+      }
+    },
+    {
+      "model": "amazon/nova-2-lite-v1",
+      "task": "image-page-1",
+      "pathway": "chat-image",
+      "latencyMs": 1171,
+      "costUsd": 0.0003393,
+      "inputTokens": 331,
+      "outputTokens": 96,
+      "jsonValid": true,
+      "strictJson": false,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-101",
+            "amount": 12345,
+            "currency": "COP",
+            "date": "2026-09-01"
+          },
+          {
+            "reference": "REF-102",
+            "amount": 6789,
+            "currency": "COP",
+            "date": "2026-09-02"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 2,
+        "returned": 2,
+        "coverage": 2,
+        "exact": 2,
+        "correct": {
+          "amount": 2,
+          "currency": 2,
+          "date": 2
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "amazon/nova-2-lite-v1",
+      "task": "image-page-2",
+      "pathway": "chat-image",
+      "latencyMs": 1380,
+      "costUsd": 0.0003393,
+      "inputTokens": 331,
+      "outputTokens": 96,
+      "jsonValid": true,
+      "strictJson": false,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-201",
+            "amount": 12345,
+            "currency": "COP",
+            "date": "2026-09-01"
+          },
+          {
+            "reference": "REF-202",
+            "amount": 22222,
+            "currency": "COP",
+            "date": "2026-09-03"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 2,
+        "returned": 2,
+        "coverage": 2,
+        "exact": 2,
+        "correct": {
+          "amount": 2,
+          "currency": 2,
+          "date": 2
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "amazon/nova-2-lite-v1",
+      "task": "image-page-3",
+      "pathway": "chat-image",
+      "latencyMs": 994,
+      "costUsd": 0.0001343,
+      "inputTokens": 331,
+      "outputTokens": 14,
+      "jsonValid": true,
+      "strictJson": false,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": []
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 0,
+        "returned": 0,
+        "coverage": 0,
+        "exact": 0,
+        "correct": {
+          "amount": 0,
+          "currency": 0,
+          "date": 0
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "amazon/nova-2-lite-v1",
+      "task": "image-page-4",
+      "pathway": "chat-image",
+      "latencyMs": 3165,
+      "costUsd": 0.0016393,
+      "inputTokens": 331,
+      "outputTokens": 616,
+      "jsonValid": true,
+      "strictJson": false,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-401",
+            "amount": 3000,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-402",
+            "amount": 3037,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-403",
+            "amount": 3074,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-404",
+            "amount": 3111,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-405",
+            "amount": 3148,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-406",
+            "amount": 3185,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-407",
+            "amount": 3222,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-408",
+            "amount": 3259,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-409",
+            "amount": 3296,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-410",
+            "amount": 3333,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-411",
+            "amount": 3370,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-412",
+            "amount": 3407,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-413",
+            "amount": 3444,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-414",
+            "amount": 3481,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-415",
+            "amount": 3518,
+            "currency": "COP",
+            "date": "2026-09-04"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 15,
+        "returned": 15,
+        "coverage": 15,
+        "exact": 15,
+        "correct": {
+          "amount": 15,
+          "currency": 15,
+          "date": 15
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "amazon/nova-2-lite-v1",
+      "task": "image-page-5",
+      "pathway": "chat-image",
+      "latencyMs": 1291,
+      "costUsd": 0.0003393,
+      "inputTokens": 331,
+      "outputTokens": 96,
+      "jsonValid": true,
+      "strictJson": false,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-501",
+            "amount": 45555,
+            "currency": "COP",
+            "date": "2026-09-05"
+          },
+          {
+            "reference": "REF-502",
+            "amount": 98765,
+            "currency": "COP",
+            "date": "2026-09-06"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 2,
+        "returned": 2,
+        "coverage": 2,
+        "exact": 2,
+        "correct": {
+          "amount": 2,
+          "currency": 2,
+          "date": 2
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "qwen/qwen3-vl-30b-a3b-instruct",
+      "task": "image-page-1",
+      "pathway": "chat-image",
+      "latencyMs": 1970,
+      "costUsd": 0.0002277,
+      "inputTokens": 1166,
+      "outputTokens": 88,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-101",
+            "amount": 12345,
+            "currency": "COP",
+            "date": "2026-09-01"
+          },
+          {
+            "reference": "REF-102",
+            "amount": 6789,
+            "currency": "COP",
+            "date": "2026-09-02"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 2,
+        "returned": 2,
+        "coverage": 2,
+        "exact": 2,
+        "correct": {
+          "amount": 2,
+          "currency": 2,
+          "date": 2
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "qwen/qwen3-vl-30b-a3b-instruct",
+      "task": "image-page-2",
+      "pathway": "chat-image",
+      "latencyMs": 1736,
+      "costUsd": 0.0002283,
+      "inputTokens": 1166,
+      "outputTokens": 89,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-201",
+            "amount": 12345,
+            "currency": "COP",
+            "date": "2026-09-01"
+          },
+          {
+            "reference": "REF-202",
+            "amount": 22222,
+            "currency": "COP",
+            "date": "2026-09-03"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 2,
+        "returned": 2,
+        "coverage": 2,
+        "exact": 2,
+        "correct": {
+          "amount": 2,
+          "currency": 2,
+          "date": 2
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "qwen/qwen3-vl-30b-a3b-instruct",
+      "task": "image-page-3",
+      "pathway": "chat-image",
+      "latencyMs": 629,
+      "costUsd": 0.0001785,
+      "inputTokens": 1166,
+      "outputTokens": 6,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": []
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 0,
+        "returned": 0,
+        "coverage": 0,
+        "exact": 0,
+        "correct": {
+          "amount": 0,
+          "currency": 0,
+          "date": 0
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "qwen/qwen3-vl-30b-a3b-instruct",
+      "task": "image-page-4",
+      "pathway": "chat-image",
+      "latencyMs": 10225,
+      "costUsd": 0.0005469,
+      "inputTokens": 1166,
+      "outputTokens": 620,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-401",
+            "amount": 3000,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-402",
+            "amount": 3037,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-403",
+            "amount": 3074,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-404",
+            "amount": 3111,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-405",
+            "amount": 3148,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-406",
+            "amount": 3185,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-407",
+            "amount": 3222,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-408",
+            "amount": 3259,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-409",
+            "amount": 3296,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-410",
+            "amount": 3333,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-411",
+            "amount": 3370,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-412",
+            "amount": 3407,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-413",
+            "amount": 3444,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-414",
+            "amount": 3481,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-415",
+            "amount": 3518,
+            "currency": "COP",
+            "date": "2026-09-04"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 15,
+        "returned": 15,
+        "coverage": 15,
+        "exact": 15,
+        "correct": {
+          "amount": 15,
+          "currency": 15,
+          "date": 15
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "qwen/qwen3-vl-30b-a3b-instruct",
+      "task": "image-page-5",
+      "pathway": "chat-image",
+      "latencyMs": 1783,
+      "costUsd": 0.0002283,
+      "inputTokens": 1166,
+      "outputTokens": 89,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-501",
+            "amount": 45555,
+            "currency": "COP",
+            "date": "2026-09-05"
+          },
+          {
+            "reference": "REF-502",
+            "amount": 98765,
+            "currency": "COP",
+            "date": "2026-09-06"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 2,
+        "returned": 2,
+        "coverage": 2,
+        "exact": 2,
+        "correct": {
+          "amount": 2,
+          "currency": 2,
+          "date": 2
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "task": "signed-currency-text",
+      "pathway": "chat-text",
+      "latencyMs": 1158,
+      "costUsd": 0.0001077,
+      "inputTokens": 186,
+      "outputTokens": 133,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "SIGN-1",
+            "amount": -12345.67,
+            "currency": "COP",
+            "date": "2026-11-01"
+          },
+          {
+            "reference": "SIGN-2",
+            "amount": 12345.67,
+            "currency": "COP",
+            "date": "2026-11-02"
+          },
+          {
+            "reference": "SIGN-3",
+            "amount": -12.5,
+            "currency": "USD",
+            "date": "2026-10-31"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 3,
+        "returned": 3,
+        "coverage": 3,
+        "exact": 3,
+        "correct": {
+          "amount": 3,
+          "currency": 3,
+          "date": 3
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "task": "intelligence",
+      "pathway": "chat-text",
+      "latencyMs": 1674,
+      "costUsd": 0.0001839,
+      "inputTokens": 258,
+      "outputTokens": 242,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "answers": [
+          {
+            "id": "rule-over-history",
+            "category": "work",
+            "contact": null,
+            "review": false,
+            "description": "Merchant DEMO CAFE",
+            "notes": "Explicit user rule overrides history."
+          },
+          {
+            "id": "history",
+            "category": "education",
+            "contact": null,
+            "review": false,
+            "description": "Merchant DEMO BOOKS"
+          },
+          {
+            "id": "ambiguous-contact",
+            "category": null,
+            "contact": null,
+            "review": true,
+            "description": "Transfer to Alex"
+          },
+          {
+            "id": "known-contact",
+            "category": null,
+            "contact": "c3 DEMO LINA",
+            "review": false,
+            "description": "Transfer to c3 DEMO LINA"
+          },
+          {
+            "id": "missing-evidence",
+            "category": null,
+            "contact": null,
+            "review": true,
+            "description": "Transfer reference X9"
+          },
+          {
+            "id": "description-notes",
+            "category": null,
+            "contact": null,
+            "review": false,
+            "description": "Purchase DEMO CLINIC",
+            "notes": "Receipt: consultation. User note: annual checkup."
+          }
+        ]
+      },
+      "score": [
+        {
+          "id": "rule-over-history",
+          "pass": true
+        },
+        {
+          "id": "history",
+          "pass": true
+        },
+        {
+          "id": "ambiguous-contact",
+          "pass": true
+        },
+        {
+          "id": "known-contact",
+          "pass": false
+        },
+        {
+          "id": "missing-evidence",
+          "pass": true
+        },
+        {
+          "id": "description-notes",
+          "pass": false
+        }
+      ]
+    },
+    {
+      "model": "amazon/nova-2-lite-v1",
+      "task": "signed-currency-text",
+      "pathway": "chat-text",
+      "latencyMs": 1122,
+      "costUsd": 0.0004068,
+      "inputTokens": 181,
+      "outputTokens": 141,
+      "jsonValid": true,
+      "strictJson": false,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "SIGN-1",
+            "amount": -12345.67,
+            "currency": "COP",
+            "date": "2026-11-01"
+          },
+          {
+            "reference": "SIGN-2",
+            "amount": 12345.67,
+            "currency": "COP",
+            "date": "2026-11-02"
+          },
+          {
+            "reference": "SIGN-3",
+            "amount": -12.5,
+            "currency": "USD",
+            "date": "2026-10-31"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 3,
+        "returned": 3,
+        "coverage": 3,
+        "exact": 3,
+        "correct": {
+          "amount": 3,
+          "currency": 3,
+          "date": 3
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "amazon/nova-2-lite-v1",
+      "task": "intelligence",
+      "pathway": "chat-text",
+      "latencyMs": 1330,
+      "costUsd": 0.0007888,
+      "inputTokens": 271,
+      "outputTokens": 283,
+      "jsonValid": true,
+      "strictJson": false,
+      "error": null,
+      "status": 200,
+      "data": {
+        "answers": [
+          {
+            "id": "rule-over-history",
+            "category": "work",
+            "contact": null,
+            "review": false,
+            "notes": "Explicit user rule overrides history"
+          },
+          {
+            "id": "history",
+            "category": "education",
+            "contact": null,
+            "review": false,
+            "notes": "Categorized by last 4 confirmed purchases"
+          },
+          {
+            "id": "ambiguous-contact",
+            "category": null,
+            "contact": null,
+            "review": true,
+            "notes": "Ambiguous contact IDs with no account evidence"
+          },
+          {
+            "id": "known-contact",
+            "category": "family",
+            "contact": "c3",
+            "review": false,
+            "notes": "User rule applied to known contact"
+          },
+          {
+            "id": "missing-evidence",
+            "category": null,
+            "contact": null,
+            "review": true,
+            "notes": "No merchant, contact, or history evidence"
+          },
+          {
+            "id": "description-notes",
+            "category": null,
+            "contact": null,
+            "review": false,
+            "description": "consultation",
+            "notes": "annual checkup"
+          }
+        ]
+      },
+      "score": [
+        {
+          "id": "rule-over-history",
+          "pass": true
+        },
+        {
+          "id": "history",
+          "pass": true
+        },
+        {
+          "id": "ambiguous-contact",
+          "pass": true
+        },
+        {
+          "id": "known-contact",
+          "pass": true
+        },
+        {
+          "id": "missing-evidence",
+          "pass": true
+        },
+        {
+          "id": "description-notes",
+          "pass": false
+        }
+      ]
+    },
+    {
+      "model": "qwen/qwen3-vl-30b-a3b-instruct",
+      "task": "signed-currency-text",
+      "pathway": "chat-text",
+      "latencyMs": 25009,
+      "costUsd": 0.0001029,
+      "inputTokens": 170,
+      "outputTokens": 129,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "SIGN-1",
+            "amount": -12345.67,
+            "currency": "COP",
+            "date": "2026-11-01"
+          },
+          {
+            "reference": "SIGN-2",
+            "amount": 12345.67,
+            "currency": "COP",
+            "date": "2026-11-02"
+          },
+          {
+            "reference": "SIGN-3",
+            "amount": -12.5,
+            "currency": "USD",
+            "date": "2026-10-31"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 3,
+        "returned": 3,
+        "coverage": 3,
+        "exact": 3,
+        "correct": {
+          "amount": 3,
+          "currency": 3,
+          "date": 3
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "qwen/qwen3-vl-30b-a3b-instruct",
+      "task": "intelligence",
+      "pathway": "chat-text",
+      "latencyMs": 4552,
+      "costUsd": 0.000177,
+      "inputTokens": 236,
+      "outputTokens": 236,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "answers": [
+          {
+            "id": "rule-over-history",
+            "category": "work",
+            "contact": null,
+            "review": false,
+            "description": "Merchant DEMO CAFE",
+            "notes": null
+          },
+          {
+            "id": "history",
+            "category": "education",
+            "contact": null,
+            "review": false,
+            "description": "Merchant DEMO BOOKS",
+            "notes": null
+          },
+          {
+            "id": "ambiguous-contact",
+            "category": null,
+            "contact": null,
+            "review": true,
+            "description": "Transfer to Alex",
+            "notes": null
+          },
+          {
+            "id": "known-contact",
+            "category": null,
+            "contact": "c3",
+            "review": false,
+            "description": "Transfer to c3 DEMO LINA",
+            "notes": null
+          },
+          {
+            "id": "missing-evidence",
+            "category": null,
+            "contact": null,
+            "review": true,
+            "description": "Transfer reference X9",
+            "notes": null
+          },
+          {
+            "id": "description-notes",
+            "category": null,
+            "contact": null,
+            "review": false,
+            "description": "Purchase DEMO CLINIC",
+            "notes": "annual checkup"
+          }
+        ]
+      },
+      "score": [
+        {
+          "id": "rule-over-history",
+          "pass": true
+        },
+        {
+          "id": "history",
+          "pass": true
+        },
+        {
+          "id": "ambiguous-contact",
+          "pass": true
+        },
+        {
+          "id": "known-contact",
+          "pass": false
+        },
+        {
+          "id": "missing-evidence",
+          "pass": true
+        },
+        {
+          "id": "description-notes",
+          "pass": false
+        }
+      ]
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "task": "signed-currency-text",
+      "pathway": "chat-text",
+      "latencyMs": 2131,
+      "costUsd": 0.000062444,
+      "inputTokens": 202,
+      "outputTokens": 145,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "SIGN-1",
+            "amount": -12345.67,
+            "currency": "COP",
+            "date": "2026-11-01"
+          },
+          {
+            "reference": "SIGN-2",
+            "amount": 12345.67,
+            "currency": "COP",
+            "date": "2026-11-02"
+          },
+          {
+            "reference": "SIGN-3",
+            "amount": -12.5,
+            "currency": "USD",
+            "date": "2026-10-31"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 3,
+        "returned": 3,
+        "coverage": 3,
+        "exact": 3,
+        "correct": {
+          "amount": 3,
+          "currency": 3,
+          "date": 3
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "task": "intelligence",
+      "pathway": "chat-text",
+      "latencyMs": 16020,
+      "costUsd": 0.000317514,
+      "inputTokens": 287,
+      "outputTokens": 778,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "answers": [
+          {
+            "id": "rule-over-history",
+            "category": "work",
+            "contact": null,
+            "review": false
+          },
+          {
+            "id": "history",
+            "category": "education",
+            "contact": null,
+            "review": false
+          },
+          {
+            "id": "ambiguous-contact",
+            "category": null,
+            "contact": null,
+            "review": true
+          },
+          {
+            "id": "known-contact",
+            "category": "family",
+            "contact": "c3",
+            "review": false
+          },
+          {
+            "id": "missing-evidence",
+            "category": null,
+            "contact": null,
+            "review": true
+          },
+          {
+            "id": "description-notes",
+            "category": null,
+            "contact": null,
+            "review": true,
+            "description": "consultation",
+            "notes": "annual checkup"
+          }
+        ]
+      },
+      "score": [
+        {
+          "id": "rule-over-history",
+          "pass": true
+        },
+        {
+          "id": "history",
+          "pass": true
+        },
+        {
+          "id": "ambiguous-contact",
+          "pass": true
+        },
+        {
+          "id": "known-contact",
+          "pass": true
+        },
+        {
+          "id": "missing-evidence",
+          "pass": true
+        },
+        {
+          "id": "description-notes",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "task": "pdf-five-pages",
+      "pathway": "mistral-ocr-pdf-plugin",
+      "latencyMs": 5022,
+      "costUsd": 0.010341652,
+      "inputTokens": 766,
+      "outputTokens": 812,
+      "jsonValid": true,
+      "strictJson": true,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "REF-101",
+            "amount": 12345,
+            "currency": "COP",
+            "date": "2026-09-01"
+          },
+          {
+            "reference": "REF-102",
+            "amount": 6789,
+            "currency": "COP",
+            "date": "2026-09-02"
+          },
+          {
+            "reference": "REF-201",
+            "amount": 12345,
+            "currency": "COP",
+            "date": "2026-09-01"
+          },
+          {
+            "reference": "REF-202",
+            "amount": 22222,
+            "currency": "COP",
+            "date": "2026-09-03"
+          },
+          {
+            "reference": "REF-401",
+            "amount": 3000,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-402",
+            "amount": 3037,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-403",
+            "amount": 3074,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-404",
+            "amount": 3111,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-405",
+            "amount": 3148,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-406",
+            "amount": 3185,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-407",
+            "amount": 3222,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-408",
+            "amount": 3259,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-409",
+            "amount": 3296,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-410",
+            "amount": 3333,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-411",
+            "amount": 3370,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-412",
+            "amount": 3407,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-413",
+            "amount": 3444,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-414",
+            "amount": 3481,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-415",
+            "amount": 3518,
+            "currency": "COP",
+            "date": "2026-09-04"
+          },
+          {
+            "reference": "REF-501",
+            "amount": 45555,
+            "currency": "COP",
+            "date": "2026-09-05"
+          },
+          {
+            "reference": "REF-502",
+            "amount": 98765,
+            "currency": "COP",
+            "date": "2026-09-06"
+          }
+        ]
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 21,
+        "returned": 21,
+        "coverage": 21,
+        "exact": 21,
+        "correct": {
+          "amount": 21,
+          "currency": 21,
+          "date": 21
+        },
+        "pass": true
+      }
+    },
+    {
+      "model": "amazon/nova-2-lite-v1",
+      "task": "forced-mistral-to-nova",
+      "pathway": "chat-text",
+      "latencyMs": 1178,
+      "costUsd": 0.0004056,
+      "inputTokens": 177,
+      "outputTokens": 141,
+      "jsonValid": true,
+      "strictJson": false,
+      "error": null,
+      "status": 200,
+      "data": {
+        "rows": [
+          {
+            "reference": "SIGN-1",
+            "amount": -12345.67,
+            "currency": "COP",
+            "date": "2026-11-01"
+          },
+          {
+            "reference": "SIGN-2",
+            "amount": 12345.67,
+            "currency": "COP",
+            "date": "2026-11-02"
+          },
+          {
+            "reference": "SIGN-3",
+            "amount": -12.5,
+            "currency": "USD",
+            "date": "2026-10-31"
+          }
+        ]
+      },
+      "fallback": {
+        "injectedPrimaryFailure": true,
+        "used": true
+      },
+      "score": {
+        "schemaValid": true,
+        "expected": 3,
+        "returned": 3,
+        "coverage": 3,
+        "exact": 3,
+        "correct": {
+          "amount": 3,
+          "currency": 3,
+          "date": 3
+        },
+        "pass": true
+      }
+    }
+  ]
+}

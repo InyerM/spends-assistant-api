@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { OpenRouterError } from '../../../src/ai/openrouter';
 import { AiUsageService } from '../../../src/services/supabase/ai-usage.service';
 
 const URL = 'https://test.supabase.co';
@@ -94,6 +95,46 @@ describe('AiUsageService', () => {
         status: 'failed',
         billed_calls: 1,
         estimated_cost_micros: 3
+      });
+    });
+
+    it('logs only bounded failure metadata correlated to the stored usage event', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(1000);
+      const calls = stubFetch();
+      const failure = new OpenRouterError(429, 'http');
+      failure.message = 'private bank message and provider body';
+      await expect(
+        service.track(params, async () => {
+          vi.setSystemTime(1250);
+          throw failure;
+        })
+      ).rejects.toBe(failure);
+      expect(console.error).toHaveBeenCalledWith('[AiUsage] Operation failed', {
+        correlationId: calls[0].body?.id,
+        operation: 'parse_expense',
+        model: MODEL,
+        errorClass: 'http',
+        upstreamStatus: 429,
+        durationMs: 250
+      });
+      expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain('private');
+    });
+
+    it('does not log arbitrary error properties or unbounded model values', async () => {
+      stubFetch();
+      await expect(
+        service.track({ ...params, model: 'private body '.repeat(100) }, async () => {
+          throw Object.assign(new Error('private body'), { status: 429, reason: 'http' });
+        })
+      ).rejects.toThrow('private body');
+      expect(console.error).toHaveBeenCalledWith('[AiUsage] Operation failed', {
+        correlationId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        operation: 'parse_expense',
+        model: 'unknown',
+        errorClass: 'unknown',
+        upstreamStatus: null,
+        durationMs: expect.any(Number)
       });
     });
 

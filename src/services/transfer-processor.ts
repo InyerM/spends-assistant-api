@@ -208,23 +208,58 @@ export function buildTransferPromptSection(rules: AutomationRule[]): string {
  * This allows the parser model to proactively apply known rules during parsing.
  */
 export function buildAutomationRulesPromptSection(rules: AutomationRule[]): string {
-  const actionRules = rules.filter(
-    (r) =>
-      r.conditions &&
-      r.actions &&
-      (r.actions.set_type || r.actions.set_category || r.actions.link_to_account) &&
-      !r.match_phone
-  );
+  const supportedConditions = new Set([
+    'description_contains',
+    'description_regex',
+    'raw_text_contains',
+    'amount_between',
+    'amount_equals',
+    'from_account',
+    'to_account',
+    'source',
+    'category'
+  ]);
+  const actionRules = rules
+    .filter(
+      (r) =>
+        r.is_active &&
+        r.conditions &&
+        Object.keys(r.conditions).every((key) => supportedConditions.has(key)) &&
+        r.actions &&
+        (r.actions.set_type || r.actions.set_category !== undefined) &&
+        !r.match_phone
+    )
+    .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
 
   if (actionRules.length === 0) return '';
 
   const lines = actionRules
     .map((r) => {
       const condParts: string[] = [];
+      const keywordMode = r.condition_logic === 'and' ? 'ALL' : 'ANY';
+      if (
+        r.conditions.source?.length === 0 ||
+        (keywordMode === 'ANY' &&
+          (r.conditions.description_contains?.length === 0 ||
+            r.conditions.raw_text_contains?.length === 0))
+      )
+        return '';
       if (r.conditions.description_contains?.length) {
-        condParts.push(`description contains [${r.conditions.description_contains.join(', ')}]`);
+        condParts.push(
+          `description contains ${keywordMode} of ${JSON.stringify(r.conditions.description_contains)}`
+        );
+      }
+      if (r.conditions.raw_text_contains?.length) {
+        condParts.push(
+          `raw text contains ${keywordMode} of ${JSON.stringify(r.conditions.raw_text_contains)}`
+        );
       }
       if (r.conditions.description_regex) {
+        try {
+          new RegExp(r.conditions.description_regex, 'i');
+        } catch {
+          return '';
+        }
         condParts.push(`description matches /${r.conditions.description_regex}/`);
       }
       if (r.conditions.amount_between) {
@@ -232,19 +267,30 @@ export function buildAutomationRulesPromptSection(rules: AutomationRule[]): stri
           `amount between ${r.conditions.amount_between[0]}-${r.conditions.amount_between[1]}`
         );
       }
+      if (r.conditions.amount_equals !== undefined) {
+        condParts.push(`amount equals ${r.conditions.amount_equals}`);
+      }
+      if (r.conditions.from_account) {
+        condParts.push(`source account ID equals ${JSON.stringify(r.conditions.from_account)}`);
+      }
+      if (r.conditions.to_account) {
+        condParts.push(`destination account ID equals ${JSON.stringify(r.conditions.to_account)}`);
+      }
+      if (r.conditions.category) {
+        condParts.push(`current category ID equals ${JSON.stringify(r.conditions.category)}`);
+      }
       if (r.conditions.source?.length) {
         condParts.push(`source is [${r.conditions.source.join(', ')}]`);
       }
 
       const actParts: string[] = [];
       if (r.actions.set_type) actParts.push(`type→"${r.actions.set_type}"`);
-      if (r.actions.set_category) actParts.push(`category→"${r.actions.set_category}"`);
+      if (r.actions.set_category !== undefined)
+        actParts.push(`category→${JSON.stringify(r.actions.set_category)}`);
 
       if (condParts.length === 0 || actParts.length === 0) return '';
 
-      const logic = r.condition_logic ?? 'or';
-      const logicLabel = logic === 'and' ? ' AND ' : ' OR ';
-      return `- RULE "${r.name}" (${logic.toUpperCase()}): IF ${condParts.join(logicLabel)} THEN ${actParts.join(', ')}`;
+      return `- RULE ${JSON.stringify(r.name)} (priority ${r.priority}): IF ${condParts.join(' AND ')} THEN ${actParts.join(', ')}`;
     })
     .filter(Boolean);
 
@@ -252,5 +298,5 @@ export function buildAutomationRulesPromptSection(rules: AutomationRule[]): stri
 
   return `AUTOMATION RULES (apply these when conditions match, they override default categorization):
 ${lines.join('\n')}
-If a rule matches, use the specified values. These rules are deterministic overrides from the user.`;
+Every condition group must match; ANY/ALL applies only within its keyword group. Do not assume missing condition evidence (including source, account IDs or current category). Rules are ordered by priority: the first matching assignment to each field wins. Other fields may still be resolved by later rules. These are user rule constraints; final execution and validation remain in application code.`;
 }

@@ -4,7 +4,10 @@ import type { InboxAnalysisLease, InboxAnalysisQueueJob } from '../types/inbox-a
 import { AiConsentRequiredError } from './supabase/ai-consent.service';
 import { suggestForwardedEmail } from '../ai/forwarded-email-suggestion';
 import { extractEmailEventEvidence } from '../utils/email-event-evidence';
-import { buildInboxAnalysisProposal } from '../utils/inbox-analysis-proposal';
+import {
+  buildDeterministicInboxAnalysisProposal,
+  buildInboxAnalysisProposal
+} from '../utils/inbox-analysis-proposal';
 
 /** Generates review suggestions only. SQL leases guard replay and discarded captures. */
 export async function processInboxAnalysisLease(
@@ -36,18 +39,29 @@ export async function processInboxAnalysisLease(
       return;
     }
     const scope = item.source === 'forwarded_email' ? 'forwarded_email' : 'financial_text';
-    await services.aiConsent.require(lease.user_id, scope);
     const evidence = extractEmailEventEvidence(item.raw_text);
-    const [categories, accounts, history, rules] = await Promise.all([
+    const [categories, accounts, rules] = await Promise.all([
       services.categories.getCategories(lease.user_id),
       services.accounts.getAccounts(lease.user_id),
-      services.categoryReviewContext.history(
-        lease.user_id,
-        evidence.merchant ?? item.raw_text,
-        evidence.type ?? ''
-      ),
       services.automationRules.getAutomationRules(lease.user_id)
     ]);
+    const deterministic = buildDeterministicInboxAnalysisProposal(
+      item,
+      accounts,
+      categories,
+      rules,
+      services.automationRules
+    );
+    if (deterministic) {
+      await services.inboxAnalysis.complete(lease, deterministic);
+      return;
+    }
+    await services.aiConsent.require(lease.user_id, scope);
+    const history = await services.categoryReviewContext.history(
+      lease.user_id,
+      evidence.merchant ?? item.raw_text,
+      evidence.type ?? ''
+    );
     const reservation = await services.usage.incrementAiParses(lease.user_id);
     if (!reservation.allowed) {
       await services.inboxAnalysis.fail(lease, 'quota_limit', true);

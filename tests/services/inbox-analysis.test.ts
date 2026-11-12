@@ -1,6 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { processInboxAnalysisLease } from '../../src/services/inbox-analysis';
-import { createMockEnv } from '../__test-helpers__/factories';
+import {
+  createMockAccount,
+  createMockCategory,
+  createMockAutomationRule,
+  createMockEnv
+} from '../__test-helpers__/factories';
+import { AiConsentRequiredError } from '../../src/services/supabase/ai-consent.service';
+import { AutomationRulesService } from '../../src/services/supabase/automation-rules.service';
 const mock = vi.hoisted(() => ({
   item: vi.fn(),
   consent: vi.fn(),
@@ -9,7 +16,10 @@ const mock = vi.hoisted(() => ({
   complete: vi.fn(),
   fail: vi.fn(),
   route: vi.fn(),
-  history: vi.fn()
+  history: vi.fn(),
+  accounts: vi.fn(),
+  categories: vi.fn(),
+  rules: vi.fn()
 }));
 vi.mock('../../src/services/supabase', () => ({
   createSupabaseServices: () => ({
@@ -17,12 +27,18 @@ vi.mock('../../src/services/supabase', () => ({
     aiConsent: { require: mock.consent },
     usage: { incrementAiParses: mock.reserve },
     aiUsage: {},
-    categories: { getCategories: async () => [] },
-    accounts: { getAccounts: async () => [] },
+    categories: { getCategories: mock.categories },
+    accounts: { getAccounts: mock.accounts },
     categoryReviewContext: { history: mock.history },
     automationRules: {
-      getAutomationRules: async () => [],
-      findUniqueAccountDetectionRule: () => null
+      getAutomationRules: mock.rules,
+      findUniqueAccountDetectionRule: () => null,
+      matchesConditions: (input: never, conditions: never, logic: never) =>
+        new AutomationRulesService('https://example.test', 'example').matchesConditions(
+          input,
+          conditions,
+          logic
+        )
     },
     forwardingRoutes: { getForUser: mock.route }
   })
@@ -41,6 +57,9 @@ beforeEach(() => {
   });
   mock.consent.mockResolvedValue(undefined);
   mock.history.mockResolvedValue([]);
+  mock.accounts.mockResolvedValue([]);
+  mock.categories.mockResolvedValue([]);
+  mock.rules.mockResolvedValue([]);
   mock.reserve.mockResolvedValue({ allowed: true, used: 1, limit: 15 });
   mock.suggest.mockResolvedValue({
     type: 'expense',
@@ -111,4 +130,44 @@ it('uses the detected merchant to retrieve relevant history before considering e
   });
   await processInboxAnalysisLease(lease, createMockEnv());
   expect(mock.history).toHaveBeenCalledWith('owner', 'SPOTIFY', 'expense');
+});
+
+it('completes a fully rule-resolved capture without AI consent, quota or a model request', async () => {
+  mock.item.mockResolvedValue({
+    id: 'item',
+    user_id: 'owner',
+    source: 'native-bank-message',
+    status: 'pending',
+    raw_text: 'Compraste $20.000 en SPOTIFY con tu T.Deb *2651 el 02/10/2026 a las 14:30',
+    received_at: '2026-10-02'
+  });
+  mock.accounts.mockResolvedValue([createMockAccount({ user_id: 'owner' })]);
+  mock.categories.mockResolvedValue([createMockCategory({ user_id: 'owner' })]);
+  mock.rules.mockResolvedValue([
+    createMockAutomationRule({
+      user_id: 'owner',
+      conditions: { raw_text_contains: ['SPOTIFY'] },
+      actions: { set_category: 'cat-1' }
+    })
+  ]);
+  await processInboxAnalysisLease(lease, createMockEnv());
+  expect(mock.complete).toHaveBeenCalledWith(
+    lease,
+    expect.objectContaining({ amount: 20000, category_id: 'cat-1', account_id: 'acc-1' })
+  );
+  expect(mock.consent).not.toHaveBeenCalled();
+  expect(mock.reserve).not.toHaveBeenCalled();
+  expect(mock.suggest).not.toHaveBeenCalled();
+  expect(mock.fail).not.toHaveBeenCalled();
+  expect(mock.history).not.toHaveBeenCalled();
+});
+
+it('keeps incomplete captures blocked when AI consent is missing', async () => {
+  mock.consent.mockRejectedValue(new AiConsentRequiredError('financial_text'));
+  await processInboxAnalysisLease(lease, createMockEnv());
+  expect(mock.fail).toHaveBeenCalledWith(lease, 'consent_required', true);
+  expect(mock.suggest).not.toHaveBeenCalled();
+  expect(mock.reserve).not.toHaveBeenCalled();
+  expect(mock.complete).not.toHaveBeenCalled();
+  expect(mock.history).not.toHaveBeenCalled();
 });

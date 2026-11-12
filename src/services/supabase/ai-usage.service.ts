@@ -1,4 +1,5 @@
 import { BaseService } from './base.service';
+import { OpenRouterError } from '../../ai/openrouter';
 import { AiUsageMeter } from '../../ai/usage-meter';
 import type { AiConsentScope } from './ai-consent.service';
 import { AiConsentUnavailableError } from './ai-consent.service';
@@ -52,12 +53,35 @@ export class AiUsageService extends BaseService {
     _scope?: AiConsentScope
   ): Promise<T> {
     const meter = new AiUsageMeter();
+    const correlationId = crypto.randomUUID();
+    const startedAt = Date.now();
     try {
       const result = await fn(meter);
-      await this.recordQuietly(params, meter, 'succeeded');
+      await this.recordQuietly(params, meter, 'succeeded', correlationId);
       return result;
     } catch (error) {
-      await this.recordQuietly(params, meter, 'failed');
+      const errorClass =
+        error instanceof OpenRouterError &&
+        ['http', 'network', 'invalid_json', 'empty', 'truncated'].includes(error.reason)
+          ? error.reason
+          : 'unknown';
+      console.error('[AiUsage] Operation failed', {
+        correlationId,
+        operation: params.operation,
+        model: /^[a-zA-Z0-9][a-zA-Z0-9/_.:-]{0,127}$/u.test(params.model)
+          ? params.model
+          : 'unknown',
+        errorClass,
+        upstreamStatus:
+          error instanceof OpenRouterError &&
+          Number.isInteger(error.status) &&
+          error.status >= 100 &&
+          error.status <= 599
+            ? error.status
+            : null,
+        durationMs: Math.max(0, Math.min(3_600_000, Date.now() - startedAt))
+      });
+      await this.recordQuietly(params, meter, 'failed', correlationId);
       throw error;
     }
   }
@@ -79,7 +103,8 @@ export class AiUsageService extends BaseService {
   private async recordQuietly(
     params: TrackAiUsageParams,
     meter: AiUsageMeter,
-    status: 'succeeded' | 'failed'
+    status: 'succeeded' | 'failed',
+    correlationId: string
   ): Promise<void> {
     const summary = meter.summary();
     try {
@@ -87,7 +112,7 @@ export class AiUsageService extends BaseService {
         method: 'POST',
         headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
         body: JSON.stringify({
-          id: crypto.randomUUID(),
+          id: correlationId,
           user_id: params.userId,
           month: colombiaMonth(),
           operation: params.operation,

@@ -1,3 +1,4 @@
+import { DocumentOcrService } from './document-ocr.service';
 import { CategoryReviewContextService } from './category-review-context.service';
 import { InboxAnalysisService } from './inbox-analysis.service';
 import { PlanningService } from './planning.service';
@@ -31,6 +32,7 @@ export interface SupabaseServices {
   usage: UsageService;
   aiUsage: AiUsageService;
   aiConsent: AiConsentService;
+  documentOcr: DocumentOcrService;
   skippedMessages: SkippedMessagesService;
   shortcutInbox: ShortcutInboxService;
   forwardingRoutes: EmailForwardingRoutesService;
@@ -53,6 +55,7 @@ export function createSupabaseServices(url: string, serviceKey: string): Supabas
     usage: new UsageService(url, serviceKey),
     aiUsage: new ConsentGatedAiUsageService(url, serviceKey, aiConsent),
     aiConsent,
+    documentOcr: new DocumentOcrService(url, serviceKey),
     skippedMessages: new SkippedMessagesService(url, serviceKey),
     shortcutInbox: new ShortcutInboxService(url, serviceKey),
     forwardingRoutes: new EmailForwardingRoutesService(url, serviceKey),

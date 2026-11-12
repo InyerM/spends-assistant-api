@@ -1,0 +1,11 @@
+CREATE ROLE context_reader NOLOGIN;
+CREATE TABLE categories(id text PRIMARY KEY,user_id text,name text,slug text,is_active boolean DEFAULT true,deleted_at timestamptz);
+CREATE TABLE transactions(id text PRIMARY KEY,user_id text NOT NULL,description text,notes text,category_id text REFERENCES categories(id),type text,date date,deleted_at timestamptz,UNIQUE(id,user_id));
+CREATE TABLE counterparties(id text PRIMARY KEY,user_id text NOT NULL,UNIQUE(id,user_id));
+CREATE TABLE transaction_counterparties(transaction_id text PRIMARY KEY,user_id text NOT NULL,contact_id text NOT NULL,FOREIGN KEY(transaction_id,user_id) REFERENCES transactions(id,user_id),FOREIGN KEY(contact_id,user_id) REFERENCES counterparties(id,user_id));
+GRANT USAGE ON SCHEMA public TO context_reader;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO context_reader;
+INSERT INTO categories(id,user_id,name,slug) VALUES('owned','owner','Education','education'),('shared',NULL,'Shopping','shopping'),('foreign','other','Foreign','education');
+INSERT INTO counterparties VALUES('contact','owner'),('other-contact','other');
+INSERT INTO transactions VALUES('current','owner','Transfer DEMO X9',NULL,'owned','expense','2026-11-11',NULL),('contact-old','owner','School support','Tuition','owned','expense','2026-11-10',NULL),('shared-old','owner','School books',NULL,'shared','expense','2026-11-09',NULL),('bad-category','owner','School other',NULL,'foreign','expense','2026-11-08',NULL),('deleted','owner','School deleted',NULL,'owned','expense','2026-11-07',now()),('wrong-type','owner','School income',NULL,'owned','income','2026-11-06',NULL),('foreign-source','other','Other source',NULL,'foreign','expense','2026-11-10',NULL);
+INSERT INTO transaction_counterparties VALUES('current','owner','contact'),('contact-old','owner','contact'),('shared-old','owner','contact'),('bad-category','owner','contact'),('deleted','owner','contact'),('wrong-type','owner','contact'),('foreign-source','other','other-contact');

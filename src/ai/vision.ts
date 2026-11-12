@@ -1,4 +1,13 @@
+import { OpenRouterError } from './openrouter';
 import type { AiUsageMeter } from './usage-meter';
+
+class VisionError extends OpenRouterError {
+  constructor(status: number, reason: OpenRouterError['reason'], message: string) {
+    super(status, reason);
+    this.message = message;
+    this.name = 'VisionError';
+  }
+}
 
 export type DocumentImageType =
   | 'receipt'
@@ -89,17 +98,19 @@ function isNullableString(value: unknown): value is string | null {
 }
 
 function validateDraft(value: unknown): ImageExtractionDraft {
-  if (!value || typeof value !== 'object') throw new Error('Invalid vision response');
+  if (!value || typeof value !== 'object')
+    throw new VisionError(0, 'invalid_json', 'Invalid vision response');
   const draft = value as Partial<ImageExtractionDraft>;
   if (!DOCUMENT_TYPES.includes(draft.document_type as DocumentImageType)) {
-    throw new Error('Invalid vision response');
+    throw new VisionError(0, 'invalid_json', 'Invalid vision response');
   }
   if (!Array.isArray(draft.observations) || draft.observations.length > 50) {
-    throw new Error('Invalid vision response');
+    throw new VisionError(0, 'invalid_json', 'Invalid vision response');
   }
 
   for (const item of draft.observations) {
-    if (!item || typeof item !== 'object') throw new Error('Invalid vision response');
+    if (!item || typeof item !== 'object')
+      throw new VisionError(0, 'invalid_json', 'Invalid vision response');
     const observation = item as Partial<ImageObservation>;
     if (
       (observation.amount !== null &&
@@ -115,7 +126,7 @@ function validateDraft(value: unknown): ImageExtractionDraft {
       observation.confidence < 0 ||
       observation.confidence > 1
     ) {
-      throw new Error('Invalid vision response');
+      throw new VisionError(0, 'invalid_json', 'Invalid vision response');
     }
   }
 
@@ -196,13 +207,13 @@ export async function extractImageObservations(input: ExtractionInput): Promise<
     });
   } catch {
     input.meter?.record(null);
-    throw new Error('Vision request failed');
+    throw new VisionError(0, 'network', 'Vision request failed');
   }
 
   // Upstream bodies can include private image content. Never include them in errors.
   if (!response.ok) {
     input.meter?.record(null);
-    throw new Error(`Vision request failed (${response.status})`);
+    throw new VisionError(response.status, 'http', `Vision request failed (${response.status})`);
   }
 
   let payload: VisionResponse;
@@ -210,7 +221,7 @@ export async function extractImageObservations(input: ExtractionInput): Promise<
     payload = (await response.json()) as VisionResponse;
   } catch {
     input.meter?.record(null);
-    throw new Error('Invalid vision response');
+    throw new VisionError(0, 'invalid_json', 'Invalid vision response');
   }
 
   const rawUsage = payload?.usage;
@@ -229,14 +240,16 @@ export async function extractImageObservations(input: ExtractionInput): Promise<
   );
 
   const choice = payload?.choices?.[0];
-  if (choice?.finish_reason === 'length') throw new Error('Vision response truncated');
-  if (!choice?.message?.content) throw new Error('Invalid vision response');
+  if (choice?.finish_reason === 'length')
+    throw new VisionError(0, 'truncated', 'Vision response truncated');
+  if (!choice?.message?.content)
+    throw new VisionError(0, 'invalid_json', 'Invalid vision response');
 
   let data: unknown;
   try {
     data = JSON.parse(choice.message.content);
   } catch {
-    throw new Error('Invalid vision response');
+    throw new VisionError(0, 'invalid_json', 'Invalid vision response');
   }
 
   const draft = validateDraft(data);

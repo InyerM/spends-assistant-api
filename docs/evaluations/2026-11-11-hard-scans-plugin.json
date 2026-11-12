@@ -1,0 +1,294 @@
+{
+  "generatedAt": "2026-11-12T04:07:25.172Z",
+  "pathway": "mistral-ocr-pdf-plugin",
+  "model": {
+    "id": "deepseek/deepseek-v4.1-flash",
+    "canonical_slug": "deepseek/deepseek-v4.1-flash-20260910",
+    "hugging_face_id": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "name": "DeepSeek: DeepSeek V4.1 Flash",
+    "created": 1789021285,
+    "description": "DeepSeek V4.1 Flash is a sparse mixture-of-experts model from DeepSeek, and the first built on the company's Causal Encoder-Decoder (CED) architecture. It activates 8B parameters on input and 16B on...",
+    "context_length": 1048576,
+    "architecture": {
+      "modality": "text+image->text",
+      "input_modalities": ["text", "image"],
+      "output_modalities": ["text"],
+      "tokenizer": "DeepSeek",
+      "instruct_type": null
+    },
+    "pricing": {
+      "prompt": "0.000000022",
+      "completion": "0.0000004",
+      "input_cache_read": "0.000000004"
+    },
+    "top_provider": {
+      "context_length": 1048576,
+      "max_completion_tokens": 943718,
+      "is_moderated": false
+    },
+    "per_request_limits": null,
+    "supported_parameters": [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "parallel_tool_calls",
+      "presence_penalty",
+      "reasoning",
+      "reasoning_effort",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_a",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
+    "default_parameters": {},
+    "supported_voices": null,
+    "knowledge_cutoff": null,
+    "expiration_date": null,
+    "links": {
+      "details": "/api/v1/models/deepseek/deepseek-v4.1-flash-20260910/endpoints"
+    },
+    "endpoints": [
+      "/api/v1/chat/completions",
+      "/api/v1/completions",
+      "/api/v1/messages",
+      "/api/v1/responses"
+    ],
+    "reasoning": {
+      "mandatory": false,
+      "default_enabled": true,
+      "supported_efforts": ["max", "high", "low", "none"],
+      "default_effort": "high"
+    }
+  },
+  "syntheticRasterOnly": true,
+  "textLayerCharacters": 0,
+  "pages": 3,
+  "pdfSha256": "112f4feb3c689a70550be770917d36c1fee31f77534bfeef588e141de90cc46f",
+  "sourcePngHashes": [
+    {
+      "id": "receipt-es-skew",
+      "pngSha256": "3db46b4627d0d78b0e3aa56925aa8764ea6bfd4a904b8dd923d40bcfe7a970f5"
+    },
+    {
+      "id": "statement-mixed-low-contrast",
+      "pngSha256": "e0b60e8752cedc10f070959a44d961c85c210e471188cab8e937160ffc5b8105"
+    },
+    {
+      "id": "dense-bilingual-blur",
+      "pngSha256": "6db7bbe2bd2d74b96052681125600ea289ce305242439318fdc43ed133190f05"
+    }
+  ],
+  "reservedWorstCaseUsd": 0.052738400000000005,
+  "aggregateReservedWorstCaseUsd": 0.18820399999999998,
+  "budgetLimitUsd": 0.5,
+  "retries": 0,
+  "privacy": "data_collection=deny; synthetic only; no ZDR claim",
+  "status": 200,
+  "latencyMs": 10902,
+  "usage": {
+    "prompt_tokens": 805,
+    "completion_tokens": 1978,
+    "total_tokens": 2783,
+    "cost": 0.00680891,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.00080891,
+      "upstream_inference_prompt_cost": 0.00001771,
+      "upstream_inference_completions_cost": 0.0007912
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1286,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "strictSchema": true,
+  "normalizedSchema": true,
+  "finishReason": "stop",
+  "score": {
+    "schemaValid": true,
+    "expected": 21,
+    "returned": 21,
+    "coverage": 21,
+    "exact": 21,
+    "correct": {
+      "amount": 21,
+      "currency": 21,
+      "date": 21
+    },
+    "pass": true,
+    "signCorrect": 21,
+    "directionCorrect": 21,
+    "duplicates": 0,
+    "unexpected": 0
+  },
+  "data": {
+    "rows": [
+      {
+        "reference": "CAFE-01",
+        "amount": 12345.67,
+        "currency": "COP",
+        "date": "2026-11-01",
+        "direction": "debit"
+      },
+      {
+        "reference": "CAFE-02",
+        "amount": -2345.67,
+        "currency": "COP",
+        "date": "2026-11-01",
+        "direction": "credit"
+      },
+      {
+        "reference": "CAFE-03",
+        "amount": 12.5,
+        "currency": "USD",
+        "date": "2026-11-01",
+        "direction": "debit"
+      },
+      {
+        "reference": "CAFE-04",
+        "amount": -0.99,
+        "currency": "USD",
+        "date": "2026-11-01",
+        "direction": "credit"
+      },
+      {
+        "reference": "MIX-01",
+        "amount": 1234.56,
+        "currency": "COP",
+        "date": "2026-11-02",
+        "direction": "debit"
+      },
+      {
+        "reference": "MIX-02",
+        "amount": -1234.56,
+        "currency": "USD",
+        "date": "2026-11-03",
+        "direction": "credit"
+      },
+      {
+        "reference": "MIX-03",
+        "amount": 9876.54,
+        "currency": "USD",
+        "date": "2026-11-04",
+        "direction": "debit"
+      },
+      {
+        "reference": "MIX-04",
+        "amount": -9876.54,
+        "currency": "COP",
+        "date": "2026-11-05",
+        "direction": "credit"
+      },
+      {
+        "reference": "MIX-05",
+        "amount": 0.01,
+        "currency": "COP",
+        "date": "2026-11-06",
+        "direction": "debit"
+      },
+      {
+        "reference": "DENSE-01",
+        "amount": -1001.01,
+        "currency": "COP",
+        "date": "2026-10-01",
+        "direction": "debit"
+      },
+      {
+        "reference": "DENSE-02",
+        "amount": 2001.02,
+        "currency": "USD",
+        "date": "2026-10-02",
+        "direction": "credit"
+      },
+      {
+        "reference": "DENSE-03",
+        "amount": 3001.03,
+        "currency": "COP",
+        "date": "2026-10-03",
+        "direction": "debit"
+      },
+      {
+        "reference": "DENSE-04",
+        "amount": -4001.04,
+        "currency": "USD",
+        "date": "2026-10-04",
+        "direction": "credit"
+      },
+      {
+        "reference": "DENSE-05",
+        "amount": 5001.05,
+        "currency": "COP",
+        "date": "2026-10-05",
+        "direction": "debit"
+      },
+      {
+        "reference": "DENSE-06",
+        "amount": 6001.06,
+        "currency": "USD",
+        "date": "2026-10-06",
+        "direction": "credit"
+      },
+      {
+        "reference": "DENSE-07",
+        "amount": -7001.07,
+        "currency": "COP",
+        "date": "2026-10-07",
+        "direction": "debit"
+      },
+      {
+        "reference": "DENSE-08",
+        "amount": 8001.08,
+        "currency": "USD",
+        "date": "2026-10-08",
+        "direction": "credit"
+      },
+      {
+        "reference": "DENSE-09",
+        "amount": 9001.09,
+        "currency": "COP",
+        "date": "2026-10-09",
+        "direction": "debit"
+      },
+      {
+        "reference": "DENSE-10",
+        "amount": -10001.1,
+        "currency": "USD",
+        "date": "2026-10-10",
+        "direction": "credit"
+      },
+      {
+        "reference": "DENSE-11",
+        "amount": 11001.11,
+        "currency": "COP",
+        "date": "2026-10-11",
+        "direction": "debit"
+      },
+      {
+        "reference": "DENSE-12",
+        "amount": 12001.12,
+        "currency": "USD",
+        "date": "2026-10-12",
+        "direction": "credit"
+      }
+    ]
+  },
+  "winner": null
+}

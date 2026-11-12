@@ -57,7 +57,7 @@ export class AutomationRulesService extends BaseService {
   async getAutomationRules(userId?: string): Promise<AutomationRule[]> {
     const userFilter = userId ? `&user_id=eq.${userId}` : '';
     return await this.fetch<AutomationRule[]>(
-      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&order=priority.desc&select=*${userFilter}`
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&order=priority.desc,id.asc&select=*${userFilter}`
     );
   }
 
@@ -66,7 +66,7 @@ export class AutomationRulesService extends BaseService {
    */
   async getAccountDetectionRules(userId: string): Promise<AutomationRule[]> {
     return await this.fetch<AutomationRule[]>(
-      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&rule_type=eq.account_detection&user_id=eq.${userId}&order=priority.desc&select=*`
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&rule_type=eq.account_detection&user_id=eq.${userId}&order=priority.desc,id.asc&select=*`
     );
   }
 
@@ -120,7 +120,7 @@ export class AutomationRulesService extends BaseService {
   async getTransferRules(userId?: string): Promise<AutomationRule[]> {
     const userFilter = userId ? `&user_id=eq.${userId}` : '';
     return await this.fetch<AutomationRule[]>(
-      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=not.is.null&order=priority.desc&select=*${userFilter}`
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=not.is.null&order=priority.desc,id.asc&select=*${userFilter}`
     );
   }
 
@@ -130,8 +130,11 @@ export class AutomationRulesService extends BaseService {
   ): Promise<CreateTransactionInput> {
     const rules = await this.getAutomationRules(userId);
     const appliedRules: AppliedRule[] = [];
+    const claimed = new Set<keyof AutomationRule['actions']>();
 
-    for (const rule of rules) {
+    for (const rule of [...rules].sort(
+      (a, b) => b.priority - a.priority || a.id.localeCompare(b.id)
+    )) {
       // Skip account_detection rules during post-parse application
       if (rule.rule_type === 'account_detection') continue;
 
@@ -141,11 +144,30 @@ export class AutomationRulesService extends BaseService {
         if (rule.transfer_to_account_id && !actions.link_to_account) {
           actions.link_to_account = rule.transfer_to_account_id;
         }
+        if (
+          claimed.has('set_category') &&
+          transaction.category_id !== undefined &&
+          actions.set_type &&
+          actions.set_type !== transaction.type
+        )
+          delete actions.set_type;
+        for (const field of [
+          'set_type',
+          'set_category',
+          'set_account',
+          'link_to_account'
+        ] as const) {
+          if (actions[field] === undefined || (field !== 'set_category' && !actions[field]))
+            continue;
+          if (claimed.has(field)) Reflect.deleteProperty(actions, field);
+          else claimed.add(field);
+        }
+        if (!Object.keys(actions).length) continue;
         transaction = this.applyActions(transaction, actions);
         appliedRules.push({
           rule_id: rule.id,
           rule_name: rule.name,
-          actions: rule.actions as unknown as Record<string, unknown>
+          actions: actions as unknown as Record<string, unknown>
         });
         console.log(`[Rule Applied] ${rule.name}`);
       }

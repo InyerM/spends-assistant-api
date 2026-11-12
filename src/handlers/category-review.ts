@@ -1,3 +1,4 @@
+import { ReviewTransactionNotFoundError } from '../services/supabase/category-review-context.service';
 import { reviewCategory, type CategoryReviewInput } from '../ai/category-review';
 import { OpenRouterError } from '../ai/openrouter';
 import { createSupabaseServices } from '../services/supabase';
@@ -53,11 +54,12 @@ export async function handleCategoryReview(request: Request, env: Env): Promise<
     await services.aiUsage.requireConsent(userId, 'financial_text');
     const [categories, history, rules] = await Promise.all([
       services.categories.getCategories(userId),
-      services.categoryReviewContext.history(
+      services.categoryReviewContext.reviewHistory(
         userId,
         input.description,
         input.type,
-        input.transaction_id
+        input.transaction_id,
+        input.notes
       ),
       services.automationRules.getAutomationRules(userId)
     ]);
@@ -115,6 +117,8 @@ export async function handleCategoryReview(request: Request, env: Env): Promise<
     );
     return Response.json(result, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
+    if (error instanceof ReviewTransactionNotFoundError)
+      return Response.json({ error: 'Review transaction not found' }, { status: 404 });
     const consentResponse = aiConsentErrorResponse(error);
     if (consentResponse) return consentResponse;
     console.error('category_review_failed', {

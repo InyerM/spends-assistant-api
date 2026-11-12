@@ -1,0 +1,10 @@
+{
+  "database": "PostgreSQL16",
+  "syntheticOnly": true,
+  "concurrentReservations": 2,
+  "successfulReservations": 1,
+  "blockedByDailyBudget": 1,
+  "retainedChargeMicros": 433527,
+  "documentDeletionPreservesCharge": true,
+  "cleanup": "container removed"
+}

@@ -100,6 +100,17 @@ describe('extractImageObservations', () => {
     expect(meter.summary()).toMatchObject({ billedCalls: 1, costSource: 'unknown' });
   });
 
+  it('retains bounded provider status and failure class for diagnostics', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('private provider body', { status: 429 }))
+    );
+    await expect(extractImageObservations({ apiKey: 'key', imageDataUrl })).rejects.toMatchObject({
+      reason: 'http',
+      status: 429
+    });
+  });
+
   it('keeps billed usage when a successful provider response is unusable', async () => {
     const meter = new AiUsageMeter();
     vi.stubGlobal(

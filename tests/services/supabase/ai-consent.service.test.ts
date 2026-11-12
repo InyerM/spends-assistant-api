@@ -52,7 +52,8 @@ describe('AI consent', () => {
     expect(state.consents).toEqual({
       financial_text: false,
       document_images: true,
-      forwarded_email: false
+      forwarded_email: false,
+      document_ocr: false
     });
     await expect(service.require(userId, 'document_images')).resolves.toBeUndefined();
     await expect(service.require(userId, 'forwarded_email')).rejects.toBeInstanceOf(

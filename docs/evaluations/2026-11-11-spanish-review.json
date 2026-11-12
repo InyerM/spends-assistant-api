@@ -1,0 +1,1021 @@
+{
+  "generatedAt": "2026-11-12T03:48:18.825Z",
+  "scope": "Synthetic Spanish inputs through real reviewCategory; no retrieval or posting; no model winner",
+  "provider": "Production exact: zdr=true,data_collection=deny,max_price prompt0.4/completion1; no tools",
+  "limitUsd": 0.25,
+  "reservedUsd": 0.12066399999999998,
+  "knownCostUsd": 0.002848321,
+  "costComplete": true,
+  "catalog": [
+    {
+      "id": "deepseek/deepseek-v4.1-flash",
+      "canonical_slug": "deepseek/deepseek-v4.1-flash-20260910",
+      "hugging_face_id": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "name": "DeepSeek: DeepSeek V4.1 Flash",
+      "created": 1789021285,
+      "description": "DeepSeek V4.1 Flash is a sparse mixture-of-experts model from DeepSeek, and the first built on the company's Causal Encoder-Decoder (CED) architecture. It activates 8B parameters on input and 16B on...",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
+        "tokenizer": "DeepSeek",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000000022",
+        "completion": "0.0000004",
+        "input_cache_read": "0.000000004"
+      },
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 943718,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "min_p",
+        "parallel_tool_calls",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_a",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/deepseek/deepseek-v4.1-flash-20260910/endpoints"
+      },
+      "endpoints": [
+        "/api/v1/chat/completions",
+        "/api/v1/completions",
+        "/api/v1/messages",
+        "/api/v1/responses"
+      ],
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": ["max", "high", "low", "none"],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "mistralai/mistral-small-2603",
+      "canonical_slug": "mistralai/mistral-small-2603",
+      "hugging_face_id": "mistralai/Mistral-Small-4-119B-2603",
+      "name": "Mistral: Mistral Small 4",
+      "created": 1773695685,
+      "description": "Mistral Small 4 is the next major release in the Mistral Small family, unifying the capabilities of several flagship Mistral models into a single system. It combines strong reasoning from...",
+      "context_length": 262144,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
+        "tokenizer": "Mistral",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.0000006",
+        "input_cache_read": "0.000000015"
+      },
+      "top_provider": {
+        "context_length": 262144,
+        "max_completion_tokens": 209715,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/mistralai/mistral-small-2603/endpoints"
+      },
+      "endpoints": [
+        "/api/v1/chat/completions",
+        "/api/v1/completions",
+        "/api/v1/messages",
+        "/api/v1/responses"
+      ],
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": 4.3,
+          "coding_index": 26.6,
+          "agentic_index": 0.8
+        }
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": false,
+        "supported_efforts": ["high", "none"],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "amazon/nova-lite-v1",
+      "canonical_slug": "amazon/nova-lite-v1",
+      "hugging_face_id": "",
+      "name": "Amazon: Nova Lite 1.0",
+      "created": 1733437363,
+      "description": "Amazon Nova Lite 1.0 is a very low-cost multimodal model from Amazon that focused on fast processing of image, video, and text inputs to generate text output. Amazon Nova Lite...",
+      "context_length": 300000,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
+        "tokenizer": "Nova",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000006",
+        "completion": "0.00000024"
+      },
+      "top_provider": {
+        "context_length": 300000,
+        "max_completion_tokens": 5120,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": ["max_tokens", "stop", "temperature", "tools", "top_k", "top_p"],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": "2024-10-31",
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/amazon/nova-lite-v1/endpoints"
+      },
+      "endpoints": [
+        "/api/v1/chat/completions",
+        "/api/v1/completions",
+        "/api/v1/messages",
+        "/api/v1/responses"
+      ]
+    }
+  ],
+  "nova2Availability": {
+    "model": "amazon/nova-2-lite-v1",
+    "pricing": {
+      "prompt": "0.0000003",
+      "completion": "0.0000025"
+    },
+    "attempted": false,
+    "reason": "Catalog output price exceeds production completion max_price=1 USD per million tokens"
+  },
+  "sourceHashes": [
+    {
+      "path": "src/ai/category-review.ts",
+      "sha256": "4b841d485dafa069af389420e72664ce05230ddc399ae5e4633ea8e655369f76"
+    },
+    {
+      "path": "src/ai/openrouter.ts",
+      "sha256": "44bf5ccb16fc0720e5f36e9020d0de724be78f45377b23f1cdc2d4b5852fa7cb"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "rule-over-history",
+      "input": {
+        "locale": "es",
+        "type": "expense",
+        "description": "Café Aurora DEMO",
+        "history": [
+          {
+            "id": "h-restaurant",
+            "description": "Café Aurora DEMO",
+            "category": "Restaurantes"
+          }
+        ],
+        "notes": "Reunión con cliente"
+      },
+      "rule": {
+        "category_id": "work",
+        "name": "Reuniones con clientes"
+      },
+      "expected": {
+        "category": "work",
+        "kind": "expense",
+        "notes": "Reunión con cliente",
+        "titleIncludes": "Aurora"
+      }
+    },
+    {
+      "id": "contact-linked-purpose",
+      "input": {
+        "locale": "es",
+        "type": "expense",
+        "description": "Pago a Lina DEMO",
+        "history": [
+          {
+            "id": "h-contact",
+            "description": "Apoyo escolar",
+            "notes": "Mensualidad del colegio",
+            "category": "Educación"
+          }
+        ],
+        "notes": "Mensualidad escolar"
+      },
+      "expected": {
+        "category": "education",
+        "kind": "expense",
+        "notes": "Mensualidad escolar",
+        "titleIncludes": "Lina",
+        "requiredEvidence": "h-contact"
+      }
+    },
+    {
+      "id": "explicit-purpose-over-merchant",
+      "input": {
+        "locale": "es",
+        "type": "expense",
+        "description": "Café Aurora DEMO",
+        "history": [
+          {
+            "id": "h-coffee",
+            "description": "Café Aurora DEMO",
+            "notes": "Desayuno",
+            "category": "Restaurantes"
+          }
+        ],
+        "notes": "Compra de libros para el curso"
+      },
+      "expected": {
+        "category": "education",
+        "kind": "expense",
+        "notes": "Compra de libros para el curso",
+        "titleIncludes": "Aurora"
+      }
+    },
+    {
+      "id": "ambiguous-transfer",
+      "input": {
+        "locale": "es",
+        "type": "expense",
+        "description": "Transferencia a Alex DEMO",
+        "history": [],
+        "excerpt": "Transferencia realizada a Alex DEMO. No se identifica titularidad ni finalidad."
+      },
+      "expected": {
+        "category": null,
+        "kind": "unknown",
+        "titleIncludes": "Alex"
+      }
+    },
+    {
+      "id": "marketplace-without-item",
+      "input": {
+        "locale": "es",
+        "type": "expense",
+        "description": "Compra en Mercado Libre",
+        "history": []
+      },
+      "expected": {
+        "category": "shopping",
+        "kind": "expense",
+        "notes": "",
+        "titleIncludes": "Mercado Libre"
+      }
+    },
+    {
+      "id": "description-notes-separation",
+      "input": {
+        "locale": "es",
+        "type": "expense",
+        "description": "Pago en Clínica Lirio DEMO",
+        "history": [],
+        "notes": "Control anual de salud",
+        "excerpt": "Consulta médica en Clínica Lirio DEMO."
+      },
+      "expected": {
+        "category": "health",
+        "kind": "expense",
+        "notes": "Control anual de salud",
+        "titleIncludes": "Lirio"
+      }
+    }
+  ],
+  "results": [
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "rule-over-history",
+      "latencyMs": 853,
+      "value": {
+        "category_id": "work",
+        "description": "Café Aurora DEMO",
+        "notes": "Reunión con cliente",
+        "explanation": "Se aplica tu regla «Reuniones con clientes». Puedes cambiar la categoría para este movimiento.",
+        "kind": "expense",
+        "evidence_ids": ["h-restaurant"]
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": true,
+        "evidence": true
+      },
+      "pass": true
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "contact-linked-purpose",
+      "latencyMs": 1305,
+      "value": {
+        "category_id": "education",
+        "description": "Pago a Lina DEMO",
+        "notes": "Mensualidad escolar",
+        "explanation": "La nota «Mensualidad escolar» y el historial «Apoyo escolar» con la nota «Mensualidad del colegio» indican que este pago corresponde a Educación.",
+        "kind": "expense",
+        "evidence_ids": ["h-contact"]
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": true,
+        "evidence": true
+      },
+      "pass": true
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "explicit-purpose-over-merchant",
+      "latencyMs": 2167,
+      "value": {
+        "category_id": "education",
+        "description": "Café Aurora DEMO",
+        "notes": "Compra de libros para el curso",
+        "explanation": "Aunque el comercio suele asociarse a Restaurantes, la nota indica que la compra fue de libros para el curso, por lo que corresponde a Educación.",
+        "kind": "expense",
+        "evidence_ids": ["h-coffee"]
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": true,
+        "evidence": true
+      },
+      "pass": true
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "ambiguous-transfer",
+      "latencyMs": 870,
+      "value": {
+        "category_id": null,
+        "description": "Transferencia a Alex DEMO",
+        "notes": "",
+        "explanation": "La transferencia no identifica la titularidad de la cuenta ni su finalidad, por lo que no hay base para asignar una categoría de gasto.",
+        "kind": "unknown",
+        "evidence_ids": []
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": true,
+        "evidence": true
+      },
+      "pass": true
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "marketplace-without-item",
+      "latencyMs": 787,
+      "value": {
+        "category_id": "shopping",
+        "description": "Compra en Mercado Libre",
+        "notes": "",
+        "explanation": "Mercado Libre es un mercado general y no se detalla el artículo comprado, por lo que corresponde la categoría Compras.",
+        "kind": "expense",
+        "evidence_ids": []
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": true,
+        "evidence": true
+      },
+      "pass": true
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "description-notes-separation",
+      "latencyMs": 605,
+      "value": {
+        "category_id": "health",
+        "description": "Pago en Clínica Lirio DEMO",
+        "notes": "Control anual de salud",
+        "explanation": "La descripción indica una consulta médica en Clínica Lirio DEMO y la nota menciona un control anual de salud, por lo que corresponde a Salud.",
+        "kind": "expense",
+        "evidence_ids": []
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": true,
+        "evidence": true
+      },
+      "pass": true
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "rule-over-history",
+      "latencyMs": 1557,
+      "value": {
+        "category_id": "work",
+        "description": "Café Aurora",
+        "notes": "Reunión con cliente",
+        "explanation": "Se aplica tu regla «Reuniones con clientes». Puedes cambiar la categoría para este movimiento.",
+        "kind": "expense",
+        "evidence_ids": ["h-restaurant"]
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": true,
+        "evidence": true
+      },
+      "pass": true
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "contact-linked-purpose",
+      "latencyMs": 1140,
+      "value": {
+        "category_id": "education",
+        "description": "Colegio",
+        "notes": "Mensualidad escolar",
+        "explanation": "La descripción y las notas indican un pago por educación, coincidiendo con la categoría Educación.",
+        "kind": "expense",
+        "evidence_ids": ["h-contact"]
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": false,
+        "evidence": true
+      },
+      "pass": false
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "explicit-purpose-over-merchant",
+      "latencyMs": 1275,
+      "value": {
+        "category_id": "education",
+        "description": "Libros para curso",
+        "notes": "Compra de libros para el curso",
+        "explanation": "La nota 'Compra de libros para el curso' indica que el gasto corresponde a Educación, no a Restaurantes como sugería la categoría inicial.",
+        "kind": "expense",
+        "evidence_ids": ["h-coffee"]
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": false,
+        "evidence": true
+      },
+      "pass": false
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "ambiguous-transfer",
+      "latencyMs": 1334,
+      "value": {
+        "category_id": null,
+        "description": "Transferencia a Alex DEMO",
+        "notes": "No se identifica titularidad ni finalidad.",
+        "explanation": "No se puede confirmar si la transferencia corresponde a una cuenta propia ni su propósito. Se requiere más información para clasificarlo.",
+        "kind": "unknown",
+        "evidence_ids": []
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": true,
+        "evidence": true
+      },
+      "pass": true
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "marketplace-without-item",
+      "latencyMs": 1341,
+      "value": {
+        "category_id": "shopping",
+        "description": "Compra en Mercado Libre",
+        "notes": "",
+        "explanation": "La descripción menciona una compra en Mercado Libre, un marketplace sin detalle específico del artículo, por lo que la categoría Compras es la más adecuada.",
+        "kind": "expense",
+        "evidence_ids": []
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": true,
+        "evidence": true
+      },
+      "pass": true
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "description-notes-separation",
+      "latencyMs": 1116,
+      "value": {
+        "category_id": "health",
+        "description": "Control anual de salud en Clínica Lirio DEMO",
+        "notes": "Control anual de salud",
+        "explanation": "La evidencia menciona una consulta médica en Clínica Lirio DEMO con el propósito de un control anual de salud, lo que corresponde a la categoría Salud.",
+        "kind": "expense",
+        "evidence_ids": []
+      },
+      "checks": {
+        "category": true,
+        "kind": true,
+        "notes": true,
+        "title": true,
+        "evidence": true
+      },
+      "pass": true
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "rule-over-history",
+      "latencyMs": 4766,
+      "pass": false,
+      "error": "production_review_failed"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "contact-linked-purpose",
+      "latencyMs": 5077,
+      "pass": false,
+      "error": "production_review_failed"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "explicit-purpose-over-merchant",
+      "latencyMs": 4825,
+      "pass": false,
+      "error": "production_review_failed"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "ambiguous-transfer",
+      "latencyMs": 4561,
+      "pass": false,
+      "error": "production_review_failed"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "marketplace-without-item",
+      "latencyMs": 4061,
+      "pass": false,
+      "error": "production_review_failed"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "description-notes-separation",
+      "latencyMs": 4623,
+      "pass": false,
+      "error": "production_review_failed"
+    }
+  ],
+  "attempts": [
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "rule-over-history",
+      "reservationUsd": 0.0040564,
+      "status": 200,
+      "costUsd": 0.00020034,
+      "strictJson": true,
+      "raw": {
+        "category_id": "work",
+        "description": "Café Aurora DEMO",
+        "notes": "Reunión con cliente",
+        "explanation": "La nota «Reunión con cliente» indica un propósito laboral, por lo que corresponde a Trabajo y no a Restaurantes, aunque el comercio sea un café.",
+        "kind": "expense",
+        "evidence_ids": ["h-restaurant"]
+      },
+      "error": null
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "contact-linked-purpose",
+      "reservationUsd": 0.0040352,
+      "status": 200,
+      "costUsd": 0.00020874,
+      "strictJson": true,
+      "raw": {
+        "category_id": "education",
+        "description": "Pago a Lina DEMO",
+        "notes": "Mensualidad escolar",
+        "explanation": "La nota «Mensualidad escolar» y el historial «Apoyo escolar» con la nota «Mensualidad del colegio» indican que este pago corresponde a Educación.",
+        "kind": "expense",
+        "evidence_ids": ["h-contact"]
+      },
+      "error": null
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "explicit-purpose-over-merchant",
+      "reservationUsd": 0.004036,
+      "status": 200,
+      "costUsd": 0.00015171,
+      "strictJson": true,
+      "raw": {
+        "category_id": "education",
+        "description": "Café Aurora DEMO",
+        "notes": "Compra de libros para el curso",
+        "explanation": "Aunque el comercio suele asociarse a Restaurantes, la nota indica que la compra fue de libros para el curso, por lo que corresponde a Educación.",
+        "kind": "expense",
+        "evidence_ids": ["h-coffee"]
+      },
+      "error": null
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "ambiguous-transfer",
+      "reservationUsd": 0.0040148,
+      "status": 200,
+      "costUsd": 0.000087921,
+      "strictJson": true,
+      "raw": {
+        "category_id": null,
+        "description": "Transferencia a Alex DEMO",
+        "notes": "",
+        "explanation": "La transferencia no identifica la titularidad de la cuenta ni su finalidad, por lo que no hay base para asignar una categoría de gasto.",
+        "kind": "unknown",
+        "evidence_ids": []
+      },
+      "error": null
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "marketplace-without-item",
+      "reservationUsd": 0.0039756,
+      "status": 200,
+      "costUsd": 0.000082311,
+      "strictJson": true,
+      "raw": {
+        "category_id": "shopping",
+        "description": "Compra en Mercado Libre",
+        "notes": "",
+        "explanation": "Mercado Libre es un mercado general y no se detalla el artículo comprado, por lo que corresponde la categoría Compras.",
+        "kind": "expense",
+        "evidence_ids": []
+      },
+      "error": null
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "caseId": "description-notes-separation",
+      "reservationUsd": 0.0040148,
+      "status": 200,
+      "costUsd": 0.00019168,
+      "strictJson": true,
+      "raw": {
+        "category_id": "health",
+        "description": "Pago en Clínica Lirio DEMO",
+        "notes": "Control anual de salud",
+        "explanation": "La descripción indica una consulta médica en Clínica Lirio DEMO y la nota menciona un control anual de salud, por lo que corresponde a Salud.",
+        "kind": "expense",
+        "evidence_ids": []
+      },
+      "error": null
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "rule-over-history",
+      "reservationUsd": 0.0040564,
+      "status": 200,
+      "costUsd": 0.000181995,
+      "strictJson": true,
+      "raw": {
+        "category_id": "work",
+        "description": "Café Aurora",
+        "notes": "Reunión con cliente",
+        "explanation": "La nota 'Reunión con cliente' y la regla de automatización que sugiere 'Trabajo' respaldan esta categoría.",
+        "kind": "expense",
+        "evidence_ids": ["h-restaurant"]
+      },
+      "error": null
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "contact-linked-purpose",
+      "reservationUsd": 0.0040352,
+      "status": 200,
+      "costUsd": 0.0001548,
+      "strictJson": true,
+      "raw": {
+        "category_id": "education",
+        "description": "Colegio",
+        "notes": "Mensualidad escolar",
+        "explanation": "La descripción y las notas indican un pago por educación, coincidiendo con la categoría Educación.",
+        "kind": "expense",
+        "evidence_ids": ["h-contact"]
+      },
+      "error": null
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "explicit-purpose-over-merchant",
+      "reservationUsd": 0.004036,
+      "status": 200,
+      "costUsd": 0.000094149,
+      "strictJson": true,
+      "raw": {
+        "category_id": "education",
+        "description": "Libros para curso",
+        "notes": "Compra de libros para el curso",
+        "explanation": "La nota 'Compra de libros para el curso' indica que el gasto corresponde a Educación, no a Restaurantes como sugería la categoría inicial.",
+        "kind": "expense",
+        "evidence_ids": ["h-coffee"]
+      },
+      "error": null
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "ambiguous-transfer",
+      "reservationUsd": 0.0040148,
+      "status": 200,
+      "costUsd": 0.000089265,
+      "strictJson": true,
+      "raw": {
+        "category_id": null,
+        "description": "Transferencia a Alex DEMO",
+        "notes": "No se identifica titularidad ni finalidad.",
+        "explanation": "No se puede confirmar si la transferencia corresponde a una cuenta propia ni su propósito. Se requiere más información para clasificarlo.",
+        "kind": "unknown",
+        "evidence_ids": []
+      },
+      "error": null
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "marketplace-without-item",
+      "reservationUsd": 0.0039756,
+      "status": 200,
+      "costUsd": 0.00008349,
+      "strictJson": true,
+      "raw": {
+        "category_id": "shopping",
+        "description": "Compra en Mercado Libre",
+        "notes": "",
+        "explanation": "La descripción menciona una compra en Mercado Libre, un marketplace sin detalle específico del artículo, por lo que la categoría Compras es la más adecuada.",
+        "kind": "expense",
+        "evidence_ids": []
+      },
+      "error": null
+    },
+    {
+      "model": "mistralai/mistral-small-2603",
+      "caseId": "description-notes-separation",
+      "reservationUsd": 0.0040148,
+      "status": 200,
+      "costUsd": 0.0000888,
+      "strictJson": true,
+      "raw": {
+        "category_id": "health",
+        "description": "Control anual de salud en Clínica Lirio DEMO",
+        "notes": "Control anual de salud",
+        "explanation": "La evidencia menciona una consulta médica en Clínica Lirio DEMO con el propósito de un control anual de salud, lo que corresponde a la categoría Salud.",
+        "kind": "expense",
+        "evidence_ids": []
+      },
+      "error": null
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "rule-over-history",
+      "reservationUsd": 0.0040564,
+      "status": 200,
+      "costUsd": 0.00007224,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "rule-over-history",
+      "reservationUsd": 0.0040564,
+      "status": 200,
+      "costUsd": 0.00007584,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "rule-over-history",
+      "reservationUsd": 0.0040564,
+      "status": 200,
+      "costUsd": 0.0000732,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "contact-linked-purpose",
+      "reservationUsd": 0.0040352,
+      "status": 200,
+      "costUsd": 0.00007374,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "contact-linked-purpose",
+      "reservationUsd": 0.0040352,
+      "status": 200,
+      "costUsd": 0.00006918,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "contact-linked-purpose",
+      "reservationUsd": 0.0040352,
+      "status": 200,
+      "costUsd": 0.00006942,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "explicit-purpose-over-merchant",
+      "reservationUsd": 0.004036,
+      "status": 200,
+      "costUsd": 0.00007224,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "explicit-purpose-over-merchant",
+      "reservationUsd": 0.004036,
+      "status": 200,
+      "costUsd": 0.00007056,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "explicit-purpose-over-merchant",
+      "reservationUsd": 0.004036,
+      "status": 200,
+      "costUsd": 0.00007224,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "ambiguous-transfer",
+      "reservationUsd": 0.0040148,
+      "status": 200,
+      "costUsd": 0.00006804,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "ambiguous-transfer",
+      "reservationUsd": 0.0040148,
+      "status": 200,
+      "costUsd": 0.00006804,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "ambiguous-transfer",
+      "reservationUsd": 0.0040148,
+      "status": 200,
+      "costUsd": 0.00006708,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "marketplace-without-item",
+      "reservationUsd": 0.0039756,
+      "status": 200,
+      "costUsd": 0.00006144,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "marketplace-without-item",
+      "reservationUsd": 0.0039756,
+      "status": 200,
+      "costUsd": 0.0000612,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "marketplace-without-item",
+      "reservationUsd": 0.0039756,
+      "status": 200,
+      "costUsd": 0.00006144,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "description-notes-separation",
+      "reservationUsd": 0.0040148,
+      "status": 200,
+      "costUsd": 0.00006606,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "description-notes-separation",
+      "reservationUsd": 0.0040148,
+      "status": 200,
+      "costUsd": 0.00006558,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    },
+    {
+      "model": "amazon/nova-lite-v1",
+      "caseId": "description-notes-separation",
+      "reservationUsd": 0.0040148,
+      "status": 200,
+      "costUsd": 0.00006558,
+      "strictJson": false,
+      "raw": null,
+      "error": "non_strict_json"
+    }
+  ]
+}

@@ -5,7 +5,8 @@ import type { AutomationRule } from '../types/rule';
 import type { InboxAnalysisItem, InboxAnalysisProposal } from '../types/inbox-analysis';
 import type { AutomationRulesService } from '../services/supabase/automation-rules.service';
 import type { CreateTransactionInput } from '../types/transaction';
-import { extractEmailEventEvidence } from './email-event-evidence';
+import { emailEventBody, extractEmailEventEvidence } from './email-event-evidence';
+import { validateEmailEventTime } from './date';
 
 export function buildInboxAnalysisProposal(
   item: InboxAnalysisItem,
@@ -20,7 +21,7 @@ export function buildInboxAnalysisProposal(
   const ownedCategories = categories.filter((row) => row.user_id === item.user_id && row.is_active);
   const activeRules = rules
     .filter((row) => row.user_id === item.user_id && row.is_active)
-    .sort((a, b) => b.priority - a.priority);
+    .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
   const suffix = evidence.sourceLastFour ?? suggestion.sourceLastFour;
   const matches = suffix
     ? ownedAccounts.filter(
@@ -66,20 +67,31 @@ export function buildInboxAnalysisProposal(
     if (!matcher.matchesConditions(input, rule.conditions, rule.condition_logic ?? 'or')) continue;
     const actions = rule.actions;
     const changed: string[] = [];
-    if (actions.set_type) {
+    if (
+      actions.set_type &&
+      !fields.has('type') &&
+      !(fields.has('categoryId') && categoryId && actions.set_type !== type)
+    ) {
       type = actions.set_type;
       changed.push('type');
     }
-    if (actions.set_account && ownedAccounts.some((row) => row.id === actions.set_account)) {
+    if (
+      actions.set_account &&
+      !fields.has('accountId') &&
+      actions.set_account !== destination &&
+      ownedAccounts.some((row) => row.id === actions.set_account)
+    ) {
       accountId = actions.set_account;
       changed.push('accountId');
     }
-    if (actions.set_category === null) {
+    if (actions.set_category === null && !fields.has('categoryId')) {
       categoryId = null;
       categorySource = null;
       changed.push('categoryId');
     } else if (
       actions.set_category &&
+      !fields.has('categoryId') &&
+      type !== 'transfer' &&
       ownedCategories.some((row) => row.id === actions.set_category && row.type === type)
     ) {
       categoryId = actions.set_category;
@@ -87,10 +99,20 @@ export function buildInboxAnalysisProposal(
       changed.push('categoryId');
     }
     const linked = actions.link_to_account ?? rule.transfer_to_account_id;
-    if (linked && linked !== accountId && ownedAccounts.some((row) => row.id === linked)) {
+    if (
+      linked &&
+      !fields.has('transferToAccountId') &&
+      linked !== accountId &&
+      accountId &&
+      ((!fields.has('type') && !actions.set_type) || type === 'transfer') &&
+      !(fields.has('categoryId') && categoryId) &&
+      ownedAccounts.some((row) => row.id === linked)
+    ) {
       destination = linked;
       type = 'transfer';
-      changed.push('transferToAccountId', 'type');
+      categoryId = null;
+      categorySource = null;
+      changed.push('transferToAccountId', 'type', 'categoryId');
     }
     if (actions.add_note?.trim()) {
       notes = [notes, actions.add_note.trim()].filter(Boolean).join('\n').slice(0, 500);
@@ -108,6 +130,7 @@ export function buildInboxAnalysisProposal(
     categoryId = null;
     categorySource = null;
   }
+  if (type === 'transfer' && (!accountId || !destination || accountId === destination)) type = null;
   if (type !== 'transfer') destination = null;
   if (evidence.ambiguous) {
     type = null;
@@ -124,7 +147,7 @@ export function buildInboxAnalysisProposal(
   const description = suggestion.description?.trim().slice(0, 150) || merchant;
   return {
     status:
-      !evidence.ambiguous && merchant && amount && suggestion.bankEventAt && suffix
+      !evidence.ambiguous && type && merchant && amount && suggestion.bankEventAt && suffix
         ? 'parsed'
         : 'needs_review',
     merchant,
@@ -160,4 +183,53 @@ export function buildInboxAnalysisProposal(
       evidence_ids: suggestion.evidenceIds ?? []
     }
   };
+}
+
+/** Resolve complete, explicit events with owned rules before spending an AI parse. */
+export function buildDeterministicInboxAnalysisProposal(
+  item: InboxAnalysisItem,
+  accounts: Account[],
+  categories: Category[],
+  rules: AutomationRule[],
+  matcher: Pick<AutomationRulesService, 'matchesConditions' | 'findUniqueAccountDetectionRule'>
+): InboxAnalysisProposal | null {
+  const evidence = extractEmailEventEvidence(item.raw_text);
+  if (evidence.ambiguous || !evidence.amount || !evidence.merchant || !evidence.type) return null;
+  const bankEventAt = validateEmailEventTime(
+    item.raw_text,
+    evidence.date,
+    evidence.time,
+    emailEventBody(item.raw_text)
+  );
+  if (!bankEventAt || !evidence.sourceLastFour) return null;
+  const proposal = buildInboxAnalysisProposal(
+    item,
+    {
+      type: evidence.type,
+      categoryId: null,
+      categorySource: null,
+      description: evidence.merchant,
+      notes: null,
+      bankEventAt,
+      amount: evidence.amount,
+      eventDate: evidence.date,
+      sourceLastFour: evidence.sourceLastFour
+    },
+    accounts,
+    categories,
+    rules,
+    matcher
+  );
+  const resolvedClassification =
+    proposal.category_source === 'automation' && proposal.category_id !== null;
+  const resolvedTransfer =
+    proposal.analysis_details.financial_type === 'transfer' &&
+    proposal.analysis_details.transfer_to_account_id !== null &&
+    accounts.find((row) => row.id === proposal.account_id)?.currency ===
+      accounts.find((row) => row.id === proposal.analysis_details.transfer_to_account_id)?.currency;
+  return proposal.status === 'parsed' &&
+    proposal.account_id &&
+    (resolvedClassification || resolvedTransfer)
+    ? proposal
+    : null;
 }

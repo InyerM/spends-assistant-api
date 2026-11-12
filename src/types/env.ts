@@ -9,6 +9,9 @@ export interface Env {
   // OpenRouter AI
   OPENROUTER_API_KEY: string;
   OPENROUTER_TEXT_MODEL?: string;
+  DOCUMENT_PDF_OCR_ENABLED?: string;
+  DOCUMENT_PDF_OCR_PROXY_SECRET?: string;
+  DOCUMENT_PDF_OCR_DAILY_BUDGET_USD?: string;
 
   // Telegram
   TELEGRAM_BOT_TOKEN: string;
