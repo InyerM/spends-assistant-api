@@ -1,3 +1,4 @@
+import { reserveAiParse, aiParseQuotaErrorResponse } from '../utils/ai-parse-quota';
 import { CacheService } from '../services/cache.service';
 import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
@@ -11,15 +12,6 @@ import { aiConsentErrorResponse } from '../utils/ai-consent-response';
 
 interface ParseRequest {
   text: string;
-}
-
-class AiParseQuotaExceededError extends Error {
-  constructor(
-    readonly used: number,
-    readonly limit: number
-  ) {
-    super('Parse limit reached');
-  }
 }
 
 export async function handleParse(request: Request, env: Env): Promise<Response> {
@@ -82,12 +74,7 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
       categoryCatalog: categories.map(({ slug, name, type }) => ({ slug, name, type })),
       model: env.OPENROUTER_TEXT_MODEL,
       telemetry: { userId, service: services.aiUsage },
-      beforeExternalCall: async () => {
-        const usageCheck = await services.usage.incrementAiParses(userId);
-        if (!usageCheck.allowed) {
-          throw new AiParseQuotaExceededError(usageCheck.used, usageCheck.limit);
-        }
-      }
+      beforeExternalCall: () => reserveAiParse(services.usage, userId)
     });
 
     // Handle non-transactional messages
@@ -162,19 +149,10 @@ export async function handleParse(request: Request, env: Env): Promise<Response>
       }
     );
   } catch (error: unknown) {
+    const quotaResponse = aiParseQuotaErrorResponse(error);
+    if (quotaResponse) return quotaResponse;
     const consentResponse = aiConsentErrorResponse(error);
     if (consentResponse) return consentResponse;
-    if (error instanceof AiParseQuotaExceededError) {
-      return Response.json(
-        {
-          error: error.message,
-          code: 'PARSE_LIMIT_REACHED',
-          used: error.used,
-          limit: error.limit
-        },
-        { status: 429 }
-      );
-    }
     console.error('Parse API Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: errorMessage }), {

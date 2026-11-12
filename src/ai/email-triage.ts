@@ -1,3 +1,4 @@
+import { AiParseQuotaUnavailableError } from '../utils/ai-parse-quota';
 import { completeJson } from './openrouter';
 import type { AiUsageService } from '../services/supabase/ai-usage.service';
 import type { ParsedForwardedEmail } from '../utils/email-mime';
@@ -37,7 +38,8 @@ export async function triageForwardedEmail(
   model: string,
   userId: string,
   usage: AiUsageService,
-  allowExternalAi = true
+  allowExternalAi = true,
+  beforeExternalCall?: () => Promise<void>
 ): Promise<TriageResult> {
   let messageKind = detectEmailMessageKind(email.subject, email.text);
   let messageKindSource: 'rules' | 'ai' = 'rules';
@@ -100,8 +102,10 @@ export async function triageForwardedEmail(
   try {
     const { data } = await usage.track(
       { userId, operation: 'triage_forwarded_email', model },
-      (meter) =>
-        completeJson<unknown>({
+      async (meter) => {
+        if (!beforeExternalCall) throw new AiParseQuotaUnavailableError();
+        await beforeExternalCall();
+        return completeJson<unknown>({
           apiKey,
           model,
           system:
@@ -109,7 +113,8 @@ export async function triageForwardedEmail(
           user: `Subject: ${safeEmail.subject}\n\nBody: ${safeEmail.text.slice(0, 2048)}`,
           meter,
           recoverMalformedOutput: true
-        })
+        });
+      }
     );
     if (data && typeof data === 'object' && !Array.isArray(data)) {
       const result = data as Record<string, unknown>;

@@ -1,3 +1,4 @@
+import { reserveAiParse } from '../utils/ai-parse-quota';
 import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
@@ -161,7 +162,8 @@ export async function handleForwardedEmail(message: IncomingEmail, env: Env): Pr
     env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash',
     route.user_id,
     services.aiUsage,
-    !hasPdf && !!route.confirmation_received_at && !!route.user_confirmed_at
+    !hasPdf && !!route.confirmation_received_at && !!route.user_confirmed_at,
+    () => reserveAiParse(services.usage, route.user_id)
   );
   if (hasPdf) {
     triage.triageStatus = 'pending';

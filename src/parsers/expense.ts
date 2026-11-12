@@ -1,3 +1,4 @@
+import { AiParseQuotaUnavailableError } from '../utils/ai-parse-quota';
 import type { ParsedExpense } from '../types/expense';
 import type { CacheService } from '../services/cache.service';
 import { completeJson } from '../ai/openrouter';
@@ -94,7 +95,8 @@ async function parseExpenseCore(
 
   if (!options?.telemetry) throw new AiConsentUnavailableError();
   await options.telemetry.service.requireConsent(options.telemetry.userId, 'financial_text');
-  await options?.beforeExternalCall?.();
+  if (!options.beforeExternalCall) throw new AiParseQuotaUnavailableError();
+  await options.beforeExternalCall();
 
   const { data: expense } = await completeJson<ParsedExpense>({
     apiKey,

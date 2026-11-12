@@ -25,9 +25,44 @@ describe('automation rule generation via OpenRouter', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('openrouter.ai'))).toBe(false);
   });
 
+  it('returns 429 without a provider call when the atomic allowance is exhausted', async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('ai_consent_decisions'))
+        return Response.json([
+          {
+            scope: 'financial_text',
+            version: 'external-ai-v1',
+            granted_at: '2026-10-06T00:00:00Z',
+            revoked_at: null
+          }
+        ]);
+      if (url.includes('/rpc/reserve_ai_parse'))
+        return Response.json([{ allowed: false, used: 15, limit: 15 }]);
+      return Response.json([]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const response = await handleAutomationGenerate(
+      new Request('http://localhost/automation/generate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'Categorize cafe purchases' })
+      }),
+      env
+    );
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({ code: 'PARSE_LIMIT_REACHED' });
+    expect(fetchMock.mock.calls.some(([url]) => url.includes('openrouter.ai'))).toBe(false);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url.includes('/rpc/reserve_ai_parse'))
+    ).toHaveLength(1);
+  });
+
   it('returns generated rules with privacy restricted provider routing', async () => {
     const env = createMockEnv();
     const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/rpc/reserve_ai_parse'))
+        return Response.json([{ allowed: true, used: 1, limit: 15 }]);
       if (url.includes('ai_consent_decisions')) {
         return Response.json([
           {
@@ -88,6 +123,8 @@ describe('automation rule generation via OpenRouter', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes('/rpc/reserve_ai_parse'))
+          return Response.json([{ allowed: true, used: 1, limit: 15 }]);
         if (url.includes('ai_consent_decisions')) {
           return Response.json([
             {

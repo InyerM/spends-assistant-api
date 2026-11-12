@@ -1,3 +1,4 @@
+import { reserveAiParse, aiParseQuotaErrorResponse } from '../utils/ai-parse-quota';
 import { createSupabaseServices } from '../services/supabase';
 import type { Env } from '../types/env';
 import { completeJson } from '../ai/openrouter';
@@ -65,6 +66,7 @@ export async function handleAutomationExplain(request: Request, env: Env): Promi
       generation = services.aiUsage.track(
         { userId, operation: 'generate_automation', model },
         async (meter) => {
+          await reserveAiParse(services.usage, userId);
           const { data } = await completeJson<{ explanation: string }>({
             apiKey: env.OPENROUTER_API_KEY,
             model,
@@ -105,6 +107,8 @@ export async function handleAutomationExplain(request: Request, env: Env): Promi
       { headers: { 'Cache-Control': 'private, no-store' } }
     );
   } catch (error) {
+    const quotaResponse = aiParseQuotaErrorResponse(error);
+    if (quotaResponse) return quotaResponse;
     const consent = aiConsentErrorResponse(error);
     if (consent) return consent;
     console.error('[Automation explanation] Failed', {

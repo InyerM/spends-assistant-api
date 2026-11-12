@@ -56,6 +56,32 @@ export async function processInboxAnalysisLease(
       await services.inboxAnalysis.complete(lease, deterministic);
       return;
     }
+    if (
+      !evidence.ambiguous &&
+      evidence.merchant &&
+      evidence.type &&
+      evidence.date &&
+      evidence.time &&
+      evidence.amount &&
+      evidence.sourceLastFour
+    ) {
+      // Failure to load optional local context must not replace the existing AI fallback.
+      const exactHistory = await services.categoryReviewContext
+        .exactCategoryHistory(lease.user_id, evidence.merchant, evidence.type, evidence.date)
+        .catch(() => []);
+      const historical = buildDeterministicInboxAnalysisProposal(
+        item,
+        accounts,
+        categories,
+        rules,
+        services.automationRules,
+        exactHistory
+      );
+      if (historical) {
+        await services.inboxAnalysis.complete(lease, historical);
+        return;
+      }
+    }
     await services.aiConsent.require(lease.user_id, scope);
     const history = await services.categoryReviewContext.history(
       lease.user_id,

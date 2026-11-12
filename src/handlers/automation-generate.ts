@@ -1,3 +1,4 @@
+import { reserveAiParse, aiParseQuotaErrorResponse } from '../utils/ai-parse-quota';
 import { createSupabaseServices } from '../services/supabase';
 import { Env } from '../types/env';
 import { completeJson } from '../ai/openrouter';
@@ -88,6 +89,7 @@ ${JSON.stringify(existingRulesContext, null, 2)}
     const generatedRules = await services.aiUsage.track(
       { userId, operation: 'generate_automation', model },
       async (meter) => {
+        await reserveAiParse(services.usage, userId);
         const { data } = await completeJson<{ rules: GeneratedRule[] }>({
           apiKey: env.OPENROUTER_API_KEY,
           model,
@@ -118,6 +120,8 @@ ${JSON.stringify(existingRulesContext, null, 2)}
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error: unknown) {
+    const quotaResponse = aiParseQuotaErrorResponse(error);
+    if (quotaResponse) return quotaResponse;
     const consentResponse = aiConsentErrorResponse(error);
     if (consentResponse) return consentResponse;
     console.error('Automation Generate Error:', error);

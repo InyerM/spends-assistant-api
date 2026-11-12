@@ -412,3 +412,60 @@ it('leaves a transfer without an owned distinct destination unresolved', () => {
   expect(result.analysis_details.transfer_to_account_id).toBeNull();
   expect(result.status).toBe('needs_review');
 });
+
+it('keeps an explicit rule category clear above unanimous exact history', () => {
+  const capture = { ...item, raw_text: `${item.raw_text} a las 14:30` };
+  const history = ['one', 'two'].map((id) => ({
+    id,
+    user_id: owner,
+    description: 'Spotify',
+    type: 'expense',
+    date: '2026-10-01',
+    category_id: 'cat-1'
+  }));
+  expect(
+    buildDeterministicInboxAnalysisProposal(
+      capture,
+      [createMockAccount({ user_id: owner })],
+      [createMockCategory({ user_id: owner })],
+      [
+        createMockRule({
+          user_id: owner,
+          conditions: { raw_text_contains: ['Spotify'] },
+          actions: { set_category: null }
+        })
+      ],
+      rulesService,
+      history
+    )
+  ).toBeNull();
+});
+it('evaluates category-dependent rules against an exact history candidate before accepting it', () => {
+  const capture = { ...item, raw_text: `${item.raw_text} a las 14:30` };
+  const history = ['one', 'two'].map((id) => ({
+    id,
+    user_id: owner,
+    description: 'Spotify',
+    type: 'expense',
+    date: '2026-10-01',
+    category_id: 'cat-1'
+  }));
+  const proposal = buildDeterministicInboxAnalysisProposal(
+    capture,
+    [createMockAccount({ user_id: owner })],
+    [
+      createMockCategory({ user_id: owner }),
+      createMockCategory({ id: 'override', user_id: owner })
+    ],
+    [
+      createMockRule({
+        user_id: owner,
+        conditions: { category: 'cat-1' },
+        actions: { set_category: 'override' }
+      })
+    ],
+    rulesService,
+    history
+  );
+  expect(proposal?.category_id).toBe('override');
+});

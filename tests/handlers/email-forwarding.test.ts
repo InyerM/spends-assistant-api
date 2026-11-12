@@ -6,6 +6,7 @@ import {
 import { createMockEnv } from '../__test-helpers__/factories';
 
 const {
+  quota,
   attachments,
   routes,
   inbox,
@@ -16,6 +17,7 @@ const {
   categories,
   autoPost
 } = vi.hoisted(() => ({
+  quota: { incrementAiParses: vi.fn() },
   attachments: { store: vi.fn() },
   routes: {
     getForUser: vi.fn(),
@@ -36,6 +38,7 @@ const {
 
 vi.mock('../../src/services/supabase', () => ({
   createSupabaseServices: () => ({
+    usage: quota,
     emailAttachments: attachments,
     forwardingRoutes: routes,
     shortcutInbox: inbox,
@@ -84,6 +87,7 @@ function email(raw: string, to = address, from = 'forwarding-noreply@google.com'
 describe('email forwarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    quota.incrementAiParses.mockResolvedValue({ allowed: true, used: 1, limit: 15 });
     resolveUserId.mockResolvedValue('owner-id');
     aiUsage.track.mockImplementation(async (_params, task) => task({ record: vi.fn() }));
     completeJson.mockResolvedValue({ data: { kind: 'uncertain', confidence: 0.5 } });
@@ -675,6 +679,37 @@ describe('email forwarding', () => {
     expect(inbox.createForwardedPending).toHaveBeenCalledWith(
       expect.objectContaining({ triageStatus: 'non_transaction' })
     );
+  });
+
+  it.each(['denied', 'unavailable'])(
+    'keeps ambiguous intake pending without a provider call when quota is %s',
+    async (state) => {
+      routes.getByAddress.mockResolvedValue({
+        user_id: 'owner-id',
+        address,
+        confirmation_received_at: '2026-10-03T16:45:00Z',
+        user_confirmed_at: '2026-10-03T17:00:00Z'
+      });
+      if (state === 'denied')
+        quota.incrementAiParses.mockResolvedValueOnce({ allowed: false, used: 15, limit: 15 });
+      else quota.incrementAiParses.mockRejectedValueOnce(new Error('private failure'));
+      await handleForwardedEmail(email('Subject: Novedades\r\n\r\nUn mensaje para ti.'), env);
+      expect(quota.incrementAiParses).toHaveBeenCalledExactlyOnceWith('owner-id');
+      expect(completeJson).not.toHaveBeenCalled();
+      expect(autoPost.post).not.toHaveBeenCalled();
+      expect(inbox.createForwardedPending).toHaveBeenCalledWith(
+        expect.objectContaining({ triageStatus: 'pending' })
+      );
+    }
+  );
+
+  it('does not reserve quota for a deterministic purchase notice', async () => {
+    await handleForwardedEmail(
+      email('Subject: Compra realizada\r\n\r\nCompraste COP 120000 en una tienda.'),
+      env
+    );
+    expect(quota.incrementAiParses).not.toHaveBeenCalled();
+    expect(completeJson).not.toHaveBeenCalled();
   });
 
   it('keeps low-confidence AI non-transaction labels pending for review', async () => {

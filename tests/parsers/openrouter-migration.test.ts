@@ -12,6 +12,7 @@ const approvedService = {
 const parseExpense: typeof parseExpenseWithConsent = (text, apiKey, cache, options) =>
   parseExpenseWithConsent(text, apiKey, cache, {
     ...options,
+    beforeExternalCall: options?.beforeExternalCall ?? (async () => undefined),
     telemetry: options?.telemetry ?? { userId: 'owner-1', service: approvedService }
   });
 

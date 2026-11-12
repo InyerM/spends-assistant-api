@@ -410,4 +410,36 @@ describe('handleEmail', () => {
       scope: 'financial_text'
     });
   });
+  it('passes the atomic quota guard to parsing and denies before financial writes', async () => {
+    const { parseExpense } = await import('../../src/parsers/expense');
+    const provider = vi.fn();
+    vi.mocked(parseExpense).mockImplementationOnce(async (_text, _key, _cache, options) => {
+      await options?.beforeExternalCall?.();
+      provider();
+      throw new Error('Provider must remain unreachable');
+    });
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
+      Response.json(
+        url.includes('/rpc/reserve_ai_parse') ? [{ allowed: false, used: 15, limit: 15 }] : []
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const response = await handleEmail(
+      new Request('http://localhost/email', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: 'Bancolombia: Compraste $50.000 en tienda con tu tarjeta' })
+      }),
+      env
+    );
+    expect(response.status).toBe(429);
+    expect(provider).not.toHaveBeenCalled();
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) =>
+          url.includes('/rest/v1/transactions') &&
+          ['POST', 'PATCH', 'DELETE'].includes(init?.method ?? 'GET')
+      )
+    ).toBe(false);
+  });
 });

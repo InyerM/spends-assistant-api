@@ -1,3 +1,4 @@
+import { resolveExactHistoryCategory, type ExactCategoryHistory } from './inbox-history-resolution';
 import type { ForwardedEmailSuggestion } from '../ai/forwarded-email-suggestion';
 import type { Account } from '../types/account';
 import type { Category } from '../types/category';
@@ -10,7 +11,9 @@ import { validateEmailEventTime } from './date';
 
 export function buildInboxAnalysisProposal(
   item: InboxAnalysisItem,
-  suggestion: ForwardedEmailSuggestion,
+  suggestion: Omit<ForwardedEmailSuggestion, 'categorySource'> & {
+    categorySource: ForwardedEmailSuggestion['categorySource'] | 'review_context';
+  },
   accounts: Account[],
   categories: Category[],
   rules: AutomationRule[],
@@ -191,7 +194,8 @@ export function buildDeterministicInboxAnalysisProposal(
   accounts: Account[],
   categories: Category[],
   rules: AutomationRule[],
-  matcher: Pick<AutomationRulesService, 'matchesConditions' | 'findUniqueAccountDetectionRule'>
+  matcher: Pick<AutomationRulesService, 'matchesConditions' | 'findUniqueAccountDetectionRule'>,
+  history: ExactCategoryHistory[] = []
 ): InboxAnalysisProposal | null {
   const evidence = extractEmailEventEvidence(item.raw_text);
   if (evidence.ambiguous || !evidence.amount || !evidence.merchant || !evidence.type) return null;
@@ -202,12 +206,22 @@ export function buildDeterministicInboxAnalysisProposal(
     emailEventBody(item.raw_text)
   );
   if (!bankEventAt || !evidence.sourceLastFour) return null;
+  const match = evidence.date
+    ? resolveExactHistoryCategory(
+        item.user_id,
+        evidence.merchant,
+        evidence.type,
+        evidence.date,
+        categories,
+        history
+      )
+    : null;
   const proposal = buildInboxAnalysisProposal(
     item,
     {
       type: evidence.type,
-      categoryId: null,
-      categorySource: null,
+      categoryId: match?.categoryId ?? null,
+      categorySource: match ? 'review_context' : null,
       description: evidence.merchant,
       notes: null,
       bankEventAt,
@@ -220,8 +234,16 @@ export function buildDeterministicInboxAnalysisProposal(
     rules,
     matcher
   );
+  if (match && proposal.category_source === 'review_context') {
+    proposal.analysis_details.analysis_source = proposal.analysis_details.applied_rules.length
+      ? 'automation'
+      : 'history';
+    proposal.analysis_details.history_fields = ['categoryId'];
+    proposal.analysis_details.evidence_ids = match.evidenceIds;
+  }
   const resolvedClassification =
-    proposal.category_source === 'automation' && proposal.category_id !== null;
+    (proposal.category_source === 'automation' || proposal.category_source === 'review_context') &&
+    proposal.category_id !== null;
   const resolvedTransfer =
     proposal.analysis_details.financial_type === 'transfer' &&
     proposal.analysis_details.transfer_to_account_id !== null &&

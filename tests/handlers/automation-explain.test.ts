@@ -10,6 +10,7 @@ const rule = {
 };
 const cache = new Map<string, string>();
 const mocks = vi.hoisted(() => ({
+  reserve: vi.fn(),
   track: vi.fn(),
   complete: vi.fn(),
   get: vi.fn(),
@@ -21,7 +22,8 @@ vi.mock('../../src/services/supabase', () => ({
     accounts: { getAccounts: async () => [] },
     categories: { getCategories: async () => [] },
     automationRules: { getExplanation: mocks.get, saveExplanation: mocks.save },
-    aiUsage: { track: mocks.track }
+    aiUsage: { track: mocks.track },
+    usage: { incrementAiParses: mocks.reserve }
   })
 }));
 vi.mock('../../src/utils/auth', () => ({
@@ -40,6 +42,7 @@ function request(body: unknown = { rule, locale: 'es' }, auth = true): Request {
 beforeEach(() => {
   vi.clearAllMocks();
   cache.clear();
+  mocks.reserve.mockResolvedValue({ allowed: true, used: 1, limit: 15 });
   mocks.get.mockImplementation(
     async (_user, fingerprint, locale) => cache.get(fingerprint + locale) ?? null
   );
@@ -68,7 +71,32 @@ describe('automation explanation cache', () => {
     const second = await handleAutomationExplain(request(), createMockEnv());
     expect(await second.json()).toMatchObject({ cached: true });
     expect(mocks.complete).toHaveBeenCalledTimes(1);
+    expect(mocks.reserve).toHaveBeenCalledExactlyOnceWith('owner');
     expect(mocks.get).toHaveBeenCalledWith('owner', expect.any(String), 'es');
+  });
+  it('denies a new generation without calling the model or saving a cache entry', async () => {
+    mocks.reserve.mockResolvedValue({ allowed: false, used: 15, limit: 15 });
+    const response = await handleAutomationExplain(request(), createMockEnv());
+    expect(response.status).toBe(429);
+    expect(mocks.complete).not.toHaveBeenCalled();
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+  it('shares one reservation between concurrent identical generations', async () => {
+    let release: (() => void) | undefined;
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mocks.complete.mockImplementationOnce(async () => {
+      await hold;
+      return { data: { explanation: 'When coffee appears, adds Reviewed to the notes.' } };
+    });
+    const first = handleAutomationExplain(request(), createMockEnv());
+    const second = handleAutomationExplain(request(), createMockEnv());
+    await vi.waitFor(() => expect(mocks.complete).toHaveBeenCalledOnce());
+    release?.();
+    const results = await Promise.all([first, second]);
+    expect(results.map((response) => response.status)).toEqual([200, 200]);
+    expect(mocks.reserve).toHaveBeenCalledExactlyOnceWith('owner');
   });
   it('refreshes only changed behavior or language and explains actual engine limits', async () => {
     await handleAutomationExplain(request(), createMockEnv());

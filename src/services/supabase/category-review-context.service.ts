@@ -1,3 +1,4 @@
+import type { ExactCategoryHistory } from '../../utils/inbox-history-resolution';
 import { BaseService } from './base.service';
 import type { CategoryReviewInput } from '../../ai/category-review';
 interface HistoryRow {
@@ -12,6 +13,33 @@ export class ReviewTransactionNotFoundError extends Error {
   }
 }
 export class CategoryReviewContextService extends BaseService {
+  async exactCategoryHistory(
+    userId: string,
+    merchant: string,
+    type: string,
+    eventDate: string
+  ): Promise<ExactCategoryHistory[]> {
+    const event = Date.parse(eventDate);
+    if (
+      !Number.isFinite(event) ||
+      !merchant.trim() ||
+      merchant.length > 100 ||
+      !['expense', 'income'].includes(type)
+    )
+      return [];
+    const since = new Date(event - 180 * 86400000).toISOString().slice(0, 10);
+    const params = new URLSearchParams({
+      user_id: `eq.${userId}`,
+      deleted_at: 'is.null',
+      description: `eq.${merchant}`,
+      type: `eq.${type}`,
+      and: `(date.gte.${since},date.lte.${eventDate})`,
+      select: 'id,user_id,description,type,date,category_id',
+      order: 'date.desc,id.desc',
+      limit: '13'
+    });
+    return this.fetch<ExactCategoryHistory[]>(`/rest/v1/transactions?${params}`);
+  }
   async reviewHistory(
     userId: string,
     description: string,

@@ -1,3 +1,8 @@
+import {
+  reserveAiParse,
+  AiParseQuotaExceededError,
+  AiParseQuotaUnavailableError
+} from '../utils/ai-parse-quota';
 import { Telegraf, Context } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { parseExpense } from '../parsers/expense';
@@ -216,7 +221,8 @@ async function processExpense(
       dynamicPrompts,
       categoryCatalog: categories.map(({ slug, name, type }) => ({ slug, name, type })),
       model: env.OPENROUTER_TEXT_MODEL,
-      telemetry: { userId, service: services.aiUsage }
+      telemetry: { userId, service: services.aiUsage },
+      beforeExternalCall: () => reserveAiParse(services.usage, userId)
     });
 
     // Handle non-transactional messages
@@ -370,6 +376,14 @@ async function processExpense(
 
     await ctx.reply(confirmationMessage);
   } catch (error: unknown) {
+    if (error instanceof AiParseQuotaExceededError) {
+      await ctx.reply('AI analysis limit reached. Review your usage in Anotto settings.');
+      return;
+    }
+    if (error instanceof AiParseQuotaUnavailableError) {
+      await ctx.reply('AI usage could not be checked. Please try again later.');
+      return;
+    }
     if (error instanceof AiConsentRequiredError) {
       await ctx.reply('AI analysis is off. Review and enable AI data sharing in Anotto settings.');
       return;

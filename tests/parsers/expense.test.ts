@@ -1,3 +1,4 @@
+import { reserveAiParse } from '../../src/utils/ai-parse-quota';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { parseExpense as parseExpenseWithConsent } from '../../src/parsers/expense';
 import type { CacheService } from '../../src/services/cache.service';
@@ -18,6 +19,7 @@ const approvedService = {
 const parseExpense: typeof parseExpenseWithConsent = (text, apiKey, cache, options) =>
   parseExpenseWithConsent(text, apiKey, cache, {
     ...options,
+    beforeExternalCall: options?.beforeExternalCall ?? (async () => undefined),
     telemetry: options?.telemetry ?? { userId: 'owner-1', service: approvedService }
   });
 
@@ -105,6 +107,33 @@ describe('parseExpense', () => {
     expect(requireConsent).toHaveBeenCalledWith('owner-1', 'financial_text');
     expect(beforeExternalCall).not.toHaveBeenCalled();
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('openrouter.ai'))).toBe(false);
+  });
+
+  it('fails closed before the provider when a cache miss has no reservation hook', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      parseExpenseWithConsent('Lunch $50', API_KEY, undefined, {
+        telemetry: { userId: 'owner-1', service: approvedService }
+      })
+    ).rejects.toThrow('AI quota unavailable');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['denied', 'unavailable'])('never calls the provider when quota is %s', async (state) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const incrementAiParses =
+      state === 'denied'
+        ? vi.fn().mockResolvedValue({ allowed: false, used: 15, limit: 15 })
+        : vi.fn().mockRejectedValue(new Error('private database failure'));
+    await expect(
+      parseExpense('Lunch $50', API_KEY, undefined, {
+        beforeExternalCall: () => reserveAiParse({ incrementAiParses }, 'owner-1')
+      })
+    ).rejects.toThrow(state === 'denied' ? 'Parse limit reached' : 'AI quota unavailable');
+    expect(incrementAiParses).toHaveBeenCalledExactlyOnceWith('owner-1');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('reserves quota only after consent and immediately before an external call', async () => {

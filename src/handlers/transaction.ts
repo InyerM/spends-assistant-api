@@ -1,3 +1,4 @@
+import { reserveAiParse, aiParseQuotaErrorResponse } from '../utils/ai-parse-quota';
 import { createSupabaseServices } from '../services/supabase';
 import { CacheService } from '../services/cache.service';
 import { Env } from '../types/env';
@@ -88,7 +89,8 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
       dynamicPrompts,
       categoryCatalog: categories.map(({ slug, name, type }) => ({ slug, name, type })),
       model: env.OPENROUTER_TEXT_MODEL,
-      telemetry: { userId, service: services.aiUsage }
+      telemetry: { userId, service: services.aiUsage },
+      beforeExternalCall: () => reserveAiParse(services.usage, userId)
     });
 
     // Handle non-transactional messages
@@ -249,6 +251,8 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
       }
     );
   } catch (error: unknown) {
+    const quotaResponse = aiParseQuotaErrorResponse(error);
+    if (quotaResponse) return quotaResponse;
     const consentResponse = aiConsentErrorResponse(error);
     if (consentResponse) return consentResponse;
     console.error('Transaction API Error:', error);

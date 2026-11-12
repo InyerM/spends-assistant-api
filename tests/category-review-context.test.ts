@@ -261,3 +261,20 @@ it('does not retrieve history from empty or boilerplate-only notes and descripti
     vi.unstubAllGlobals();
   }
 });
+it('loads exact history with owner, event cutoff and a bounded conflict window', async () => {
+  const fetcher = vi.fn().mockResolvedValue(Response.json([]));
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    const service = new CategoryReviewContextService('https://db.test', 'secret');
+    await service.exactCategoryHistory('owner', 'SPOTIFY', 'expense', '2026-10-02');
+    const params = new URL(String(fetcher.mock.calls[0][0])).searchParams;
+    expect(params.get('user_id')).toBe('eq.owner');
+    expect(params.get('description')).toBe('eq.SPOTIFY');
+    expect(params.get('type')).toBe('eq.expense');
+    expect(params.get('limit')).toBe('13');
+    expect(params.get('and')).toContain('date.lte.2026-10-02');
+    expect(params.get('deleted_at')).toBe('is.null');
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

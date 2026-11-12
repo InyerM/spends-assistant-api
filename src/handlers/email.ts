@@ -1,3 +1,4 @@
+import { reserveAiParse, aiParseQuotaErrorResponse } from '../utils/ai-parse-quota';
 import { parseExpense } from '../parsers/expense';
 import { createSupabaseServices } from '../services/supabase';
 import { CacheService } from '../services/cache.service';
@@ -101,7 +102,8 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
         dynamicPrompts,
         categoryCatalog: categories.map(({ slug, name, type }) => ({ slug, name, type })),
         model: env.OPENROUTER_TEXT_MODEL,
-        telemetry: { userId, service: services.aiUsage }
+        telemetry: { userId, service: services.aiUsage },
+        beforeExternalCall: () => reserveAiParse(services.usage, userId)
       });
 
       // Handle non-transactional messages
@@ -235,6 +237,8 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error: unknown) {
+    const quotaResponse = aiParseQuotaErrorResponse(error);
+    if (quotaResponse) return quotaResponse;
     const consentResponse = aiConsentErrorResponse(error);
     if (consentResponse) return consentResponse;
     console.error('[Email] Error:', error);

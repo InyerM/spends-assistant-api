@@ -114,6 +114,7 @@ it('reserves before dispatch and returns only all-page review drafts', async () 
   const { fetch, calls } = setup();
   const response = await handleDocumentPdfOcrExtract(request(), env);
   expect(response.status).toBe(200);
+  expect(calls.filter((url) => url.includes('reserve_ai_parse'))).toHaveLength(1);
   expect(await response.json()).toMatchObject({
     draft: { document_type: 'statement', observations: [] },
     requiresReview: true,

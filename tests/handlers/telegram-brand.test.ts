@@ -92,4 +92,32 @@ describe('Telegram customer-facing brand', () => {
     expect(JSON.stringify(reply.mock.calls)).not.toContain('private purchase details');
     vi.unstubAllGlobals();
   });
+  it('blocks exhausted quota with a safe reply before provider work or posting', async () => {
+    const provider = vi.fn();
+    vi.mocked(parseExpense).mockImplementationOnce(async (_text, _key, _cache, options) => {
+      await options?.beforeExternalCall?.();
+      provider();
+      throw new Error('Provider must remain unreachable');
+    });
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
+      Response.json(
+        url.includes('/rpc/reserve_ai_parse') ? [{ allowed: false, used: 15, limit: 15 }] : []
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await handleTelegram(ownerMessage('/gasto private purchase details'), authorizedEnv());
+    expect(provider).not.toHaveBeenCalled();
+    expect(reply).toHaveBeenCalledWith(
+      'AI analysis limit reached. Review your usage in Anotto settings.'
+    );
+    expect(JSON.stringify(reply.mock.calls)).not.toContain('private purchase details');
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) =>
+          url.includes('/rest/v1/transactions') &&
+          ['POST', 'PATCH', 'DELETE'].includes(init?.method ?? 'GET')
+      )
+    ).toBe(false);
+    vi.unstubAllGlobals();
+  });
 });

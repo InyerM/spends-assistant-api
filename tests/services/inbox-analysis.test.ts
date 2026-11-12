@@ -17,6 +17,7 @@ const mock = vi.hoisted(() => ({
   fail: vi.fn(),
   route: vi.fn(),
   history: vi.fn(),
+  exactHistory: vi.fn(),
   accounts: vi.fn(),
   categories: vi.fn(),
   rules: vi.fn()
@@ -29,7 +30,7 @@ vi.mock('../../src/services/supabase', () => ({
     aiUsage: {},
     categories: { getCategories: mock.categories },
     accounts: { getAccounts: mock.accounts },
-    categoryReviewContext: { history: mock.history },
+    categoryReviewContext: { history: mock.history, exactCategoryHistory: mock.exactHistory },
     automationRules: {
       getAutomationRules: mock.rules,
       findUniqueAccountDetectionRule: () => null,
@@ -57,6 +58,7 @@ beforeEach(() => {
   });
   mock.consent.mockResolvedValue(undefined);
   mock.history.mockResolvedValue([]);
+  mock.exactHistory.mockResolvedValue([]);
   mock.accounts.mockResolvedValue([]);
   mock.categories.mockResolvedValue([]);
   mock.rules.mockResolvedValue([]);
@@ -89,6 +91,7 @@ it('blocks exhausted quota and does not call the model or financial posting', as
 });
 it('persists only a proposal and uses financial-text consent for native captures', async () => {
   await processInboxAnalysisLease(lease, createMockEnv());
+  expect(mock.reserve).toHaveBeenCalledExactlyOnceWith('owner');
   expect(mock.consent).toHaveBeenCalledWith('owner', 'financial_text');
   expect(mock.suggest).toHaveBeenCalledWith(
     expect.any(String),
@@ -170,4 +173,41 @@ it('keeps incomplete captures blocked when AI consent is missing', async () => {
   expect(mock.reserve).not.toHaveBeenCalled();
   expect(mock.complete).not.toHaveBeenCalled();
   expect(mock.history).not.toHaveBeenCalled();
+});
+
+it('uses unanimous exact owned history before consent for a complete explicit capture', async () => {
+  mock.item.mockResolvedValue({
+    id: 'item',
+    user_id: 'owner',
+    source: 'native-bank-message',
+    status: 'pending',
+    raw_text: 'Compraste $20.000 en SPOTIFY con tu T.Deb *2651 el 02/10/2026 a las 14:30',
+    received_at: '2026-10-02'
+  });
+  mock.accounts.mockResolvedValue([createMockAccount({ user_id: 'owner' })]);
+  mock.categories.mockResolvedValue([createMockCategory({ user_id: 'owner' })]);
+  mock.exactHistory.mockResolvedValue(
+    ['one', 'two'].map((id) => ({
+      id,
+      user_id: 'owner',
+      description: 'SPOTIFY',
+      type: 'expense',
+      date: '2026-10-01',
+      category_id: 'cat-1'
+    }))
+  );
+  await processInboxAnalysisLease(lease, createMockEnv());
+  expect(mock.complete).toHaveBeenCalledWith(
+    lease,
+    expect.objectContaining({
+      category_id: 'cat-1',
+      category_source: 'review_context',
+      analysis_details: expect.objectContaining({
+        history_fields: ['categoryId'],
+        evidence_ids: ['one', 'two']
+      })
+    })
+  );
+  expect(mock.consent).not.toHaveBeenCalled();
+  expect(mock.suggest).not.toHaveBeenCalled();
 });
