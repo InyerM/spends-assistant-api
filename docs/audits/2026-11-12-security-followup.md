@@ -1,8 +1,12 @@
 # Security follow-up — 12 November 2026
 
+## Subsequent release status
+
+The findings below preserve the initial inspection snapshot. Later on 12 November, backend `65d614e` and web `f2c2be7` / `6e9951b` published the scoped quota and dependency fixes; image OCR then passed actual production acceptance after correcting the Sharp artifact link. Web `ea6749f` subsequently published the A09 mutation-origin and credential boundary, with normal browser/native/PDF production acceptance passing at 21:13 UTC. See [the consolidated release evidence](../plans/2026-11-12-home-ocr-native-followup.md). A03 ingress/deduplication, A07 financial authority, A10 matcher bounds and native/distribution findings remain separate open work; this is not blanket security completion.
+
 ## Scope and limits
 
-Initial read-only source/dependency follow-up to [the October audit](../security/2026-10-22-cross-repository-audit.md), informed by [the November pipeline audit](2026-11-11-pipeline-audit.md) and [publication evidence](../plans/2026-11-12-production-publication.md). The initial audit changed only this report. Subsequently authorized dependency remediation is recorded below; no deployed configuration, database grants, or external publication was changed. The later scoped frontend compatibility fixes are recorded below. No private exports, credentials, provider bodies or personal financial records were inspected. This is not a security certification.
+Initial read-only source/dependency follow-up to [the October audit](../security/2026-10-22-cross-repository-audit.md), informed by [the November pipeline audit](2026-11-11-pipeline-audit.md) and [publication evidence](../plans/2026-11-12-production-publication.md). The initial audit changed only this report. Subsequently authorized dependency remediation is recorded below. During the initial inspection, no deployed configuration, database grants, or external publication was changed; later releases are identified in the status above. The later scoped frontend compatibility fixes are recorded below. No private exports, credentials, provider bodies or personal financial records were inspected. This is not a security certification.
 
 Snapshot: backend `d840dc185ee9eae27200cdcb804e8de6c8877f99`, web `8a7a8ae722c389ade6337f29193cb251d8f5d716`, mobile `5e86b0b8456ce2291704da3c589d87c6ab1c267d`. Existing local changes were preserved. Source references describe the inspected working trees, not proof of installed production grants or shipped mobile artifacts.
 

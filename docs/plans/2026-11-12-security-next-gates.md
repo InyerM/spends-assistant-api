@@ -2,7 +2,7 @@
 
 ## Status and ownership
 
-This is a follow-up plan, not implemented protection or a security completion claim. It extends [the current audit and local remediation record](../audits/2026-11-12-security-followup.md) and [the original cross-repository findings](../security/2026-10-22-cross-repository-audit.md). The current web release remains frozen while its coordinator finishes build, native acceptance and publication checks. This document changes no application source, deployment configuration or database privileges.
+This is a follow-up plan, not implemented protection or a security completion claim. It extends [the current audit and local remediation record](../audits/2026-11-12-security-followup.md) and [the original cross-repository findings](../security/2026-10-22-cross-repository-audit.md). The Home/OCR release has passed production image acceptance (`6e9951b`); A09 was subsequently implemented and published as web `ea6749f`, with production acceptance in `/tmp/anotto-a09-production-acceptance-20261112.json`; its exact scope and residual limits are recorded in the sibling web `docs/audits/2026-11-12-mutation-origin-hardening.md`. Native runtime acceptance continues separately. This plan itself changes no application source, deployment configuration or database privileges.
 
 Existing owner authorization covers continuing the security fixes. The gates below are evidence, compatibility and validation prerequisites; they do not introduce another permission request for already authorized work. The coordinator owns sequencing and independent review. A07 privilege changes must wait for compatibility evidence, rather than an arbitrary approval round trip.
 
