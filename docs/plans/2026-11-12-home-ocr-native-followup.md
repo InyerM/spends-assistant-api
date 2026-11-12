@@ -37,7 +37,7 @@ Optional Mistral OCR accepts an unencrypted PDF of up to five pages / 5 MB, or a
 
 ## Remaining boundaries
 
-The entire improvement plan is not complete. Deterministic verified-contact resolution and field-specific AI requests remain separate increments. Further ingress/deduplication limits, regex compatibility/resource limits, native OAuth/backup/signing and legacy financial grants remain tracked in [the next security gates](2026-11-12-security-next-gates.md). Revoking legacy grants requires evidence that released clients and offline queues have migrated. Native touch behavior, keyboard/safe areas, large text and real device intake still require runtime acceptance.
+The entire improvement plan is not complete. Deterministic verified-contact resolution and field-specific AI requests remain separate increments. Further ingress/deduplication limits, regex compatibility/resource limits, native OAuth/backup/signing and legacy financial grants remain tracked in [the next security gates](2026-11-12-security-next-gates.md). Revoking legacy grants requires evidence that released clients and offline queues have migrated. Broader keyboard/safe-area scenarios, large text and real-device intake remain beyond the bounded simulator acceptance above.
 
 ## Owner acceptance checklist
 
@@ -47,7 +47,7 @@ For a safe OCR trial, upload `/tmp/anotto-ocr-demo/extracto-demo-COP-USD.pdf` as
 
 Native acceptance uses a standalone Release simulator artifact with a synthetic owner, real test currency ledgers and an unextracted document, then checks navigation and currency changes after 21 seconds plus the explicit OCR acknowledgement. It does not substitute for a physical iPhone test or dispatch OCR without acknowledgement. Physical installation preserves the app identifier and existing data, after the web runtime gate and device availability are verified.
 
-## Separate mutation security candidate
+## Mutation security release
 
 Web commit `ea6749f` adds exact-origin protection for cookie mutations and keeps bearer authentication restricted to the existing verified native route/method allowlist. An AST gate and a runtime sweep cover all 82 unsafe exports, including shared wrappers and Shortcut cookie fallback. Invalid bearer credentials do not fall back to a cookie. Compatible headers preserve PDF embedding and audio MIME behavior.
 
