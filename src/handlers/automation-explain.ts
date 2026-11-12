@@ -1,3 +1,4 @@
+import { inspectAutomationRegex } from '../utils/automation-regex';
 import { reserveAiParse, aiParseQuotaErrorResponse } from '../utils/ai-parse-quota';
 import { createSupabaseServices } from '../services/supabase';
 import type { Env } from '../types/env';
@@ -27,6 +28,14 @@ export async function handleAutomationExplain(request: Request, env: Env): Promi
     } catch {
       return Response.json({ error: 'Invalid automation draft' }, { status: 400 });
     }
+    if (inspectAutomationRegex(rule.conditions.description_regex).requires_review)
+      return Response.json(
+        {
+          error: 'Automation expression requires review',
+          code: 'AUTOMATION_REGEX_REVIEW_REQUIRED'
+        },
+        { status: 400 }
+      );
     const locale = ['en', 'es', 'pt'].includes(String(body.locale)) ? String(body.locale) : 'es';
     stage = 'context';
     const [accounts, categories] = await Promise.all([

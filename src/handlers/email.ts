@@ -1,3 +1,4 @@
+import { automationMatchingErrorResponse } from '../utils/automation-regex';
 import { reserveAiParse, aiParseQuotaErrorResponse } from '../utils/ai-parse-quota';
 import { parseExpense } from '../parsers/expense';
 import { createSupabaseServices } from '../services/supabase';
@@ -237,6 +238,8 @@ export async function handleEmail(request: Request, env: Env): Promise<Response>
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error: unknown) {
+    const matchingResponse = automationMatchingErrorResponse(error);
+    if (matchingResponse) return matchingResponse;
     const quotaResponse = aiParseQuotaErrorResponse(error);
     if (quotaResponse) return quotaResponse;
     const consentResponse = aiConsentErrorResponse(error);

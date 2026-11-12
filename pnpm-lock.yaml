@@ -17,6 +17,9 @@ importers:
       postal-mime:
         specifier: 4.0.8
         version: 4.0.8
+      re2js:
+        specifier: 2.10.0
+        version: 2.10.0
       telegraf:
         specifier: ^4.16.3
         version: 4.16.3(supports-color@7.2.0)
@@ -1808,6 +1811,18 @@ packages:
   zod@3.22.3:
     resolution: {integrity: sha512-EjIevzuJRiRPbVH4mGc8nApb/lVLKVpmUhAaR5R5doKGfAnGJ6Gr3CViAVjP+4FWSxCsybeWQdcgCtbX+7oZug==}
 
+  re2js@2.10.0:
+    resolution:
+      {
+        integrity: sha512-/P6FNnLbHjXJMRF1dPoZoVTyHvFcuVhbDpzml9DPMlbeErYlZ18GueAaG9GhYhAm/9AN7i7Y6crmDrLX0DeJ4Q==
+      }
+    engines: { node: '>=20.0.0' }
+
+snapshots:
+  '@babel/helper-string-parser@7.27.1': {}
+
+  '@babel/helper-validator-identifier@7.28.5': {}
+
 snapshots:
 
   '@babel/helper-string-parser@7.27.1': {}
@@ -3355,3 +3370,5 @@ snapshots:
       stacktracey: 2.1.8
 
   zod@3.22.3: {}
+
+  re2js@2.10.0: {}

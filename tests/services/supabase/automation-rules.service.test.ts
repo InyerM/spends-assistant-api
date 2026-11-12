@@ -17,6 +17,15 @@ describe('AutomationRulesService', () => {
     vi.restoreAllMocks();
   });
 
+  it('requires review for overlong matching input before any fallback rule or prompt path', () => {
+    expect(() => service.matchesConditions({ description: 'x'.repeat(8193) }, {})).toThrow(
+      'Automation matching requires review'
+    );
+    expect(() => service.findUniqueAccountDetectionRule([], 'x'.repeat(8193))).toThrow(
+      'Automation matching requires review'
+    );
+  });
+
   it('generates detection rules for each active ending and omits retired cards', () => {
     const account = {
       id: 'account-1',

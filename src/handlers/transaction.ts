@@ -1,3 +1,4 @@
+import { automationMatchingErrorResponse } from '../utils/automation-regex';
 import { reserveAiParse, aiParseQuotaErrorResponse } from '../utils/ai-parse-quota';
 import { createSupabaseServices } from '../services/supabase';
 import { CacheService } from '../services/cache.service';
@@ -251,6 +252,8 @@ export async function handleTransaction(request: Request, env: Env): Promise<Res
       }
     );
   } catch (error: unknown) {
+    const matchingResponse = automationMatchingErrorResponse(error);
+    if (matchingResponse) return matchingResponse;
     const quotaResponse = aiParseQuotaErrorResponse(error);
     if (quotaResponse) return quotaResponse;
     const consentResponse = aiConsentErrorResponse(error);

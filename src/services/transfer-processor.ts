@@ -1,3 +1,4 @@
+import { assertAutomationRuleSet, inspectAutomationRegex } from '../utils/automation-regex';
 import type { CreateTransactionInput, AutomationRule } from '../types';
 import type { createSupabaseServices } from './supabase';
 
@@ -187,12 +188,16 @@ export async function processTransfer(
  * Build dynamic prompt section for transfer rules (kept minimal to avoid token limits)
  */
 export function buildTransferPromptSection(rules: AutomationRule[]): string {
+  assertAutomationRuleSet(rules);
   if (rules.length === 0) {
     return '';
   }
 
   const ruleLines = rules
-    .filter((r) => r.match_phone)
+    .filter(
+      (r) =>
+        r.match_phone && !inspectAutomationRegex(r.conditions?.description_regex).requires_review
+    )
     .map((r) => `*${r.match_phone}→transfer`)
     .join(', ');
 
@@ -208,6 +213,7 @@ export function buildTransferPromptSection(rules: AutomationRule[]): string {
  * This allows the parser model to proactively apply known rules during parsing.
  */
 export function buildAutomationRulesPromptSection(rules: AutomationRule[]): string {
+  assertAutomationRuleSet(rules);
   const supportedConditions = new Set([
     'description_contains',
     'description_regex',
@@ -224,6 +230,7 @@ export function buildAutomationRulesPromptSection(rules: AutomationRule[]): stri
       (r) =>
         r.is_active &&
         r.conditions &&
+        !inspectAutomationRegex(r.conditions.description_regex).requires_review &&
         Object.keys(r.conditions).every((key) => supportedConditions.has(key)) &&
         r.actions &&
         (r.actions.set_type || r.actions.set_category !== undefined) &&
@@ -255,11 +262,7 @@ export function buildAutomationRulesPromptSection(rules: AutomationRule[]): stri
         );
       }
       if (r.conditions.description_regex) {
-        try {
-          new RegExp(r.conditions.description_regex, 'i');
-        } catch {
-          return '';
-        }
+        if (inspectAutomationRegex(r.conditions.description_regex).requires_review) return '';
         condParts.push(`description matches /${r.conditions.description_regex}/`);
       }
       if (r.conditions.amount_between) {

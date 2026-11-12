@@ -1,3 +1,10 @@
+import {
+  assertAutomationRuleSet,
+  inspectAutomationRegex,
+  matchesAutomationRegex,
+  assertAutomationMatchInput,
+  MAX_AUTOMATION_RULES
+} from '../../utils/automation-regex';
 import { BaseService } from './base.service';
 import type {
   AutomationRule,
@@ -56,8 +63,12 @@ export class AutomationRulesService extends BaseService {
 
   async getAutomationRules(userId?: string): Promise<AutomationRule[]> {
     const userFilter = userId ? `&user_id=eq.${userId}` : '';
-    return await this.fetch<AutomationRule[]>(
-      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&order=priority.desc,id.asc&select=*${userFilter}`
+    const rules = await this.fetch<AutomationRule[]>(
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&order=priority.desc,id.asc&select=*&limit=${MAX_AUTOMATION_RULES + 1}${userFilter}`
+    );
+    assertAutomationRuleSet(rules);
+    return rules.filter(
+      (rule) => !inspectAutomationRegex(rule.conditions?.description_regex).requires_review
     );
   }
 
@@ -65,12 +76,18 @@ export class AutomationRulesService extends BaseService {
    * Get only account_detection rules for pre-parse evaluation
    */
   async getAccountDetectionRules(userId: string): Promise<AutomationRule[]> {
-    return await this.fetch<AutomationRule[]>(
-      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&rule_type=eq.account_detection&user_id=eq.${userId}&order=priority.desc,id.asc&select=*`
+    const rules = await this.fetch<AutomationRule[]>(
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&rule_type=eq.account_detection&user_id=eq.${userId}&order=priority.desc,id.asc&select=*&limit=${MAX_AUTOMATION_RULES + 1}`
+    );
+    assertAutomationRuleSet(rules);
+    return rules.filter(
+      (rule) => !inspectAutomationRegex(rule.conditions?.description_regex).requires_review
     );
   }
 
   findUniqueAccountDetectionRule(rules: AutomationRule[], rawText: string): AutomationRule | null {
+    assertAutomationRuleSet(rules);
+    assertAutomationMatchInput('', rawText);
     let matchedRule: AutomationRule | null = null;
     for (const rule of rules) {
       if (
@@ -94,9 +111,15 @@ export class AutomationRulesService extends BaseService {
   async getActivePrompts(userId?: string): Promise<string[]> {
     const userFilter = userId ? `&user_id=eq.${userId}` : '';
     const rules = await this.fetch<AutomationRule[]>(
-      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&prompt_text=not.is.null&order=priority.desc&select=prompt_text${userFilter}`
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&prompt_text=not.is.null&order=priority.desc&select=prompt_text,conditions&limit=${MAX_AUTOMATION_RULES + 1}${userFilter}`
     );
-    return rules.filter((r) => r.prompt_text).map((r) => r.prompt_text as string);
+    assertAutomationRuleSet(rules);
+    return rules
+      .filter(
+        (r) =>
+          r.prompt_text && !inspectAutomationRegex(r.conditions?.description_regex).requires_review
+      )
+      .map((r) => r.prompt_text as string);
   }
 
   /**
@@ -108,10 +131,15 @@ export class AutomationRulesService extends BaseService {
     const userFilter = userId ? `&user_id=eq.${userId}` : '';
 
     const rules = await this.fetch<AutomationRule[]>(
-      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=eq.${normalizedPhone}&select=*${userFilter}`
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=eq.${normalizedPhone}&select=*&order=priority.desc,id.asc&limit=${MAX_AUTOMATION_RULES + 1}${userFilter}`
     );
 
-    return rules.length > 0 ? rules[0] : null;
+    assertAutomationRuleSet(rules);
+    return (
+      rules.find(
+        (rule) => !inspectAutomationRegex(rule.conditions?.description_regex).requires_review
+      ) ?? null
+    );
   }
 
   /**
@@ -119,8 +147,12 @@ export class AutomationRulesService extends BaseService {
    */
   async getTransferRules(userId?: string): Promise<AutomationRule[]> {
     const userFilter = userId ? `&user_id=eq.${userId}` : '';
-    return await this.fetch<AutomationRule[]>(
-      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=not.is.null&order=priority.desc,id.asc&select=*${userFilter}`
+    const rules = await this.fetch<AutomationRule[]>(
+      `/rest/v1/automation_rules?is_active=eq.true&deleted_at=is.null&match_phone=not.is.null&order=priority.desc,id.asc&select=*&limit=${MAX_AUTOMATION_RULES + 1}${userFilter}`
+    );
+    assertAutomationRuleSet(rules);
+    return rules.filter(
+      (rule) => !inspectAutomationRegex(rule.conditions?.description_regex).requires_review
     );
   }
 
@@ -129,6 +161,8 @@ export class AutomationRulesService extends BaseService {
     userId?: string
   ): Promise<CreateTransactionInput> {
     const rules = await this.getAutomationRules(userId);
+    assertAutomationRuleSet(rules);
+    assertAutomationMatchInput(transaction.description ?? '', transaction.raw_text ?? '');
     const appliedRules: AppliedRule[] = [];
     const claimed = new Set<keyof AutomationRule['actions']>();
 
@@ -192,6 +226,7 @@ export class AutomationRulesService extends BaseService {
     conditions: AutomationRuleConditions,
     logic: ConditionLogic = 'or'
   ): boolean {
+    assertAutomationMatchInput(transaction.description ?? '', transaction.raw_text ?? '');
     if (conditions.description_contains) {
       const desc = (transaction.description ?? '').toLowerCase();
       const matchFn =
@@ -205,14 +240,8 @@ export class AutomationRulesService extends BaseService {
       if (!matchFn) return false;
     }
 
-    if (conditions.description_regex) {
-      try {
-        const regex = new RegExp(conditions.description_regex, 'i');
-        if (!regex.test(transaction.description ?? '')) return false;
-      } catch {
-        return false;
-      }
-    }
+    if (!matchesAutomationRegex(conditions.description_regex, transaction.description ?? ''))
+      return false;
 
     if (conditions.raw_text_contains) {
       const rawText = (transaction.raw_text ?? '').toLowerCase();

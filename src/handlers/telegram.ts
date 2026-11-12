@@ -1,3 +1,4 @@
+import { AutomationMatchingReviewRequiredError } from '../utils/automation-regex';
 import {
   reserveAiParse,
   AiParseQuotaExceededError,
@@ -376,6 +377,12 @@ async function processExpense(
 
     await ctx.reply(confirmationMessage);
   } catch (error: unknown) {
+    if (error instanceof AutomationMatchingReviewRequiredError) {
+      await ctx.reply(
+        'Automation matching needs review. Disable or simplify the affected rules in Anotto settings.'
+      );
+      return;
+    }
     if (error instanceof AiParseQuotaExceededError) {
       await ctx.reply('AI analysis limit reached. Review your usage in Anotto settings.');
       return;

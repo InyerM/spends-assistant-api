@@ -55,6 +55,15 @@ beforeEach(() => {
   });
 });
 describe('automation explanation cache', () => {
+  it('rejects unsupported expression drafts before charging or sending them to the model', async () => {
+    const response = await handleAutomationExplain(
+      request({ rule: { ...rule, conditions: { description_regex: '(?=a)a' } }, locale: 'es' }),
+      createMockEnv()
+    );
+    expect(response.status).toBe(400);
+    expect(mocks.track).not.toHaveBeenCalled();
+    expect(mocks.complete).not.toHaveBeenCalled();
+  });
   it('authenticates before context reads and rejects malformed drafts', async () => {
     expect((await handleAutomationExplain(request(undefined, false), createMockEnv())).status).toBe(
       401
