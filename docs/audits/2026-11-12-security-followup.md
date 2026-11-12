@@ -2,7 +2,7 @@
 
 ## Subsequent release status
 
-The findings below preserve the initial inspection snapshot. Later on 12 November, backend `65d614e` and web `f2c2be7` / `6e9951b` published the scoped quota and dependency fixes; image OCR then passed actual production acceptance after correcting the Sharp artifact link. Web `ea6749f` subsequently published the A09 mutation-origin and credential boundary, with normal browser/native/PDF production acceptance passing at 21:13 UTC. See [the consolidated release evidence](../plans/2026-11-12-home-ocr-native-followup.md). A03 ingress/deduplication, A07 financial authority, A10 matcher bounds and native/distribution findings remain separate open work; this is not blanket security completion.
+The findings below preserve the initial inspection snapshot. Later on 12 November, backend `65d614e` and web `f2c2be7` / `6e9951b` published the scoped quota and dependency fixes; image OCR then passed actual production acceptance after correcting the Sharp artifact link. Web `ea6749f` subsequently published the A09 mutation-origin and credential boundary, with normal browser/native/PDF production acceptance passing at 21:13 UTC. See [the consolidated release evidence](../plans/2026-11-12-home-ocr-native-followup.md). A10 subsequently shipped in backend `994e7d7` and web `ecce7ea`; see [the bounded matcher report](2026-11-12-bounded-automation-matching.md). A03 ingress/deduplication, A07 financial authority and native/distribution findings remain separate open work; this is not blanket security completion.
 
 ## Scope and limits
 

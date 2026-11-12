@@ -2,7 +2,7 @@
 
 ## Scope and release boundary
 
-This candidate addresses A10 in [the follow-up plan](../plans/2026-11-12-security-next-gates.md). It replaces user-controlled JavaScript regular-expression execution in backend and web automation matchers with the pinned `re2js@2.10.0` engine. It does not revoke database grants, change native offline writes, migrate/delete stored rules, or close A07. Deployment remains a separate release gate.
+This candidate addresses A10 in [the follow-up plan](../plans/2026-11-12-security-next-gates.md). It replaces user-controlled JavaScript regular-expression execution in backend and web automation matchers with the pinned `re2js@2.10.0` engine. It does not revoke database grants, change native offline writes, migrate/delete stored rules, or close A07. The deployment gate was completed as recorded below.
 
 ## Engine and compatibility contract
 
@@ -27,3 +27,7 @@ Private synthetic evidence is under `/tmp/anotto-a10-20261112/`; it contains no 
 The actual helper was bundled (153465 bytes) and executed in a terminable Node process with 128 MiB heap and in real workerd without provider/database bindings. Each performed 136 adversarial calls with 8192-character input and an aggregate maximum of 510 allowed instructions: zero matches, approximately 35 ms in Node and 53 ms in workerd. Rule/work/input limit guards and unsupported expansion/lookaround checks passed. These measurements are bounded synthetic acceptance, not a latency guarantee or blanket security certification.
 
 Independent review reproduced the original forwarded-account bypass and verified its corrected unsupported/no-match/201-rule behavior. The isolated Next 16.4.1 production build passed. All 28 owned web source files matched the frozen SHA-256 manifest in the build copy. Its exact extraction-route NFT trace was copied to an isolated archive (435 files and 31 relative links); PDF, PNG, JPEG and WebP each rendered one page successfully with original node_modules unavailable. No provider or database calls were made. The final full-web and lint gates passed as recorded above.
+
+## Published versions
+
+Backend commit `994e7d7`, including verified-contact increment `770b216`, is deployed as Worker `63666ac2-e4b7-4907-9952-5eb03d495dea`; its public health check returned 200 with status ok on 12 November 2026 at 22:31 UTC. Web commit `ecce7ea` is READY as deployment `dpl_em3MpWutR9T49V4tunncyHsYCwLT`, with the my.anotto.app alias independently verified through the Vercel API. No database migration or privilege change was performed. Deployment logs remain private under `/tmp/anotto-a10-20261112/`. Production acceptance passed with normal test-user UI login: owned rules returned 200 before and after with the same two rules; three unsupported web submissions and three Worker explanation drafts each returned 400 with the expected review code. No valid rules, financial operations or provider requests were issued. Evidence: `/tmp/anotto-a10-production-acceptance-20261112.json`. Localhost:3000 now serves the A10 build. A full committed-source comparison verified all runtime files match web `ecce7ea`; only a non-runtime example environment file and release document differed (`/tmp/anotto-a10-build-full-source-review-20261112.json`).
