@@ -436,7 +436,8 @@ it('keeps an explicit rule category clear above unanimous exact history', () => 
         })
       ],
       rulesService,
-      history
+      history,
+      { contactId: 'contact', rows: history.map((row) => ({ ...row, contact_id: 'contact' })) }
     )
   ).toBeNull();
 });

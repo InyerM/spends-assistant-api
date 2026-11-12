@@ -56,26 +56,35 @@ export async function processInboxAnalysisLease(
       await services.inboxAnalysis.complete(lease, deterministic);
       return;
     }
-    if (
+    const completeEvidence =
       !evidence.ambiguous &&
       evidence.merchant &&
       evidence.type &&
       evidence.date &&
       evidence.time &&
       evidence.amount &&
-      evidence.sourceLastFour
-    ) {
-      // Failure to load optional local context must not replace the existing AI fallback.
-      const exactHistory = await services.categoryReviewContext
-        .exactCategoryHistory(lease.user_id, evidence.merchant, evidence.type, evidence.date)
-        .catch(() => []);
+      evidence.sourceLastFour;
+    const [contact, exactHistory] = await Promise.all([
+      !evidence.ambiguous && evidence.type && evidence.date
+        ? services.categoryReviewContext
+            .verifiedContactHistory(lease.user_id, item.raw_text, evidence.type, evidence.date)
+            .catch(() => ({ contactId: null, rows: [], ambiguous: true }))
+        : Promise.resolve(null),
+      completeEvidence
+        ? services.categoryReviewContext
+            .exactCategoryHistory(lease.user_id, evidence.merchant!, evidence.type!, evidence.date!)
+            .catch(() => null)
+        : Promise.resolve([])
+    ]);
+    if (completeEvidence && exactHistory) {
       const historical = buildDeterministicInboxAnalysisProposal(
         item,
         accounts,
         categories,
         rules,
         services.automationRules,
-        exactHistory
+        exactHistory,
+        contact
       );
       if (historical) {
         await services.inboxAnalysis.complete(lease, historical);
@@ -83,11 +92,47 @@ export async function processInboxAnalysisLease(
       }
     }
     await services.aiConsent.require(lease.user_id, scope);
-    const history = await services.categoryReviewContext.history(
+    const lexicalHistory = await services.categoryReviewContext.history(
       lease.user_id,
       evidence.merchant ?? item.raw_text,
       evidence.type ?? ''
     );
+    const contactRows =
+      contact && !contact.ambiguous
+        ? contact.rows
+            .filter(
+              (row) =>
+                row.user_id === lease.user_id &&
+                row.contact_id === contact.contactId &&
+                row.type === evidence.type &&
+                row.date <= (evidence.date ?? '') &&
+                Date.parse(evidence.date ?? '') - Date.parse(row.date) <= 180 * 86400000
+            )
+            .flatMap((row) => {
+              const category = categories.find(
+                (category) =>
+                  category.user_id === lease.user_id &&
+                  category.is_active &&
+                  category.type === row.type &&
+                  category.id === row.category_id &&
+                  !['uncategorized', 'uncategorized-income', 'missing'].includes(category.slug)
+              );
+              return category
+                ? [
+                    {
+                      id: row.id,
+                      description: row.description.slice(0, 500),
+                      notes: row.notes ?? null,
+                      category: category.name.slice(0, 150)
+                    }
+                  ]
+                : [];
+            })
+        : [];
+    const mergedHistory = new Map<string, (typeof lexicalHistory)[number]>();
+    for (const row of [...contactRows, ...lexicalHistory])
+      if (!mergedHistory.has(row.id)) mergedHistory.set(row.id, row);
+    const history = [...mergedHistory.values()].slice(0, 12);
     const reservation = await services.usage.incrementAiParses(lease.user_id);
     if (!reservation.allowed) {
       await services.inboxAnalysis.fail(lease, 'quota_limit', true);

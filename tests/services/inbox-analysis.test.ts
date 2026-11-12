@@ -18,6 +18,7 @@ const mock = vi.hoisted(() => ({
   route: vi.fn(),
   history: vi.fn(),
   exactHistory: vi.fn(),
+  contactHistory: vi.fn(),
   accounts: vi.fn(),
   categories: vi.fn(),
   rules: vi.fn()
@@ -30,7 +31,11 @@ vi.mock('../../src/services/supabase', () => ({
     aiUsage: {},
     categories: { getCategories: mock.categories },
     accounts: { getAccounts: mock.accounts },
-    categoryReviewContext: { history: mock.history, exactCategoryHistory: mock.exactHistory },
+    categoryReviewContext: {
+      history: mock.history,
+      exactCategoryHistory: mock.exactHistory,
+      verifiedContactHistory: mock.contactHistory
+    },
     automationRules: {
       getAutomationRules: mock.rules,
       findUniqueAccountDetectionRule: () => null,
@@ -59,6 +64,7 @@ beforeEach(() => {
   mock.consent.mockResolvedValue(undefined);
   mock.history.mockResolvedValue([]);
   mock.exactHistory.mockResolvedValue([]);
+  mock.contactHistory.mockResolvedValue(null);
   mock.accounts.mockResolvedValue([]);
   mock.categories.mockResolvedValue([]);
   mock.rules.mockResolvedValue([]);
@@ -210,4 +216,117 @@ it('uses unanimous exact owned history before consent for a complete explicit ca
   );
   expect(mock.consent).not.toHaveBeenCalled();
   expect(mock.suggest).not.toHaveBeenCalled();
+});
+
+it('resolves explicit verified contact history before AI while retaining only a category proposal', async () => {
+  mock.item.mockResolvedValue({
+    id: 'item',
+    user_id: 'owner',
+    source: 'native-bank-message',
+    status: 'pending',
+    raw_text: 'Compraste $20.000 en SPOTIFY con tu T.Deb *2651 el 02/10/2026 a las 14:30',
+    received_at: '2026-10-02'
+  });
+  mock.accounts.mockResolvedValue([createMockAccount({ user_id: 'owner' })]);
+  mock.categories.mockResolvedValue([createMockCategory({ user_id: 'owner' })]);
+  mock.contactHistory.mockResolvedValue({
+    contactId: 'contact',
+    rows: ['one', 'two'].map((id) => ({
+      id,
+      user_id: 'owner',
+      contact_id: 'contact',
+      description: 'Previous subscription',
+      type: 'expense',
+      date: '2026-10-01',
+      category_id: 'cat-1'
+    }))
+  });
+  await processInboxAnalysisLease(lease, createMockEnv());
+  expect(mock.complete).toHaveBeenCalledWith(
+    lease,
+    expect.objectContaining({
+      category_id: 'cat-1',
+      description: 'SPOTIFY',
+      analysis_details: expect.objectContaining({
+        contact_id: 'contact',
+        history_fields: ['categoryId'],
+        evidence_ids: ['one', 'two']
+      })
+    })
+  );
+  expect(mock.consent).not.toHaveBeenCalled();
+  expect(mock.suggest).not.toHaveBeenCalled();
+});
+it('keeps authoritative contact evidence first in unresolved AI context without inventing facts', async () => {
+  mock.item.mockResolvedValue({
+    id: 'item',
+    user_id: 'owner',
+    source: 'native-bank-message',
+    status: 'pending',
+    raw_text: 'Compraste $20.000 en SPOTIFY con tu T.Deb *2651 el 02/10/2026',
+    received_at: '2026-10-02'
+  });
+  mock.categories.mockResolvedValue([createMockCategory({ user_id: 'owner' })]);
+  mock.contactHistory.mockResolvedValue({
+    contactId: 'contact',
+    rows: [
+      {
+        id: 'prior',
+        user_id: 'owner',
+        contact_id: 'contact',
+        description: 'Tuition',
+        notes: 'Monthly course',
+        type: 'expense',
+        date: '2026-10-01',
+        category_id: 'cat-1'
+      }
+    ]
+  });
+  mock.history.mockResolvedValue([
+    { id: 'prior', description: 'Lexical replacement', category: 'Other' }
+  ]);
+  await processInboxAnalysisLease(lease, createMockEnv());
+  expect(mock.suggest).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.any(Array),
+    expect.any(String),
+    expect.any(String),
+    'owner',
+    expect.any(Object),
+    expect.objectContaining({
+      history: [
+        expect.objectContaining({ id: 'prior', description: 'Tuition', notes: 'Monthly course' })
+      ]
+    })
+  );
+  expect(mock.consent).toHaveBeenCalled();
+  expect(mock.reserve).toHaveBeenCalled();
+});
+it('does not auto-resolve contact classification when exact-history conflict checking is unavailable', async () => {
+  mock.item.mockResolvedValue({
+    id: 'item',
+    user_id: 'owner',
+    source: 'native-bank-message',
+    status: 'pending',
+    raw_text: 'Compraste $20.000 en SPOTIFY con tu T.Deb *2651 el 02/10/2026 a las 14:30',
+    received_at: '2026-10-02'
+  });
+  mock.accounts.mockResolvedValue([createMockAccount({ user_id: 'owner' })]);
+  mock.categories.mockResolvedValue([createMockCategory({ user_id: 'owner' })]);
+  mock.contactHistory.mockResolvedValue({
+    contactId: 'contact',
+    rows: ['one', 'two'].map((id) => ({
+      id,
+      user_id: 'owner',
+      contact_id: 'contact',
+      description: 'Previous subscription',
+      type: 'expense',
+      date: '2026-10-01',
+      category_id: 'cat-1'
+    }))
+  });
+  mock.exactHistory.mockRejectedValue(new Error('unavailable'));
+  await processInboxAnalysisLease(lease, createMockEnv());
+  expect(mock.suggest).toHaveBeenCalledTimes(1);
+  expect(mock.consent).toHaveBeenCalled();
 });

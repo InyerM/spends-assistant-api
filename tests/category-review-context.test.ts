@@ -278,3 +278,91 @@ it('loads exact history with owner, event cutoff and a bounded conflict window',
     vi.unstubAllGlobals();
   }
 });
+it('uses explicit SQL identity then exact owner catalog linkage for bounded contact history', async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ status: 'found', kind: 'account', value: '1234567890' }))
+    .mockResolvedValueOnce(
+      Response.json([
+        { id: 'contact', user_id: 'owner', identity_kind: 'account', identity_value: '1234567890' }
+      ])
+    )
+    .mockResolvedValueOnce(
+      Response.json([
+        {
+          id: 'old',
+          user_id: 'owner',
+          description: 'Tuition',
+          notes: 'Course',
+          type: 'expense',
+          date: '2026-10-01',
+          category_id: 'category',
+          contact_link: { user_id: 'owner', contact_id: 'contact' }
+        }
+      ])
+    );
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    const result = await new CategoryReviewContextService(
+      'https://db.test',
+      'secret'
+    ).verifiedContactHistory('owner', 'Transfer to 1234567890', 'expense', '2026-10-02');
+    expect(result).toMatchObject({
+      contactId: 'contact',
+      rows: [{ id: 'old', contact_id: 'contact', description: 'Tuition' }]
+    });
+    expect(String(fetcher.mock.calls[0][0])).toContain('/rpc/counterparty_evidence');
+    const catalog = new URL(String(fetcher.mock.calls[1][0])).searchParams;
+    expect(catalog.get('user_id')).toBe('eq.owner');
+    expect(catalog.get('identity_value')).toBe('eq.1234567890');
+    expect(catalog.get('limit')).toBe('2');
+    const history = new URL(String(fetcher.mock.calls[2][0])).searchParams;
+    expect(history.get('contact_link.contact_id')).toBe('eq.contact');
+    expect(history.get('user_id')).toBe('eq.owner');
+    expect(history.get('limit')).toBe('13');
+    expect(history.get('and')).toContain('date.lte.2026-10-02');
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+it.each([{ status: 'ambiguous' }, { status: 'no_evidence' }])(
+  'does not identify a contact from missing or ambiguous explicit evidence ($status)',
+  async (evidence) => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json(evidence));
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      const result = await new CategoryReviewContextService(
+        'https://db.test',
+        'secret'
+      ).verifiedContactHistory('owner', 'A contact name only', 'expense', '2026-10-02');
+      expect(result?.rows ?? []).toEqual([]);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);
+it('rejects foreign or conflicting catalog identities before reading linked transactions', async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ status: 'found', kind: 'account', value: '1234567890' }))
+    .mockResolvedValueOnce(
+      Response.json([
+        { id: 'foreign', user_id: 'other', identity_kind: 'account', identity_value: '1234567890' }
+      ])
+    );
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    expect(
+      await new CategoryReviewContextService('https://db.test', 'secret').verifiedContactHistory(
+        'owner',
+        'Transfer to 1234567890',
+        'expense',
+        '2026-10-02'
+      )
+    ).toMatchObject({ ambiguous: true, rows: [] });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

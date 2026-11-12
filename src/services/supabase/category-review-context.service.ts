@@ -1,4 +1,7 @@
-import type { ExactCategoryHistory } from '../../utils/inbox-history-resolution';
+import type {
+  ExactCategoryHistory,
+  VerifiedContactHistory
+} from '../../utils/inbox-history-resolution';
 import { BaseService } from './base.service';
 import type { CategoryReviewInput } from '../../ai/category-review';
 interface HistoryRow {
@@ -13,6 +16,95 @@ export class ReviewTransactionNotFoundError extends Error {
   }
 }
 export class CategoryReviewContextService extends BaseService {
+  async verifiedContactHistory(
+    userId: string,
+    text: string,
+    type: string,
+    eventDate: string
+  ): Promise<VerifiedContactHistory | null> {
+    const event = Date.parse(eventDate);
+    if (
+      !text.trim() ||
+      text.length > 8000 ||
+      !Number.isFinite(event) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(eventDate) ||
+      !['expense', 'income'].includes(type)
+    )
+      return null;
+    const evidence = await this.fetch<{ status: string; kind?: string; value?: string }>(
+      '/rest/v1/rpc/counterparty_evidence',
+      { method: 'POST', body: JSON.stringify({ p_text: text }) }
+    );
+    if (evidence.status === 'ambiguous') return { contactId: null, rows: [], ambiguous: true };
+    if (
+      evidence.status !== 'found' ||
+      !evidence.kind ||
+      !['account', 'nequi', 'payment_key', 'merchant'].includes(evidence.kind) ||
+      !evidence.value ||
+      evidence.value.length > 160
+    )
+      return null;
+    const params = new URLSearchParams({
+      user_id: `eq.${userId}`,
+      identity_kind: `eq.${evidence.kind}`,
+      identity_value: `eq.${evidence.value}`,
+      select: 'id,user_id,identity_kind,identity_value',
+      limit: '2'
+    });
+    const contacts = await this.fetch<
+      Array<{ id: string; user_id: string; identity_kind: string; identity_value: string }>
+    >(`/rest/v1/counterparties?${params}`);
+    if (!contacts.length) return null;
+    if (
+      contacts.length !== 1 ||
+      !contacts[0].id ||
+      contacts[0].user_id !== userId ||
+      contacts[0].identity_kind !== evidence.kind ||
+      contacts[0].identity_value !== evidence.value
+    )
+      return { contactId: null, rows: [], ambiguous: true };
+    const contactId = contacts[0].id;
+    const since = new Date(event - 180 * 86400000).toISOString().slice(0, 10);
+    const history = new URLSearchParams({
+      user_id: `eq.${userId}`,
+      deleted_at: 'is.null',
+      type: `eq.${type}`,
+      and: `(date.gte.${since},date.lte.${eventDate})`,
+      select:
+        'id,user_id,description,notes,type,date,category_id,contact_link:transaction_counterparties!transaction_counterparties_transaction_id_user_id_fkey!inner(user_id,contact_id)',
+      'contact_link.user_id': `eq.${userId}`,
+      'contact_link.contact_id': `eq.${contactId}`,
+      order: 'date.desc,id.desc',
+      limit: '13'
+    });
+    type Link = { user_id: string; contact_id: string };
+    const rows = await this.fetch<
+      Array<ExactCategoryHistory & { notes?: string | null; contact_link: Link | Link[] }>
+    >(`/rest/v1/transactions?${history}`);
+    if (
+      rows.some(
+        (row) =>
+          row.user_id !== userId ||
+          !(Array.isArray(row.contact_link) ? row.contact_link : [row.contact_link]).some(
+            (link) => link?.user_id === userId && link.contact_id === contactId
+          )
+      )
+    )
+      return { contactId, rows: [], ambiguous: true };
+    return {
+      contactId,
+      rows: rows.map((row) => ({
+        id: row.id,
+        user_id: row.user_id,
+        description: row.description,
+        type: row.type,
+        date: row.date,
+        category_id: row.category_id,
+        notes: row.notes?.slice(0, 1500) ?? null,
+        contact_id: contactId
+      }))
+    };
+  }
   async exactCategoryHistory(
     userId: string,
     merchant: string,

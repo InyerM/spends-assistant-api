@@ -16,6 +16,23 @@ export function resolveExactHistoryCategory(
   categories: Category[],
   rows: ExactCategoryHistory[]
 ): { categoryId: string; evidenceIds: string[] } | null {
+  return resolveCategoryHistory(
+    userId,
+    type,
+    eventDate,
+    categories,
+    rows,
+    (row) => row.description === merchant
+  );
+}
+function resolveCategoryHistory(
+  userId: string,
+  type: string,
+  eventDate: string,
+  categories: Category[],
+  rows: ExactCategoryHistory[],
+  accepts: (row: ExactCategoryHistory) => boolean
+): { categoryId: string; evidenceIds: string[] } | null {
   const event = Date.parse(eventDate);
   if (!Number.isFinite(event) || rows.length < 2 || rows.length >= 13) return null;
   const ids = new Set<string>();
@@ -37,7 +54,7 @@ export function resolveExactHistoryCategory(
       !row.id ||
       ids.has(row.id) ||
       row.user_id !== userId ||
-      row.description !== merchant ||
+      !accepts(row) ||
       row.type !== type ||
       row.category_id !== categoryId ||
       !Number.isFinite(date) ||
@@ -48,4 +65,54 @@ export function resolveExactHistoryCategory(
     ids.add(row.id);
   }
   return { categoryId, evidenceIds: [...ids] };
+}
+export interface VerifiedContactHistory {
+  contactId: string | null;
+  ambiguous?: boolean;
+  rows: Array<ExactCategoryHistory & { contact_id: string; notes?: string | null }>;
+}
+export function resolveInboxHistoryCategory(
+  userId: string,
+  merchant: string,
+  type: string,
+  eventDate: string,
+  categories: Category[],
+  exact: ExactCategoryHistory[],
+  contact?: VerifiedContactHistory | null
+): { categoryId: string; evidenceIds: string[]; contactId?: string } | null {
+  if (!contact)
+    return resolveExactHistoryCategory(userId, merchant, type, eventDate, categories, exact);
+  if (
+    contact.ambiguous ||
+    !contact.contactId ||
+    exact.length >= 13 ||
+    contact.rows.length >= 13 ||
+    exact.some((row) => row.description !== merchant) ||
+    contact.rows.some((row) => row.contact_id !== contact.contactId)
+  )
+    return null;
+  const merged = new Map<string, ExactCategoryHistory>();
+  for (const row of [...exact, ...contact.rows]) {
+    const previous = merged.get(row.id);
+    if (
+      previous &&
+      (previous.category_id !== row.category_id ||
+        previous.user_id !== row.user_id ||
+        previous.type !== row.type ||
+        previous.date !== row.date)
+    )
+      return null;
+    merged.set(row.id, row);
+  }
+  const result = resolveCategoryHistory(
+    userId,
+    type,
+    eventDate,
+    categories,
+    [...merged.values()],
+    () => true
+  );
+  return result
+    ? { ...result, ...(contact.rows.length ? { contactId: contact.contactId } : {}) }
+    : null;
 }

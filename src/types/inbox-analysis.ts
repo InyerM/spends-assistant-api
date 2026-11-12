@@ -34,6 +34,7 @@ export interface InboxAnalysisProposal {
   description: string | null;
   notes: string | null;
   analysis_details: {
+    contact_id?: string;
     analysis_source: 'ai' | 'automation' | 'history' | 'evidence';
     explanation: string | null;
     event_date: string | null;

@@ -1,4 +1,8 @@
-import { resolveExactHistoryCategory, type ExactCategoryHistory } from './inbox-history-resolution';
+import {
+  resolveInboxHistoryCategory,
+  type ExactCategoryHistory,
+  type VerifiedContactHistory
+} from './inbox-history-resolution';
 import type { ForwardedEmailSuggestion } from '../ai/forwarded-email-suggestion';
 import type { Account } from '../types/account';
 import type { Category } from '../types/category';
@@ -195,7 +199,8 @@ export function buildDeterministicInboxAnalysisProposal(
   categories: Category[],
   rules: AutomationRule[],
   matcher: Pick<AutomationRulesService, 'matchesConditions' | 'findUniqueAccountDetectionRule'>,
-  history: ExactCategoryHistory[] = []
+  history: ExactCategoryHistory[] = [],
+  contact?: VerifiedContactHistory | null
 ): InboxAnalysisProposal | null {
   const evidence = extractEmailEventEvidence(item.raw_text);
   if (evidence.ambiguous || !evidence.amount || !evidence.merchant || !evidence.type) return null;
@@ -207,13 +212,14 @@ export function buildDeterministicInboxAnalysisProposal(
   );
   if (!bankEventAt || !evidence.sourceLastFour) return null;
   const match = evidence.date
-    ? resolveExactHistoryCategory(
+    ? resolveInboxHistoryCategory(
         item.user_id,
         evidence.merchant,
         evidence.type,
         evidence.date,
         categories,
-        history
+        history,
+        contact
       )
     : null;
   const proposal = buildInboxAnalysisProposal(
@@ -238,6 +244,7 @@ export function buildDeterministicInboxAnalysisProposal(
     proposal.analysis_details.analysis_source = proposal.analysis_details.applied_rules.length
       ? 'automation'
       : 'history';
+    if (match.contactId) proposal.analysis_details.contact_id = match.contactId;
     proposal.analysis_details.history_fields = ['categoryId'];
     proposal.analysis_details.evidence_ids = match.evidenceIds;
   }
