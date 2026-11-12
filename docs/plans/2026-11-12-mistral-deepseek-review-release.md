@@ -1,5 +1,7 @@
 # Mistral OCR + DeepSeek: review release
 
+This is the pre-publication implementation record. For current deployment status, use [the publication record](2026-11-12-production-publication.md); for available features and explicit native/pipeline gaps, use [the acceptance guide](2026-11-12-web-mobile-acceptance.md). Historical statements below about authorization, migrations and local port 3107 are superseded by those records.
+
 ## Scope
 
 The owner selected Mistral OCR with DeepSeek on 12 November 2026. This release implements an explicit optional extraction action for PDF statements and image receipts. It does not automatically switch existing extraction, post transactions, replay old documents, or deploy mobile changes. The accepted currency carousel remains in the web account-detail view.
