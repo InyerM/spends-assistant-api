@@ -330,3 +330,56 @@ it('does not auto-resolve contact classification when exact-history conflict che
   expect(mock.suggest).toHaveBeenCalledTimes(1);
   expect(mock.consent).toHaveBeenCalled();
 });
+
+it('proposes only the known destination category for the literal undated inbox transfer before AI', async () => {
+  const raw = 'Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403';
+  mock.item.mockResolvedValue({
+    id: 'item',
+    user_id: 'owner',
+    source: 'native-bank-message',
+    status: 'pending',
+    raw_text: raw,
+    received_at: '2026-11-12T12:00:00Z'
+  });
+  mock.accounts.mockResolvedValue([createMockAccount({ user_id: 'owner', last_four: '2651' })]);
+  mock.categories.mockResolvedValue([
+    createMockCategory({ id: 'barber', user_id: 'owner', name: 'Barbería' })
+  ]);
+  mock.contactHistory.mockResolvedValue({
+    contactId: 'destination',
+    identityKind: 'account',
+    identityValue: '3243466403',
+    label: 'Mi barbería',
+    rows: ['one', 'two'].map((id) => ({
+      id,
+      user_id: 'owner',
+      contact_id: 'destination',
+      description: 'Haircut',
+      type: 'expense',
+      date: '2026-11-01',
+      category_id: 'barber'
+    }))
+  });
+  await processInboxAnalysisLease(lease, createMockEnv());
+  expect(mock.contactHistory).toHaveBeenCalledWith('owner', raw, 'expense', '2026-11-12');
+  expect(mock.complete).toHaveBeenCalledWith(
+    lease,
+    expect.objectContaining({
+      status: 'needs_review',
+      merchant: null,
+      category_id: 'barber',
+      category_source: 'review_context',
+      amount: 30000,
+      bank_event_at: null,
+      description: 'Transferencia a Mi barbería',
+      analysis_details: expect.objectContaining({
+        event_date: null,
+        history_fields: expect.arrayContaining(['categoryId']),
+        evidence_ids: ['one', 'two']
+      })
+    })
+  );
+  expect(mock.consent).not.toHaveBeenCalled();
+  expect(mock.reserve).not.toHaveBeenCalled();
+  expect(mock.suggest).not.toHaveBeenCalled();
+});

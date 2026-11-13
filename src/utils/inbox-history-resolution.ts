@@ -69,6 +69,9 @@ function resolveCategoryHistory(
 export interface VerifiedContactHistory {
   contactId: string | null;
   ambiguous?: boolean;
+  identityKind?: string;
+  identityValue?: string;
+  label?: string;
   rows: Array<ExactCategoryHistory & { contact_id: string; notes?: string | null }>;
 }
 export function resolveInboxHistoryCategory(

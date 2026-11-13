@@ -6,7 +6,9 @@ import { suggestForwardedEmail } from '../ai/forwarded-email-suggestion';
 import { extractEmailEventEvidence } from '../utils/email-event-evidence';
 import {
   buildDeterministicInboxAnalysisProposal,
-  buildInboxAnalysisProposal
+  buildInboxAnalysisProposal,
+  buildPartialInboxHistoryProposal,
+  inboxHistoryCutoff
 } from '../utils/inbox-analysis-proposal';
 
 /** Generates review suggestions only. SQL leases guard replay and discarded captures. */
@@ -56,6 +58,7 @@ export async function processInboxAnalysisLease(
       await services.inboxAnalysis.complete(lease, deterministic);
       return;
     }
+    const historyCutoff = inboxHistoryCutoff(item);
     const completeEvidence =
       !evidence.ambiguous &&
       evidence.merchant &&
@@ -65,14 +68,14 @@ export async function processInboxAnalysisLease(
       evidence.amount &&
       evidence.sourceLastFour;
     const [contact, exactHistory] = await Promise.all([
-      !evidence.ambiguous && evidence.type && evidence.date
+      !evidence.ambiguous && evidence.type && historyCutoff
         ? services.categoryReviewContext
-            .verifiedContactHistory(lease.user_id, item.raw_text, evidence.type, evidence.date)
+            .verifiedContactHistory(lease.user_id, item.raw_text, evidence.type, historyCutoff)
             .catch(() => ({ contactId: null, rows: [], ambiguous: true }))
         : Promise.resolve(null),
-      completeEvidence
+      !evidence.ambiguous && evidence.merchant && evidence.type && historyCutoff
         ? services.categoryReviewContext
-            .exactCategoryHistory(lease.user_id, evidence.merchant!, evidence.type!, evidence.date!)
+            .exactCategoryHistory(lease.user_id, evidence.merchant, evidence.type, historyCutoff)
             .catch(() => null)
         : Promise.resolve([])
     ]);
@@ -91,6 +94,22 @@ export async function processInboxAnalysisLease(
         return;
       }
     }
+    if (historyCutoff && exactHistory) {
+      const partial = buildPartialInboxHistoryProposal(
+        item,
+        accounts,
+        categories,
+        rules,
+        services.automationRules,
+        historyCutoff,
+        exactHistory,
+        contact
+      );
+      if (partial) {
+        await services.inboxAnalysis.complete(lease, partial);
+        return;
+      }
+    }
     await services.aiConsent.require(lease.user_id, scope);
     const lexicalHistory = await services.categoryReviewContext.history(
       lease.user_id,
@@ -105,8 +124,8 @@ export async function processInboxAnalysisLease(
                 row.user_id === lease.user_id &&
                 row.contact_id === contact.contactId &&
                 row.type === evidence.type &&
-                row.date <= (evidence.date ?? '') &&
-                Date.parse(evidence.date ?? '') - Date.parse(row.date) <= 180 * 86400000
+                row.date <= (historyCutoff ?? '') &&
+                Date.parse(historyCutoff ?? '') - Date.parse(row.date) <= 180 * 86400000
             )
             .flatMap((row) => {
               const category = categories.find(

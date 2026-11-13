@@ -55,6 +55,13 @@ it('scans every confirmed transaction idempotently without changing financial ro
         )
       ).rows[0]
     ).toMatchObject({ evidence: { status: 'found', kind: 'merchant', value: 'acme s.a.s.' } });
+    expect(
+      (
+        await db.query('SELECT public.counterparty_evidence($1) evidence', [
+          'Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403'
+        ])
+      ).rows[0]
+    ).toMatchObject({ evidence: { status: 'found', kind: 'account', value: '3243466403' } });
     const before = (await db.query('SELECT * FROM transactions ORDER BY id')).rows;
     await db.query('SELECT public.scan_counterparty_catalog(null,200)');
     await db.query('SELECT public.scan_counterparty_catalog(null,200)');

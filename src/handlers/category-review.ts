@@ -1,5 +1,6 @@
 import { ReviewTransactionNotFoundError } from '../services/supabase/category-review-context.service';
-import { reviewCategory, type CategoryReviewInput } from '../ai/category-review';
+import type { CategoryReviewInput } from '../ai/category-review';
+import { reviewCategoryProposal, CategoryReviewQuotaError } from '../services/category-review';
 import { OpenRouterError } from '../ai/openrouter';
 import { createSupabaseServices } from '../services/supabase';
 import { resolveUserId, unauthorizedResponse } from '../utils/auth';
@@ -15,6 +16,19 @@ function validInput(value: unknown): value is CategoryReviewInput {
     v.description.length <= 500 &&
     (v.notes === undefined || (typeof v.notes === 'string' && v.notes.length <= 1500)) &&
     (v.excerpt === undefined || (typeof v.excerpt === 'string' && v.excerpt.length <= 3000)) &&
+    (v.review_fields === undefined ||
+      (Array.isArray(v.review_fields) &&
+        v.review_fields.length > 0 &&
+        v.review_fields.length <= 3 &&
+        new Set(v.review_fields).size === v.review_fields.length &&
+        v.review_fields.every((field) =>
+          ['category', 'description', 'notes'].includes(String(field))
+        ))) &&
+    (v.event_date === undefined ||
+      (typeof v.event_date === 'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(v.event_date) &&
+        Number.isFinite(Date.parse(v.event_date)) &&
+        new Date(v.event_date).toISOString().slice(0, 10) === v.event_date)) &&
     (v.account_type === undefined ||
       (typeof v.account_type === 'string' && v.account_type.length <= 30)) &&
     (v.category_id === undefined || typeof v.category_id === 'string') &&
@@ -51,72 +65,11 @@ export async function handleCategoryReview(request: Request, env: Env): Promise<
     const input: unknown = await request.json().catch(() => null);
     if (!validInput(input))
       return Response.json({ error: 'Invalid review context' }, { status: 400 });
-    await services.aiUsage.requireConsent(userId, 'financial_text');
-    const [categories, history, rules] = await Promise.all([
-      services.categories.getCategories(userId),
-      services.categoryReviewContext.reviewHistory(
-        userId,
-        input.description,
-        input.type,
-        input.transaction_id,
-        input.notes
-      ),
-      services.automationRules.getAutomationRules(userId)
-    ]);
-    const categoryRule = rules.find(
-      (rule) =>
-        rule.rule_type !== 'account_detection' &&
-        !rule.conditions.to_account &&
-        (!rule.conditions.category || rule.conditions.category === input.category_id) &&
-        rule.actions.set_category &&
-        (!rule.actions.set_type || rule.actions.set_type === input.type) &&
-        categories.some(
-          (category) => category.id === rule.actions.set_category && category.type === input.type
-        ) &&
-        services.automationRules.matchesConditions(
-          {
-            description: input.description,
-            raw_text: input.excerpt,
-            amount: input.amount,
-            account_id: input.account_id,
-            source: input.source,
-            category_id: input.category_id
-          },
-          rule.conditions,
-          rule.condition_logic
-        )
-    );
-    const context = {
-      preferences: rules
-        .map((rule) => rule.prompt_text?.slice(0, 1000))
-        .filter((value): value is string => Boolean(value))
-        .slice(0, 12),
-      ...(categoryRule?.actions.set_category
-        ? {
-            categoryRule: {
-              category_id: categoryRule.actions.set_category,
-              name: categoryRule.name.slice(0, 100)
-            }
-          }
-        : {})
-    };
-    const quota = await services.usage.incrementAiParses(userId);
-    if (!quota.allowed) return Response.json({ error: 'Parse limit reached' }, { status: 429 });
-    const model = env.OPENROUTER_TEXT_MODEL ?? 'deepseek/deepseek-v4.1-flash';
-    const result = await services.aiUsage.track(
-      { userId, operation: 'parse_expense', model },
-      (meter) =>
-        reviewCategory(
-          { ...input, history },
-          categories,
-          env.OPENROUTER_API_KEY,
-          model,
-          meter,
-          context
-        )
-    );
+    const result = await reviewCategoryProposal(userId, input, env, services);
     return Response.json(result, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
+    if (error instanceof CategoryReviewQuotaError)
+      return Response.json({ error: 'Parse limit reached' }, { status: 429 });
     if (error instanceof ReviewTransactionNotFoundError)
       return Response.json({ error: 'Review transaction not found' }, { status: 404 });
     const consentResponse = aiConsentErrorResponse(error);

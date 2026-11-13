@@ -262,3 +262,115 @@ export function buildDeterministicInboxAnalysisProposal(
     ? proposal
     : null;
 }
+
+/** The capture timestamp bounds history lookup; it is never a bank-event fact. */
+export function inboxHistoryCutoff(item: InboxAnalysisItem, now = Date.now()): string | null {
+  const evidence = extractEmailEventEvidence(item.raw_text);
+  if (evidence.date) return evidence.date;
+  const received = Date.parse(item.received_at);
+  return Number.isFinite(received) && received <= now
+    ? new Date(received).toISOString().slice(0, 10)
+    : null;
+}
+
+/** Classify an incomplete capture without manufacturing the missing posting facts. */
+export function buildPartialInboxHistoryProposal(
+  item: InboxAnalysisItem,
+  accounts: Account[],
+  categories: Category[],
+  rules: AutomationRule[],
+  matcher: Pick<AutomationRulesService, 'matchesConditions' | 'findUniqueAccountDetectionRule'>,
+  cutoff: string,
+  history: ExactCategoryHistory[],
+  contact?: VerifiedContactHistory | null
+): InboxAnalysisProposal | null {
+  const evidence = extractEmailEventEvidence(item.raw_text);
+  if (evidence.ambiguous || !evidence.type) return null;
+  const destinations = new Set(
+    [
+      ...item.raw_text.matchAll(
+        /\b(?:a (?:la )?cuenta|transfer to|destino)\s*\*?([0-9]{8,18})\b/giu
+      )
+    ].map((match) => match[1])
+  );
+  const knownDestination =
+    contact &&
+    !contact.ambiguous &&
+    contact.contactId &&
+    contact.identityKind === 'account' &&
+    destinations.size === 1 &&
+    destinations.has(contact.identityValue ?? '');
+  if (!evidence.merchant && !knownDestination) return null;
+  if (
+    contact?.identityValue &&
+    accounts.some(
+      (account) =>
+        account.user_id === item.user_id &&
+        [
+          account.last_four,
+          ...(account.identifiers ?? []).filter((id) => id.is_active).map((id) => id.last_four)
+        ].some(
+          (suffix) =>
+            typeof suffix === 'string' &&
+            /^\d{4}$/.test(suffix) &&
+            contact.identityValue!.endsWith(suffix)
+        )
+    )
+  )
+    return null;
+  if (
+    /\b(?:cuentas propias|entre mis cuentas|entre tus cuentas|own accounts|my accounts)\b/iu.test(
+      item.raw_text
+    )
+  )
+    return null;
+  const match = resolveInboxHistoryCategory(
+    item.user_id,
+    evidence.merchant ?? '',
+    evidence.type,
+    cutoff,
+    categories,
+    history,
+    contact
+  );
+  if (!match) return null;
+  const label = knownDestination && evidence.type === 'expense' ? contact.label?.trim() : null;
+  const proposal = buildInboxAnalysisProposal(
+    item,
+    {
+      type: evidence.type,
+      categoryId: match.categoryId,
+      categorySource: 'review_context',
+      description: label
+        ? `Transferencia a ${label}`
+        : (evidence.merchant ?? item.raw_text.slice(0, 150)),
+      notes: null,
+      bankEventAt: validateEmailEventTime(
+        item.raw_text,
+        evidence.date,
+        evidence.time,
+        emailEventBody(item.raw_text)
+      ),
+      amount: evidence.amount,
+      eventDate: evidence.date,
+      sourceLastFour: evidence.sourceLastFour,
+      evidenceIds: match.evidenceIds,
+      explanation:
+        'El historial coincidente respalda esta categoría. Revisa los datos del movimiento antes de confirmarlo.'
+    },
+    accounts,
+    categories,
+    rules,
+    matcher
+  );
+  proposal.status = 'needs_review';
+  if (proposal.category_source === 'review_context') {
+    proposal.analysis_details.analysis_source = proposal.analysis_details.applied_rules.length
+      ? 'automation'
+      : 'history';
+    proposal.analysis_details.history_fields = ['categoryId'];
+    proposal.analysis_details.evidence_ids = match.evidenceIds;
+    if (match.contactId) proposal.analysis_details.contact_id = match.contactId;
+  }
+  return proposal;
+}

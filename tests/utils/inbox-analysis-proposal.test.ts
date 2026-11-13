@@ -470,3 +470,145 @@ it('evaluates category-dependent rules against an exact history candidate before
   );
   expect(proposal?.category_id).toBe('override');
 });
+
+it('uses received time only as a bounded lookup cutoff, never as an event fact', async () => {
+  const { inboxHistoryCutoff } = await import('../../src/utils/inbox-analysis-proposal');
+  const undated = {
+    ...item,
+    raw_text: 'Transferencia desde cuenta *2651 a la cuenta *3243466403',
+    received_at: '2026-11-12T10:00:00Z'
+  };
+  const now = Date.parse('2026-11-12T12:00:00Z');
+  expect(inboxHistoryCutoff(undated, now)).toBe('2026-11-12');
+  expect(inboxHistoryCutoff({ ...undated, received_at: 'invalid' }, now)).toBeNull();
+  expect(inboxHistoryCutoff({ ...undated, received_at: '2026-11-13T00:00:00Z' }, now)).toBeNull();
+  expect(inboxHistoryCutoff({ ...item, received_at: 'invalid' }, now)).toBe('2026-10-02');
+});
+
+it('keeps explicit rule clearing above partial history and leaves every missing fact empty', async () => {
+  const { buildPartialInboxHistoryProposal } = await import(
+    '../../src/utils/inbox-analysis-proposal'
+  );
+  const capture = {
+    ...item,
+    raw_text: 'Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403'
+  };
+  const contact = {
+    contactId: 'destination',
+    identityKind: 'account',
+    identityValue: '3243466403',
+    label: 'Mi barbería',
+    rows: ['one', 'two'].map((id) => ({
+      id,
+      user_id: owner,
+      contact_id: 'destination',
+      description: 'Haircut',
+      type: 'expense',
+      date: '2026-10-01',
+      category_id: 'cat-1'
+    }))
+  };
+  const result = buildPartialInboxHistoryProposal(
+    capture,
+    [],
+    [createMockCategory({ user_id: owner })],
+    [createMockRule({ user_id: owner, conditions: {}, actions: { set_category: null } })],
+    rulesService,
+    '2026-10-02',
+    [],
+    contact
+  );
+  expect(result).toMatchObject({
+    status: 'needs_review',
+    category_id: null,
+    amount: 30000,
+    merchant: null,
+    bank_event_at: null,
+    account_id: null,
+    analysis_details: { event_date: null, automation_fields: ['categoryId'] }
+  });
+  expect(capture.raw_text).toBe(
+    'Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403'
+  );
+  expect(
+    buildPartialInboxHistoryProposal(
+      capture,
+      [createMockAccount({ user_id: owner, last_four: '6403' })],
+      [createMockCategory({ user_id: owner })],
+      [],
+      rulesService,
+      '2026-10-02',
+      [],
+      contact
+    )
+  ).toBeNull();
+  expect(
+    buildPartialInboxHistoryProposal(
+      capture,
+      [],
+      [createMockCategory({ user_id: owner })],
+      [],
+      rulesService,
+      '2026-10-02',
+      [],
+      { ...contact, ambiguous: true }
+    )
+  ).toBeNull();
+  expect(
+    buildPartialInboxHistoryProposal(
+      capture,
+      [],
+      [createMockCategory({ user_id: owner })],
+      [],
+      rulesService,
+      '2026-10-02',
+      [],
+      {
+        ...contact,
+        rows: contact.rows.map((row, index) => ({ ...row, category_id: index ? 'other' : 'cat-1' }))
+      }
+    )
+  ).toBeNull();
+});
+
+it('preserves an explicit validated event timestamp even when the account still needs review', async () => {
+  const { buildPartialInboxHistoryProposal } = await import(
+    '../../src/utils/inbox-analysis-proposal'
+  );
+  const capture = {
+    ...item,
+    raw_text:
+      'Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403 el 02/10/2026 a las 14:30'
+  };
+  const contact = {
+    contactId: 'destination',
+    identityKind: 'account',
+    identityValue: '3243466403',
+    rows: ['one', 'two'].map((id) => ({
+      id,
+      user_id: owner,
+      contact_id: 'destination',
+      description: 'Haircut',
+      type: 'expense',
+      date: '2026-10-01',
+      category_id: 'cat-1'
+    }))
+  };
+  expect(
+    buildPartialInboxHistoryProposal(
+      capture,
+      [],
+      [createMockCategory({ user_id: owner })],
+      [],
+      rulesService,
+      '2026-10-02',
+      [],
+      contact
+    )
+  ).toMatchObject({
+    status: 'needs_review',
+    bank_event_at: '2026-10-02T14:30:00-05:00',
+    account_id: null,
+    analysis_details: { event_date: '2026-10-02' }
+  });
+});

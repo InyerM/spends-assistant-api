@@ -366,3 +366,266 @@ it('rejects foreign or conflicting catalog identities before reading linked tran
     vi.unstubAllGlobals();
   }
 });
+
+it('resolves the full original destination to consistent Barbería history without rewriting evidence', async () => {
+  const original = 'Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403';
+  const service = new CategoryReviewContextService('https://db.test', 'secret');
+  const contact = vi.spyOn(service, 'verifiedContactHistory').mockResolvedValue({
+    contactId: 'destination',
+    rows: ['one', 'two'].map((id) => ({
+      id,
+      user_id: 'owner',
+      description: 'Transferencia anterior',
+      notes: null,
+      type: 'expense',
+      date: '2026-11-01',
+      category_id: 'barber',
+      contact_id: 'destination'
+    }))
+  });
+  vi.spyOn(service, 'exactCategoryHistory').mockResolvedValue([]);
+  const categories = [
+    {
+      id: 'barber',
+      user_id: 'owner',
+      name: 'Barbería',
+      slug: 'barber',
+      type: 'expense',
+      is_active: true
+    }
+  ];
+  const result = await service.evidenceReview(
+    'owner',
+    {
+      locale: 'es',
+      type: 'expense',
+      description: original,
+      excerpt: original,
+      event_date: '2026-11-12',
+      history: []
+    },
+    categories as never
+  );
+  expect(contact).toHaveBeenCalledWith('owner', original, 'expense', '2026-11-12');
+  expect(result).toMatchObject({ categoryId: 'barber', evidenceIds: ['one', 'two'] });
+  expect(original).toBe('Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403');
+});
+
+it.each([{ event_date: undefined }, { account_type: 'credit_card', type: 'income' }])(
+  'abstains from deterministic contact categorization for unsafe context %j',
+  async (changes) => {
+    const service = new CategoryReviewContextService('https://db.test', 'secret');
+    const lookup = vi.spyOn(service, 'verifiedContactHistory');
+    expect(
+      await service.evidenceReview(
+        'owner',
+        {
+          locale: 'es',
+          type: 'expense',
+          description: 'Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403',
+          event_date: '2026-11-12',
+          history: [],
+          ...changes
+        } as never,
+        []
+      )
+    ).toBeNull();
+    expect(lookup).not.toHaveBeenCalled();
+  }
+);
+
+it('abstains when the exact destination has conflicting historical categories', async () => {
+  const original = 'Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403';
+  const service = new CategoryReviewContextService('https://db.test', 'secret');
+  vi.spyOn(service, 'verifiedContactHistory').mockResolvedValue({
+    contactId: 'destination',
+    rows: ['barber', 'other'].map((category_id, i) => ({
+      id: String(i),
+      user_id: 'owner',
+      description: 'Previous',
+      type: 'expense',
+      date: '2026-11-01',
+      category_id,
+      contact_id: 'destination'
+    }))
+  });
+  vi.spyOn(service, 'exactCategoryHistory').mockResolvedValue([]);
+  expect(
+    await service.evidenceReview(
+      'owner',
+      {
+        locale: 'es',
+        type: 'expense',
+        description: original,
+        excerpt: original,
+        event_date: '2026-11-12',
+        history: []
+      },
+      [
+        { id: 'barber', user_id: 'owner', slug: 'barber', type: 'expense', is_active: true }
+      ] as never
+    )
+  ).toMatchObject({ categoryId: null, history: expect.any(Array) });
+});
+
+it.each([
+  { type: 'expense', accounts: [], expected: 'Transferencia a Mi barbería' },
+  { type: 'expense', accounts: [{ user_id: 'owner', last_four: '6403' }], expected: null },
+  { type: 'income', accounts: [], expected: undefined }
+])(
+  'recognizes an owner alias only for an outgoing full destination and vetoes own accounts: %j',
+  async ({ type, accounts, expected }) => {
+    const original = 'Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403';
+    const service = new CategoryReviewContextService('https://db.test', 'secret');
+    vi.spyOn(service, 'verifiedContactHistory').mockResolvedValue({
+      contactId: 'destination',
+      identityKind: 'account',
+      identityValue: '3243466403',
+      label: 'Mi barbería',
+      rows: ['one', 'two'].map((id) => ({
+        id,
+        user_id: 'owner',
+        description: 'Previous',
+        type,
+        date: '2026-11-01',
+        category_id: 'barber',
+        contact_id: 'destination'
+      }))
+    } as never);
+    vi.spyOn(service, 'exactCategoryHistory').mockResolvedValue([]);
+    const result = await service.evidenceReview(
+      'owner',
+      {
+        locale: 'es',
+        type,
+        description: original,
+        excerpt: original,
+        event_date: '2026-11-12',
+        history: []
+      } as never,
+      [{ id: 'barber', user_id: 'owner', slug: 'barber', type, is_active: true }] as never,
+      accounts as never
+    );
+    if (expected === null) expect(result).toBeNull();
+    else expect(result?.description).toBe(expected);
+  }
+);
+
+it('uses exact contact history as AI context with explicit notes without forcing their old category', async () => {
+  const original = 'Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403';
+  const service = new CategoryReviewContextService('https://db.test', 'secret');
+  vi.spyOn(service, 'verifiedContactHistory').mockResolvedValue({
+    contactId: 'destination',
+    rows: ['one', 'two'].map((id) => ({
+      id,
+      user_id: 'owner',
+      description: 'Haircut',
+      notes: 'Previous purpose',
+      type: 'expense',
+      date: '2026-11-01',
+      category_id: 'barber',
+      contact_id: 'destination'
+    }))
+  });
+  vi.spyOn(service, 'exactCategoryHistory').mockResolvedValue([]);
+  const result = await service.evidenceReview(
+    'owner',
+    {
+      locale: 'es',
+      type: 'expense',
+      description: original,
+      notes: 'Different explicit current purpose',
+      excerpt: original,
+      event_date: '2026-11-12',
+      history: []
+    },
+    [
+      {
+        id: 'barber',
+        user_id: 'owner',
+        name: 'Barbería',
+        slug: 'barber',
+        type: 'expense',
+        is_active: true
+      }
+    ] as never
+  );
+  expect(result).toMatchObject({
+    categoryId: null,
+    history: [
+      { id: 'one', description: 'Haircut', notes: 'Previous purpose', category: 'Barbería' },
+      { id: 'two', description: 'Haircut', notes: 'Previous purpose', category: 'Barbería' }
+    ]
+  });
+});
+
+it('excludes the currently reviewed transaction from both exact and contact queries', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValue(
+        Response.json([
+          { id: 'current', user_id: 'owner', date: '2026-11-12', raw_text: 'Original' }
+        ])
+      )
+  );
+  const service = new CategoryReviewContextService('https://db.test', 'secret');
+  const contact = vi.spyOn(service, 'verifiedContactHistory').mockResolvedValue(null);
+  const exact = vi.spyOn(service, 'exactCategoryHistory').mockResolvedValue([]);
+  await service.evidenceReview(
+    'owner',
+    {
+      locale: 'es',
+      type: 'expense',
+      description: 'Original',
+      transaction_id: 'current',
+      event_date: '1990-01-01',
+      excerpt: 'Forged editable raw text',
+      history: []
+    },
+    []
+  );
+  expect(contact).toHaveBeenCalledWith('owner', 'Original', 'expense', '2026-11-12', 'current');
+  expect(exact).toHaveBeenCalledWith('owner', 'Original', 'expense', '2026-11-12', 'current');
+  vi.unstubAllGlobals();
+});
+
+it('vetoes a complete own destination even when internal transfers have no contact catalog record', async () => {
+  const original = 'Transferencia de $30,000.00 desde cuenta *2651 a la cuenta *3243466403';
+  const service = new CategoryReviewContextService('https://db.test', 'secret');
+  vi.spyOn(service, 'verifiedContactHistory').mockResolvedValue(null);
+  vi.spyOn(service, 'exactCategoryHistory').mockResolvedValue(
+    ['one', 'two'].map((id) => ({
+      id,
+      user_id: 'owner',
+      description: original,
+      type: 'expense',
+      date: '2026-11-01',
+      category_id: 'barber'
+    }))
+  );
+  expect(
+    await service.evidenceReview(
+      'owner',
+      {
+        locale: 'es',
+        type: 'expense',
+        description: original,
+        event_date: '2026-11-12',
+        history: []
+      },
+      [
+        {
+          id: 'barber',
+          user_id: 'owner',
+          name: 'Barbería',
+          slug: 'barber',
+          type: 'expense',
+          is_active: true
+        }
+      ] as never,
+      [{ user_id: 'owner', last_four: '6403' }] as never
+    )
+  ).toBeNull();
+});
