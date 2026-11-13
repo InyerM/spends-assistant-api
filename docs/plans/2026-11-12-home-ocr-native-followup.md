@@ -1,5 +1,19 @@
 # Home currency, statement OCR and native follow-up
 
+## Latest release: cash-flow paging and partial inbox history
+
+This section supersedes the compact-header acceptance instructions below. On 12 November, the owner selected Cash Flow as the ARQ-style paging card. Web `767fba5` embeds currency dots, arrows and horizontal swipe in that existing summary card; Income and Expenses share its selected currency. The header control remains only when the summary widget is hidden. Negative amounts retain their sign and loading does not show a stale amount. The contact-name editor exposes the unchanged financial identity separately from its editable alias.
+
+Backend `9eeae40` fixes the reported **Inbox** case: missing merchant/date/time no longer prevents an exact owned destination from using consistent linked history for a partial category suggestion. A capture timestamp is only a lookup cutoff, never an invented bank-event timestamp. Rules retain priority; suggestions remain review drafts. Web `ae32ed3` also forwards event dates and preserves per-field provenance for statement and existing-transaction review. Details and limits are in [the inbox report](../audits/2026-11-12-inbox-history-review.md).
+
+The frozen regression passed 157 backend files / 1,234 tests and 302 web files / 1,651 tests. Types, lint, clean production build and four isolated compiled OCR-package checks passed. Evidence: `/tmp/anotto-barber-history-integrated-20261112/checks.json`. Independent reviews covered the partial-history boundary and requested-field merges. UI fixtures at 320/390/1440px verified paging, signed long amounts and no page overflow (`/tmp/anotto-flow-ui-20261112/final-checks.json`).
+
+Published Worker `893b3760-c12d-47b1-ad5b-7f03f4ff92eb` returned health 200. Web deployment `dpl_GHnr4br8fZHDunqC9izynLhcKMew` is READY; the production alias `my.anotto.app` was independently verified and login returned 200. Local port 3000 now serves the integrated tested artifact at `/tmp/anotto-barber-history-integrated-20261112/web`.
+
+For acceptance, refresh Home and change currency inside Cash Flow. In Inbox, explicitly refresh/reanalyze a previously stored proposal: deployment does not rewrite cached analyses or transactions. The literal transfer test used synthetic linked Barbería history. A bounded read-only query under normal TEST_USER authentication found no matching capture, so the reported owner's real history remains unverified (`/tmp/anotto-inbox-owner-readonly-result-20261112.json`). No financial posting or provider call was used for this release's validation.
+
+Corresponding native Cash Flow paging and the optional individual phone-contact name picker started after this web release. Previous compact-header physical/simulator artifacts remain obsolete for the newest Home design. Native completion and device installation are not claimed here. Residual security work remains listed in [the next gates](2026-11-12-security-next-gates.md).
+
 ## Scope and visibility correction
 
 The earlier carousel existed only in web account detail and exposed navigation only for multiple ledgers. The owner expected the ARQ-style currency interaction on Home. The first web change added a separate current-account-balance carousel on Home. The owner rejected its size and approved one compact shared control. The current web release replaces that extra section with a 46px-high currency pager beside the Home heading, connected to transaction queries, summary amounts, category/nature charts and recent transactions. Balances remain in their native currency; no exchange rate or cross-currency sum is introduced.
